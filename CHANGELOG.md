@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.7.3
+- **Fix:** the server badge now appears where you choose (top right by default) instead of getting stuck in the top-left corner behind Roblox's menu button.
+
 ## v1.7.2
 - Internal: better on-screen checks for the server badge in the automatic Windows tests.
 

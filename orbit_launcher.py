@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.7.2"
+APP_VERSION = "1.7.3"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2324,21 +2324,10 @@ def show_badge_window(title, body):
     for t, f, col in parts:
         cv.create_text(x, cy, text=t, anchor="w", font=f, fill=col)
         x += f.measure(t)
-    root.geometry(f"{w}x{h}+0+0")
-    root.deiconify()
-    root.update_idletasks()
-    hwnd = _no_activate(root)
-    if hwnd and IS_WINDOWS:
-        try:
-            u = ctypes.windll.user32
-            style = u.GetWindowLongW(hwnd, -20)
-            u.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
-        except Exception:
-            pass
-    state = {"alpha": 0.0, "xy": None}
+    state = {"alpha": 0.0, "xy": None, "hwnd": None}
     peak = 0.86
 
-    def place():
+    def target_xy():
         rect = roblox_rect() or (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
         L, T, R, B = rect
         margin, top = 12, 66
@@ -2352,11 +2341,43 @@ def show_badge_window(title, body):
             xy = (L + (R - L - w) // 2, T + 8)
         else:
             xy = (R - w - margin, T + top)
-        if xy != state["xy"]:
-            if state["xy"] is None:
-                log(f"Badge placed at {xy} ({w}x{h}, {pos}, anchored to {'Roblox' if roblox_rect() else 'screen'} {rect})")
-            state["xy"] = xy
+        return xy, rect
+
+    def place():
+        xy, rect = target_xy()
+        if xy == state["xy"]:
+            return
+        state["xy"] = xy
+        moved = False
+        if state["hwnd"] and IS_WINDOWS:
+            try:
+                u = ctypes.windll.user32
+                u.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+                moved = bool(u.SetWindowPos(state["hwnd"], ctypes.c_void_p(-1), xy[0], xy[1], 0, 0,
+                                            0x0001 | 0x0010 | 0x0040))
+            except Exception:
+                moved = False
+        if not moved:
             root.geometry(f"{w}x{h}+{xy[0]}+{xy[1]}")
+
+    first_xy, first_rect = target_xy()
+    state["xy"] = first_xy
+    root.geometry(f"{w}x{h}+{first_xy[0]}+{first_xy[1]}")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    state["hwnd"] = hwnd
+    if hwnd and IS_WINDOWS:
+        try:
+            u = ctypes.windll.user32
+            style = u.GetWindowLongW(hwnd, -20)
+            u.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+        state["xy"] = None
+        place()
+    log(f"Badge placed at {first_xy} ({w}x{h}, {pos}, anchored to {'Roblox' if roblox_rect() else 'screen'} {first_rect})")
 
     def tick():
         try:
