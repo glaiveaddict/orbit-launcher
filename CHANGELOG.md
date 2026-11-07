@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.5
+- **Fix:** restarting after an update no longer shows "Orbit couldn't open its window" or "Failed to remove temporary directory". Each copy of Orbit now starts with its own clean files.
+- **Fix:** closing Orbit while you're in a game no longer breaks session tracking.
+
 ## v1.6.4
 - **Fix:** the title bar (minimize, maximize and close) is no longer cut off at the top of the window. The maximize button still makes Orbit fill the screen.
 

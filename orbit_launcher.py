@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.4"
+APP_VERSION = "1.6.5"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -222,6 +222,25 @@ def fetch_json(url, timeout=8):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def child_env(extra=None):
+    env = {k: v for k, v in os.environ.items()
+           if not (k.startswith("_PYI") or k.startswith("_MEI") or k in ("PYINSTALLER_RESET_ENVIRONMENT", "ORBIT_REEXEC"))}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    if is_frozen():
+        mei = str(getattr(sys, "_MEIPASS", ""))
+        if mei:
+            env["PATH"] = os.pathsep.join(x for x in env.get("PATH", "").split(os.pathsep) if x and mei not in x)
+    env.update(extra or {})
+    return env
+
+
+def stale_extraction():
+    if not is_frozen() or os.environ.get("ORBIT_REEXEC"):
+        return False
+    built = (build_info() or {}).get("version")
+    return bool(built) and built != APP_VERSION
+
+
 def sys_tool(name):
     root = Path(os.environ.get("SystemRoot") or os.environ.get("windir") or r"C:\Windows")
     known = {"powershell": root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe",
@@ -263,7 +282,7 @@ def self_command(*args):
 
 def spawn_self(*args):
     try:
-        subprocess.Popen(self_command(*args), creationflags=CREATE_NO_WINDOW)
+        subprocess.Popen(self_command(*args), creationflags=CREATE_NO_WINDOW, env=child_env())
     except OSError as e:
         log(f"Could not start {args[:1]}: {e}")
 
@@ -877,7 +896,7 @@ def start_companions(settings):
         if not path.is_file() or process_running(path.name):
             continue
         try:
-            subprocess.Popen([str(path)], cwd=str(path.parent))
+            subprocess.Popen([str(path)], cwd=str(path.parent), env=child_env())
             started.append(app)
             log(f"Started {path.name}")
         except OSError as e:
@@ -1084,7 +1103,7 @@ def install_extension():
 def open_browser_extensions(browser):
     page = {"chrome": "chrome://extensions", "msedge": "edge://extensions"}[browser]
     if IS_WINDOWS:
-        subprocess.Popen([sys_tool("cmd"), "/c", "start", "", browser, page], creationflags=CREATE_NO_WINDOW)
+        subprocess.Popen([sys_tool("cmd"), "/c", "start", "", browser, page], creationflags=CREATE_NO_WINDOW, env=child_env())
 
 
 def watch_for_updates(settings, known, place_id):
@@ -1124,7 +1143,7 @@ def start_roblox(settings, uri):
     args = [str(exe), uri] if uri else [str(exe), "--app"]
     known = set(all_version_dirs())
     launch_time = time.time()
-    subprocess.Popen(args, cwd=str(exe.parent))
+    subprocess.Popen(args, cwd=str(exe.parent), env=child_env())
     log(f"Started {players[0].name}")
     updater = threading.Thread(target=watch_for_updates, args=(settings, known, place_id), daemon=True)
     updater.start()
@@ -1686,7 +1705,7 @@ def apply_pending_update(restart_args=()):
         (UPDATE_DIR / "OrbitLauncher.exe").unlink(missing_ok=True)
         (UPDATE_DIR / "pending.json").unlink(missing_ok=True)
         log(f"Updated to {version}")
-        subprocess.Popen([sys.executable, *restart_args])
+        subprocess.Popen([sys.executable, *restart_args], env=child_env())
         return True
     except Exception as e:
         log(f"Applying update failed: {e}")
@@ -2155,7 +2174,7 @@ class Api:
 
     def finish_setup(self, launch):
         if launch and INSTALLED_EXE.exists():
-            subprocess.Popen([str(INSTALLED_EXE)])
+            subprocess.Popen([str(INSTALLED_EXE)], env=child_env())
         self._window.destroy()
 
     def live_state(self):
@@ -2245,7 +2264,7 @@ class Api:
 
     def show_in_folder(self, path):
         if _is_screenshot(path) and IS_WINDOWS:
-            subprocess.Popen([sys_tool("explorer"), "/select,", str(Path(path))])
+            subprocess.Popen([sys_tool("explorer"), "/select,", str(Path(path))], env=child_env())
 
     def open_screenshots_folder(self):
         dirs = screenshot_dirs()
@@ -2487,6 +2506,13 @@ def main():
     sys.excepthook = lambda t, e, tb: _log_unhandled("main", t, e, tb)
     threading.excepthook = lambda a: _log_unhandled("thread", a.exc_type, a.exc_value, a.exc_traceback)
     args = sys.argv[1:]
+    if stale_extraction():
+        log(f"Restarting cleanly (started with files from v{build_info().get('version')})")
+        subprocess.Popen([sys.executable, *args], env=child_env({"ORBIT_REEXEC": "1"}))
+        return
+    if "--selftest-spawn" in args:
+        subprocess.Popen([sys.executable, "--selftest"], env=child_env())
+        return
     setup_named = is_frozen() and "setup" in Path(sys.executable).stem.lower()
     if UNINSTALL_FLAG in args:
         run_uninstall()

@@ -72,12 +72,19 @@ jobs:
             cat "selftest-$mode.json" 2>/dev/null || echo "(no self-test result written)"
             echo
           done
+          export ORBIT_SELFTEST_OUT="$PWD/selftest-spawn.json"
+          dist/OrbitLauncher.exe --selftest-spawn
+          for i in $(seq 1 60); do [ -f selftest-spawn.json ] && break; sleep 2; done
+          sleep 3
+          echo "== spawn (restart) test =="
+          cat selftest-spawn.json 2>/dev/null || echo "(no result)"
+          echo
           echo "== launcher.log =="
           cat "$LOCALAPPDATA/OrbitLauncher/launcher.log" 2>/dev/null
           python - <<'PY'
           import json, sys
           ok = True
-          for mode in ("setup", "app"):
+          for mode in ("setup", "app", "spawn"):
               try:
                   r = json.load(open(f"selftest-{mode}.json"))
               except Exception:
