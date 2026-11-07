@@ -83,8 +83,16 @@ jobs:
           import base64, io, sys
           from PIL import ImageGrab
           name = sys.argv[1]
-          img = ImageGrab.grab()
+          img = ImageGrab.grab(include_layered_windows=True)
           W = img.width
+          full = img.convert("RGB"); fp = full.load()
+          hits = [(x, y) for x in range(0, full.width, 2) for y in range(0, min(full.height, 400), 2)
+                  if fp[x, y][2] > 150 and fp[x, y][0] > 90 and fp[x, y][1] < 140]
+          if hits:
+              xs, ys = [h[0] for h in hits], [h[1] for h in hits]
+              print(f"FOUND {name}: {len(hits)} purple samples, box x={min(xs)}-{max(xs)} y={min(ys)}-{max(ys)}, screen {full.size}")
+          else:
+              print(f"FOUND {name}: nothing purple in the top 400px, screen {full.size}")
           box = (W - 460, 40, W, 120) if name == "badge" else (W // 2 - 360, 0, W // 2 + 360, 130)
           crop = img.crop(box).convert("RGB")
           px = crop.load()

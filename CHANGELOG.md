@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.7.2
+- Internal: better on-screen checks for the server badge in the automatic Windows tests.
+
 ## v1.7.1
 - **Fix:** the server badge now recovers from drawing errors instead of silently staying invisible, and logs where it places itself.
 
