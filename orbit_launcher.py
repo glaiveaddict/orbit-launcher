@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
@@ -16,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -37,6 +38,10 @@ OLD_MODS_DIR = DATA_DIR / "Mods"
 LOG_FILE = DATA_DIR / "launcher.log"
 LAST_SERVER_FILE = DATA_DIR / "last_server.json"
 PLAYTIME_FILE = DATA_DIR / "playtime.json"
+SESSIONS_FILE = DATA_DIR / "sessions.json"
+ACHIEVEMENTS_FILE = DATA_DIR / "achievements.json"
+THUMBS_DIR = DATA_DIR / "Thumbs"
+SHOW_FLAG = DATA_DIR / "show.flag"
 ICON_FILE = DATA_DIR / "roblox_icon.ico"
 EXTENSIONS_DIR = DATA_DIR / "Extensions"
 EXTENSION_NAME = "orbit_preview"
@@ -107,6 +112,11 @@ DEFAULT_SETTINGS = {
     "custom_flags": {},
     "game_profiles": {},
     "apply_mods": True,
+    "library": [],
+    "launch_with": [],
+    "performance": {"high_priority": False, "power_plan": False},
+    "sounds": {"pack": "Warp", "volume": 0.6},
+    "last_seen_version": "",
     "mod_profile": "Default",
     "discord": {
         "enabled": False,
@@ -123,6 +133,10 @@ DEFAULT_SETTINGS = {
         "mode": "Dark",
         "accent": "Void",
         "custom_window_icon": False,
+        "background": "Starfield",
+        "bg_file": "",
+        "bg_dim": 0.55,
+        "tray": True,
     },
     "updates": {"auto": True},
     "registration": {"registered": False, "backups": {}},
@@ -259,10 +273,40 @@ def game_info(place_id):
         icons = fetch_json("https://thumbnails.roblox.com/v1/games/icons?universeIds="
                            f"{universe}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false")
         info["icon"] = icons["data"][0].get("imageUrl")
+        info["universe"] = universe
+        try:
+            thumbs = fetch_json("https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds="
+                                f"{universe}&countPerUniverse=1&defaults=true&size=768x432&format=Png&isCircular=false")
+            info["thumb"] = thumbs["data"][0]["thumbnails"][0].get("imageUrl")
+        except Exception:
+            info["thumb"] = None
         _GAME_CACHE[place_id] = info
     except Exception as e:
         log(f"Game lookup failed for {place_id}: {e}")
     return info
+
+
+def list_servers(place_id, pages=3):
+    servers, cursor, note = [], "", None
+    for _ in range(pages):
+        url = (f"https://games.roblox.com/v1/games/{place_id}/servers/Public?sortOrder=Desc"
+               f"&excludeFullGames=true&limit=100" + (f"&cursor={cursor}" if cursor else ""))
+        try:
+            data = fetch_json(url, timeout=10)
+        except urllib.error.HTTPError as e:
+            note = "Roblox is rate-limiting server lists right now. Try again in a minute." if e.code == 429 \
+                else f"Roblox returned an error ({e.code})."
+            break
+        except Exception:
+            note = "Couldn't reach Roblox."
+            break
+        for sv in data.get("data", []):
+            servers.append({"id": sv.get("id"), "playing": sv.get("playing", 0), "max": sv.get("maxPlayers", 0),
+                            "ping": sv.get("ping"), "fps": round(sv.get("fps") or 0, 1)})
+        cursor = data.get("nextPageCursor")
+        if not cursor:
+            break
+    return servers, note
 
 
 def is_public_ip(ip):
@@ -472,11 +516,23 @@ def player_dirs():
     return found
 
 
+def mods_folder_for(settings, place_id=None):
+    if not settings.get("apply_mods", True):
+        return None
+    if place_id is not None:
+        for game in settings.get("library") or []:
+            if str(game.get("pid")) == str(place_id) and game.get("mod_profile"):
+                folder = PROFILES_DIR / game["mod_profile"]
+                if folder.is_dir():
+                    return folder
+    return mods_dir(settings)
+
+
 def apply_all(settings, version_dir=None, place_id=None):
     ensure_dirs()
     dirs = [Path(version_dir)] if version_dir else player_dirs()[:1]
     flags = build_flags(settings, place_id)
-    folder = mods_dir(settings) if settings.get("apply_mods", True) else None
+    folder = mods_folder_for(settings, place_id)
     for d in dirs:
         write_flags(d, flags)
         n = sync_mods(d, folder)
@@ -739,6 +795,94 @@ def record_playtime(place_id, name, seconds):
     save_json(PLAYTIME_FILE, data)
 
 
+def record_session(game, seconds):
+    if seconds < 5:
+        return
+    data = load_json(SESSIONS_FILE, [])
+    if not isinstance(data, list):
+        data = []
+    data.append({"place_id": str(game["place_id"]), "job_id": game.get("job_id"),
+                 "name": game.get("name") or f"Place {game['place_id']}", "start": int(game["joined"]),
+                 "end": int(game["joined"] + seconds), "seconds": int(seconds), "location": game.get("location")})
+    save_json(SESSIONS_FILE, data[-1500:])
+
+
+def process_running(image):
+    if not IS_WINDOWS:
+        return False
+    try:
+        out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {image}", "/NH"], capture_output=True,
+                             text=True, creationflags=CREATE_NO_WINDOW).stdout
+        return image.lower() in out.lower()
+    except Exception:
+        return False
+
+
+class PerfBoost:
+    def __init__(self, perf):
+        self.perf = perf or {}
+        self.prev_scheme = None
+        self.priority_set = False
+
+    @property
+    def active(self):
+        return bool(self.perf.get("high_priority") or self.perf.get("power_plan"))
+
+    def begin(self):
+        if not IS_WINDOWS or not self.perf.get("power_plan"):
+            return
+        try:
+            out = subprocess.run(["powercfg", "/getactivescheme"], capture_output=True, text=True,
+                                 creationflags=CREATE_NO_WINDOW).stdout
+            m = re.search(r"([0-9a-fA-F-]{36})", out)
+            self.prev_scheme = m.group(1) if m else None
+            subprocess.run(["powercfg", "/setactive", "SCHEME_MIN"], capture_output=True, creationflags=CREATE_NO_WINDOW)
+            log("Switched to the high performance power plan")
+        except Exception as e:
+            log(f"Power plan change failed: {e}")
+
+    def tick(self):
+        if self.priority_set or not IS_WINDOWS or not self.perf.get("high_priority") or not roblox_running():
+            return
+        self.priority_set = True
+        subprocess.run(["powershell", "-NoProfile", "-Command",
+                        "Get-Process RobloxPlayerBeta -ErrorAction SilentlyContinue | "
+                        "ForEach-Object { try { $_.PriorityClass = 'High' } catch {} }"],
+                       capture_output=True, creationflags=CREATE_NO_WINDOW)
+        log("Set Roblox to high priority")
+
+    def end(self):
+        if self.prev_scheme:
+            subprocess.run(["powercfg", "/setactive", self.prev_scheme], capture_output=True,
+                           creationflags=CREATE_NO_WINDOW)
+            log("Restored the previous power plan")
+            self.prev_scheme = None
+
+
+def start_companions(settings):
+    started = []
+    for app in settings.get("launch_with") or []:
+        path = Path(app.get("path") or "")
+        if not path.is_file() or process_running(path.name):
+            continue
+        try:
+            subprocess.Popen([str(path)], cwd=str(path.parent))
+            started.append(app)
+            log(f"Started {path.name}")
+        except OSError as e:
+            log(f"Couldn't start {path.name}: {e}")
+    return started
+
+
+def close_companions(started):
+    for app in started:
+        if app.get("close_after"):
+            name = Path(app.get("path") or "").name
+            if name:
+                subprocess.run(["taskkill", "/IM", name, "/T"], capture_output=True, creationflags=CREATE_NO_WINDOW)
+                log(f"Closed {name}")
+
+
 def spawn_toast(title, body):
     spawn_self(TOAST_FLAG, title, body)
 
@@ -762,12 +906,15 @@ class SessionMonitor:
         self.lock = threading.Lock()
         self.game = None
         self.crashed = None
+        self.boost = PerfBoost(settings.get("performance"))
 
     @staticmethod
     def wanted(settings):
         s, d, a = settings["session"], settings["discord"], settings["appearance"]
+        perf = settings.get("performance") or {}
         return (any(s.values()) or (d.get("enabled") and d.get("client_id", "").strip())
-                or (a.get("custom_window_icon") and ICON_FILE.exists()))
+                or (a.get("custom_window_icon") and ICON_FILE.exists())
+                or perf.get("high_priority") or perf.get("power_plan") or bool(settings.get("launch_with")))
 
     def _discord(self, activity):
         if self.ipc:
@@ -805,12 +952,15 @@ class SessionMonitor:
 
     def _locate(self, game):
         if not self.session.get("server_popup"):
+            if not game.get("location"):
+                game["location"] = server_location(game["ip"])
             return
         with self.lock:
             if game["located"]:
                 return
             game["located"] = True
         location = server_location(game["ip"])
+        game["location"] = location
         if not location or self.game is not game:
             return
         for _ in range(10):
@@ -825,6 +975,7 @@ class SessionMonitor:
             return
         if self.session.get("track_playtime"):
             record_playtime(game["place_id"], game["name"], time.time() - game["joined"])
+            record_session(game, time.time() - game["joined"])
         self._discord(None)
 
     def _newest_log(self):
@@ -855,6 +1006,7 @@ class SessionMonitor:
             if not log_path:
                 if self.icon:
                     self.icon.apply()
+                self.boost.tick()
                 time.sleep(1)
         if not log_path:
             log("No Roblox log appeared; session features disabled for this launch")
@@ -874,6 +1026,7 @@ class SessionMonitor:
                 last_check = time.time()
                 if self.icon:
                     self.icon.apply()
+                self.boost.tick()
                 newer = self._newest_log()
                 if newer and newer != log_path:
                     self.on_leave()
@@ -1008,10 +1161,15 @@ def headless_main(uri):
         if not owns_monitor or not SessionMonitor.wanted(settings):
             break
         monitor = SessionMonitor(settings, launch_time)
+        companions = start_companions(settings)
+        monitor.boost.begin()
         try:
             monitor.run()
         except Exception:
             log("Session monitor crashed:\n" + traceback.format_exc())
+        finally:
+            monitor.boost.end()
+            close_companions(companions)
         if monitor.crashed and ask_rejoin(monitor.crashed):
             uri = rejoin_uri(monitor.crashed["place_id"], monitor.crashed["job_id"])
             log("Rejoining after crash")
@@ -1026,6 +1184,323 @@ def headless_main(uri):
             register_protocols(settings)
         except OSError as e:
             log(f"Could not re-register: {e}")
+
+
+ACHIEVEMENTS = [
+    ("first_steps", "First Steps", "Play your first game through Orbit", "🚀"),
+    ("tourist", "Tourist", "Play 5 different games", "🧭"),
+    ("explorer", "Explorer", "Play 20 different games", "🌌"),
+    ("regular", "Regular", "Play 25 sessions", "🎮"),
+    ("server_hopper", "Server Hopper", "Play 100 sessions", "🛰️"),
+    ("dedicated", "Dedicated", "Spend 10 hours in one game", "💜"),
+    ("obsessed", "Obsessed", "Spend 50 hours in one game", "🔥"),
+    ("marathon", "Marathon", "Play one session for 3 hours straight", "⏱️"),
+    ("night_owl", "Night Owl", "Still playing past 3 AM", "🌙"),
+    ("early_bird", "Early Bird", "Start a session between 5 and 8 AM", "☀️"),
+    ("globetrotter", "Globetrotter", "Join servers in 5 different places", "🌍"),
+    ("streak", "On a Roll", "Play 7 days in a row", "⚡"),
+    ("weekender", "Weekend Warrior", "Play on 10 different weekend days", "🏖️"),
+    ("veteran", "Veteran", "Reach 100 hours of total play time", "🏆"),
+    ("legend", "Black Hole", "Reach 500 hours of total play time", "🕳️"),
+]
+
+
+def _sessions():
+    data = load_json(SESSIONS_FILE, [])
+    return data if isinstance(data, list) else []
+
+
+def achievement_progress():
+    play = load_json(PLAYTIME_FILE, {}) or {}
+    sess = _sessions()
+    total = sum(e.get("seconds", 0) for e in play.values())
+    top = max([e.get("seconds", 0) for e in play.values()] or [0])
+    count = max(len(sess), sum(e.get("sessions", 0) for e in play.values()))
+    games = len(play)
+    longest = max([x.get("seconds", 0) for x in sess] or [0])
+    night = any(_hours_overlap(x, 3, 5) for x in sess)
+    early = any(5 <= time.localtime(x["start"]).tm_hour < 8 for x in sess)
+    places = len({x.get("location") for x in sess if x.get("location")})
+    days = sorted({time.strftime("%Y-%m-%d", time.localtime(x["start"])) for x in sess})
+    weekend = len({d for d in days if time.strptime(d, "%Y-%m-%d").tm_wday >= 5})
+    streak = best = 0
+    prev = None
+    for d in days:
+        t = time.mktime(time.strptime(d, "%Y-%m-%d"))
+        streak = streak + 1 if prev is not None and 0 < t - prev <= 90000 else 1
+        best, prev = max(best, streak), t
+    h = 3600
+    return {
+        "first_steps": (count, 1), "tourist": (games, 5), "explorer": (games, 20), "regular": (count, 25),
+        "server_hopper": (count, 100), "dedicated": (top / h, 10), "obsessed": (top / h, 50),
+        "marathon": (longest / h, 3), "night_owl": (int(night), 1), "early_bird": (int(early), 1),
+        "globetrotter": (places, 5), "streak": (best, 7), "weekender": (weekend, 10),
+        "veteran": (total / h, 100), "legend": (total / h, 500),
+    }
+
+
+def _hours_overlap(sess, start_h, end_h):
+    t = sess["start"]
+    while t < sess["end"]:
+        if start_h <= time.localtime(t).tm_hour < end_h:
+            return True
+        t += 600
+    return False
+
+
+def achievements_state():
+    prog = achievement_progress()
+    stored = load_json(ACHIEVEMENTS_FILE, {}) or {}
+    out, new = [], []
+    for aid, title, desc, icon in ACHIEVEMENTS:
+        cur, goal = prog.get(aid, (0, 1))
+        done = cur >= goal
+        if done and aid not in stored:
+            stored[aid] = int(time.time())
+            new.append(aid)
+        out.append({"id": aid, "title": title, "desc": desc, "icon": icon, "cur": round(min(cur, goal), 1),
+                    "goal": goal, "unlocked": aid in stored, "at": stored.get(aid)})
+    if new:
+        save_json(ACHIEVEMENTS_FILE, stored)
+    return {"list": out, "new": new}
+
+
+def weekly_recap(now=None):
+    now = now or time.time()
+    week = [x for x in _sessions() if x.get("start", 0) >= now - 7 * 86400]
+    if not week:
+        return {"empty": True}
+    by_game, by_day = {}, {}
+    for x in week:
+        g = by_game.setdefault(x["place_id"], {"name": x.get("name"), "seconds": 0})
+        g["seconds"] += x.get("seconds", 0)
+        day = time.strftime("%A", time.localtime(x["start"]))
+        by_day[day] = by_day.get(day, 0) + x.get("seconds", 0)
+    top_pid, top = max(by_game.items(), key=lambda kv: kv[1]["seconds"])
+    earlier = {x["place_id"] for x in _sessions() if x.get("start", 0) < now - 7 * 86400}
+    return {
+        "empty": False, "total": sum(x.get("seconds", 0) for x in week), "sessions": len(week),
+        "games": len(by_game), "new_games": len(set(by_game) - earlier),
+        "top_game": top["name"], "top_pid": top_pid, "top_seconds": top["seconds"],
+        "best_day": max(by_day.items(), key=lambda kv: kv[1])[0],
+        "longest": max(x.get("seconds", 0) for x in week),
+        "days_played": len({time.strftime("%Y-%m-%d", time.localtime(x["start"])) for x in week}),
+        "range": time.strftime("%b %d", time.localtime(now - 6 * 86400)) + " – " + time.strftime("%b %d", time.localtime(now)),
+    }
+
+
+def _font(size, bold=False):
+    from PIL import ImageFont
+    names = (["segoeuib.ttf", "seguisb.ttf"] if bold else ["segoeui.ttf"]) + ["DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"]
+    for name in names:
+        for folder in (Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts", Path("/usr/share/fonts/truetype/dejavu")):
+            if (folder / name).exists():
+                return ImageFont.truetype(str(folder / name), size)
+    return ImageFont.load_default(size)
+
+
+def render_recap_png(recap, settings, dest):
+    from PIL import Image, ImageDraw, ImageFilter
+    accents = ACCENTS.get(settings["appearance"].get("accent"), ACCENTS["Void"])
+    c1, c2 = (tuple(int(h[i:i + 2], 16) for i in (1, 3, 5)) for h in accents)
+    W, H = 1200, 675
+    img = Image.new("RGB", (W, H), (8, 6, 14))
+    glow = Image.new("RGB", (W, H), (0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([700, -250, 1350, 400], fill=c1)
+    gd.ellipse([-200, 420, 400, 900], fill=c2)
+    img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(160)), 0.45)
+    d = ImageDraw.Draw(img)
+    import random
+    rnd = random.Random(7)
+    for _ in range(120):
+        x, y, r = rnd.randint(0, W), rnd.randint(0, H), rnd.choice([1, 1, 1.5, 2])
+        d.ellipse([x - r, y - r, x + r, y + r], fill=(230, 220, 255))
+    d.text((70, 60), "ORBIT  ·  WEEKLY RECAP", font=_font(22, True), fill=c1)
+    d.text((70, 96), recap["range"], font=_font(20), fill=(170, 160, 200))
+    d.text((70, 150), fmt_duration(recap["total"]), font=_font(110, True), fill=(245, 240, 255))
+    d.text((74, 280), "played this week", font=_font(28), fill=(170, 160, 200))
+    cards = [("TOP GAME", recap["top_game"] or "-", fmt_duration(recap["top_seconds"])),
+             ("SESSIONS", str(recap["sessions"]), f"{recap['days_played']} day(s) played"),
+             ("BEST DAY", recap["best_day"], f"longest {fmt_duration(recap['longest'])}")]
+    for i, (k, v, sub) in enumerate(cards):
+        x0 = 70 + i * 360
+        d.rounded_rectangle([x0, 390, x0 + 330, 590], radius=22, fill=(22, 17, 38), outline=c1, width=2)
+        d.text((x0 + 26, 416), k, font=_font(18, True), fill=c1)
+        val = v if len(v) <= 18 else v[:17] + "…"
+        d.text((x0 + 26, 450), val, font=_font(36, True), fill=(245, 240, 255))
+        d.text((x0 + 26, 530), sub, font=_font(20), fill=(170, 160, 200))
+    d.text((W - 300, 624), "made with Orbit Launcher", font=_font(18), fill=(120, 110, 150))
+    Path(dest).parent.mkdir(parents=True, exist_ok=True)
+    img.save(dest)
+    return dest
+
+
+def pictures_dir():
+    for p in (Path.home() / "OneDrive" / "Pictures", Path.home() / "Pictures"):
+        if p.is_dir():
+            return p
+    return Path.home()
+
+
+def screenshot_dirs():
+    out = []
+    for base in (Path.home() / "Pictures", Path.home() / "OneDrive" / "Pictures", Path.home() / "Videos"):
+        if (base / "Roblox").is_dir():
+            out.append(base / "Roblox")
+    return out
+
+
+def list_screenshots():
+    files = []
+    for folder in screenshot_dirs():
+        files += [p for p in folder.iterdir() if p.suffix.lower() in (".png", ".jpg", ".jpeg") and p.is_file()]
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def _is_screenshot(path):
+    try:
+        path = Path(path).resolve()
+        return any(path.is_relative_to(d.resolve()) for d in screenshot_dirs())
+    except (OSError, ValueError):
+        return False
+
+
+def has_pillow():
+    import importlib.util
+    return importlib.util.find_spec("PIL") is not None
+
+
+def data_url(path, max_side=None, quality=82):
+    import base64
+    import hashlib
+    path = Path(path)
+    if max_side and has_pillow():
+        THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+        key = hashlib.sha1(f"{path}|{path.stat().st_mtime}|{max_side}".encode()).hexdigest()
+        thumb = THUMBS_DIR / f"{key}.jpg"
+        if not thumb.exists():
+            from PIL import Image
+            with Image.open(path) as im:
+                im = im.convert("RGB")
+                im.thumbnail((max_side, max_side))
+                im.save(thumb, "JPEG", quality=quality)
+        path = thumb
+    elif max_side and path.stat().st_size > 2_500_000:
+        return None
+    mime = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+
+
+def changelog_section(version):
+    for base in (resource_dir(), Path(__file__).resolve().parent):
+        f = base / "CHANGELOG.md"
+        if f.exists():
+            text = f.read_text(encoding="utf-8")
+            m = re.search(rf"^## v?{re.escape(version)}\b.*?$(.*?)(?=^## |\Z)", text, re.S | re.M)
+            return m.group(1).strip() if m else ""
+    return ""
+
+
+def background_file(settings):
+    name = settings["appearance"].get("bg_file") or ""
+    f = DATA_DIR / name
+    return f if name and f.is_file() else None
+
+
+BACKUP_FILES = ["settings.json", "playtime.json", "sessions.json", "achievements.json", "last_server.json",
+                "roblox_icon.ico"]
+
+
+def export_backup(dest, settings):
+    import zipfile
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("orbit_backup.json", json.dumps({"version": APP_VERSION, "made": int(time.time())}))
+        for name in BACKUP_FILES:
+            if (DATA_DIR / name).exists():
+                z.write(DATA_DIR / name, name)
+        bg = background_file(settings)
+        if bg:
+            z.write(bg, bg.name)
+        for f in PROFILES_DIR.rglob("*"):
+            if f.is_file():
+                z.write(f, "ModProfiles/" + f.relative_to(PROFILES_DIR).as_posix())
+    return dest
+
+
+def import_backup(src):
+    import zipfile
+    with zipfile.ZipFile(src) as z:
+        names = z.namelist()
+        if "orbit_backup.json" not in names or "settings.json" not in names:
+            raise ValueError("That file isn't an Orbit backup.")
+        for name in names:
+            target = (DATA_DIR / name).resolve()
+            if not str(target).startswith(str(DATA_DIR.resolve())) or name.endswith("/"):
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(name) as fsrc, open(target, "wb") as fdst:
+                shutil.copyfileobj(fsrc, fdst)
+
+
+_GUI_MUTEX = None
+
+
+def acquire_gui_lock(wait=0.0):
+    global _GUI_MUTEX
+    if not IS_WINDOWS:
+        return True
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    end = time.time() + wait
+    while True:
+        handle = k32.CreateMutexW(None, False, "Local\\OrbitLauncherWindow")
+        if ctypes.get_last_error() != 183:
+            _GUI_MUTEX = handle
+            return True
+        k32.CloseHandle(handle)
+        if time.time() >= end:
+            return False
+        time.sleep(0.4)
+
+
+def start_tray(api):
+    import importlib.util
+    if not IS_WINDOWS or importlib.util.find_spec("pystray") is None or not has_pillow():
+        return None
+    import pystray
+    from PIL import Image
+    image = Image.open(app_icon_file()) if app_icon_file().exists() else Image.new("RGB", (64, 64), (157, 107, 255))
+
+    def favorites():
+        items = []
+        for game in (load_settings().get("library") or [])[:8]:
+            pid = str(game.get("pid"))
+            items.append(pystray.MenuItem(game.get("name") or pid, lambda *_ , p=pid: api.play_game(p)))
+        return items or [pystray.MenuItem("Add games in the Library tab", None, enabled=False)]
+
+    def show(*_):
+        api.show_window()
+
+    def quit_app(*_):
+        api._quitting = True
+        icon.stop()
+        api._window.destroy()
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Open Orbit", show, default=True),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Launch Roblox", lambda *_: api.launch("")),
+        pystray.MenuItem("Rejoin last server", lambda *_: api.rejoin()),
+        pystray.MenuItem("Library", pystray.Menu(favorites)),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Quit Orbit", quit_app),
+    )
+    icon = pystray.Icon("OrbitLauncher", image, APP_NAME, menu)
+    icon.run_detached()
+    return icon
 
 
 def resource_dir():
@@ -1366,6 +1841,9 @@ class Api:
         self._settings = load_settings()
         self._window = None
         self._mode = mode
+        self._tray = None
+        self._quitting = False
+        self._tray_hint = False
 
     def _js(self, code):
         try:
@@ -1401,6 +1879,9 @@ class Api:
             "pending_update": pending_update(),
             "frozen": is_frozen(),
             "setup": {"installed_version": installed_version(), "path": str(INSTALL_DIR)},
+            "has_pillow": has_pillow(),
+            "tray": self._tray is not None,
+            "screens_dirs": [str(d) for d in screenshot_dirs()],
         }
 
     def check_version(self):
@@ -1575,7 +2056,13 @@ class Api:
             return self._err(e)
 
     def restart_to_update(self):
-        if apply_pending_update():
+        if apply_pending_update(("--after-update",)):
+            self._quitting = True
+            if self._tray is not None:
+                try:
+                    self._tray.stop()
+                except Exception:
+                    pass
             self._window.destroy()
             return True
         return {"error": "No downloaded update to install."}
@@ -1593,10 +2080,216 @@ class Api:
             subprocess.Popen([str(INSTALLED_EXE)])
         self._window.destroy()
 
+    def play_game(self, pid):
+        if not str(pid).isdigit():
+            return {"error": "Unknown game."}
+        return self.launch(rejoin_uri(pid))
+
+    def join_server(self, pid, job):
+        if not str(pid).isdigit() or not re.fullmatch(r"[0-9a-fA-F-]{36}", str(job or "")):
+            return {"error": "That server link looks wrong."}
+        return self.launch(rejoin_uri(pid, job))
+
+    def games_info(self, pids):
+        from concurrent.futures import ThreadPoolExecutor
+        ids = [str(p) for p in (pids or []) if str(p).isdigit()][:60]
+        with ThreadPoolExecutor(6) as pool:
+            infos = list(pool.map(game_info, ids))
+        return {pid: {"name": i["name"], "icon": i.get("icon"), "thumb": i.get("thumb"), "creator": i.get("creator")}
+                for pid, i in zip(ids, infos)}
+
+    def servers(self, text):
+        pid = parse_game_id(str(text))
+        if not pid:
+            return {"error": "Paste a game link (roblox.com/games/...) or a place ID."}
+        info = game_info(pid)
+        servers, note = list_servers(pid)
+        return {"pid": pid, "name": info["name"], "thumb": info.get("thumb") or info.get("icon"),
+                "servers": servers, "note": note}
+
+    def recent_servers(self, limit=10):
+        seen, out = set(), []
+        for x in reversed(_sessions()):
+            if x.get("job_id") and x["job_id"] not in seen:
+                seen.add(x["job_id"])
+                out.append(x)
+            if len(out) >= limit:
+                break
+        return out
+
+    def sessions(self, offset=0, count=40):
+        data = list(reversed(_sessions()))
+        return {"items": data[offset:offset + count], "total": len(data)}
+
+    def achievements(self):
+        return achievements_state()
+
+    def weekly_recap(self):
+        return weekly_recap()
+
+    def export_recap(self):
+        recap = weekly_recap()
+        if recap.get("empty"):
+            return {"error": "Play something this week first."}
+        if not has_pillow():
+            return {"error": "Saving the recap image needs the installed app (or 'pip install pillow')."}
+        try:
+            dest = pictures_dir() / "Orbit" / f"Orbit-recap-{time.strftime('%Y-%m-%d')}.png"
+            render_recap_png(recap, self._settings, dest)
+            open_path(dest)
+            return {"path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def screenshots(self, offset=0, count=24):
+        files = list_screenshots()
+        items = []
+        for f in files[offset:offset + count]:
+            try:
+                items.append({"path": str(f), "name": f.name, "time": int(f.stat().st_mtime),
+                              "thumb": data_url(f, max_side=480)})
+            except Exception:
+                continue
+        return {"items": items, "total": len(files)}
+
+    def screenshot_full(self, path):
+        if not _is_screenshot(path):
+            return None
+        return data_url(path, max_side=1920 if has_pillow() else None, quality=90)
+
+    def open_screenshot(self, path):
+        if _is_screenshot(path):
+            open_path(path)
+
+    def show_in_folder(self, path):
+        if _is_screenshot(path) and IS_WINDOWS:
+            subprocess.Popen(["explorer", "/select,", str(Path(path))])
+
+    def open_screenshots_folder(self):
+        dirs = screenshot_dirs()
+        if dirs:
+            open_path(dirs[0])
+
+    def copy_image(self, path):
+        if not _is_screenshot(path) or not IS_WINDOWS:
+            return {"error": "Can't copy that file."}
+        p = str(Path(path)).replace("'", "''")
+        subprocess.run(["powershell", "-NoProfile", "-STA", "-Command",
+                        "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
+                        f"[System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('{p}'))"],
+                       capture_output=True, creationflags=CREATE_NO_WINDOW)
+        return True
+
+    def whats_new(self):
+        seen = self._settings.get("last_seen_version") or ""
+        if seen == APP_VERSION:
+            return None
+        return {"version": APP_VERSION, "notes": changelog_section(APP_VERSION), "first": not seen}
+
+    def mark_seen(self):
+        self._settings["last_seen_version"] = APP_VERSION
+        save_settings(self._settings)
+        return True
+
+    def _dialog(self, kind, **kw):
+        import webview
+        fd = getattr(webview, "FileDialog", None)
+        const = getattr(fd, kind, None) if fd else None
+        if const is None:
+            const = getattr(webview, f"{kind}_DIALOG")
+        return self._window.create_file_dialog(const, **kw)
+
+    def choose_app(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Programs (*.exe)",))
+            if not picked:
+                return None
+            path = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            return {"path": str(path), "name": path.stem}
+        except Exception as e:
+            return self._err(e)
+
+    def choose_background(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)",))
+            if not picked:
+                return None
+            src = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            for old in DATA_DIR.glob("background.*"):
+                old.unlink(missing_ok=True)
+            dest = DATA_DIR / ("background" + src.suffix.lower())
+            if has_pillow() and src.suffix.lower() != ".gif":
+                from PIL import Image
+                with Image.open(src) as im:
+                    im = im.convert("RGB")
+                    im.thumbnail((2200, 2200))
+                    dest = DATA_DIR / "background.jpg"
+                    im.save(dest, "JPEG", quality=88)
+            else:
+                shutil.copy2(src, dest)
+            self._settings["appearance"]["bg_file"] = dest.name
+            self._settings["appearance"]["background"] = "Image"
+            save_settings(self._settings)
+            return {"file": dest.name, "data": data_url(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def background_data(self):
+        f = background_file(self._settings)
+        return data_url(f) if f else None
+
+    def export_backup(self):
+        try:
+            name = f"Orbit-backup-{time.strftime('%Y-%m-%d')}.orbitbackup"
+            picked = self._dialog("SAVE", save_filename=name, file_types=("Orbit backup (*.orbitbackup)",))
+            if not picked:
+                return None
+            dest = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            save_settings(self._settings)
+            export_backup(dest, self._settings)
+            return {"path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def import_backup(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Orbit backup (*.orbitbackup;*.zip)",))
+            if not picked:
+                return None
+            import_backup(Path(picked[0] if isinstance(picked, (list, tuple)) else picked))
+            self._settings = load_settings()
+            return {"ok": True}
+        except Exception as e:
+            return self._err(e)
+
+    def reload_ui(self):
+        self._window.load_html(ui_file().read_text(encoding="utf-8"))
+
+    def show_window(self):
+        try:
+            self._window.show()
+            self._window.restore()
+        except Exception:
+            pass
+
     def minimize(self):
         self._window.minimize()
 
     def close(self):
+        if self._tray is not None and self._settings["appearance"].get("tray", True) and not self._quitting:
+            self._window.hide()
+            if not self._tray_hint:
+                self._tray_hint = True
+                try:
+                    self._tray.notify("Orbit is still running in the tray. Right-click the icon to quit.", APP_NAME)
+                except Exception:
+                    pass
+            return "hidden"
+        if self._tray is not None:
+            try:
+                self._tray.stop()
+            except Exception:
+                pass
         self._window.destroy()
 
 
@@ -1625,11 +2318,16 @@ def _ensure_webview():
     return False
 
 
-def run_gui(mode="app"):
+def run_gui(mode="app", after_update=False):
     if mode == "app":
         settings = load_settings()
-        if settings["updates"].get("auto", True) and apply_pending_update():
+        if settings["updates"].get("auto", True) and apply_pending_update(("--after-update",)):
             return
+        if not acquire_gui_lock(wait=12 if after_update else 0):
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            SHOW_FLAG.write_text(str(time.time()))
+            return
+        SHOW_FLAG.unlink(missing_ok=True)
         startup_maintenance(settings)
     if not _ensure_webview():
         return
@@ -1642,6 +2340,20 @@ def run_gui(mode="app"):
     window = webview.create_window(title, html=html, js_api=api, width=size[0], height=size[1],
                                    resizable=False, frameless=True, easy_drag=False, background_color=bg)
     api._window = window
+    if mode == "app":
+        if api._settings["appearance"].get("tray", True):
+            try:
+                api._tray = start_tray(api)
+            except Exception as e:
+                log(f"Tray icon unavailable: {e}")
+
+        def watch_show_requests():
+            while True:
+                time.sleep(0.6)
+                if SHOW_FLAG.exists():
+                    SHOW_FLAG.unlink(missing_ok=True)
+                    api.show_window()
+        threading.Thread(target=watch_show_requests, daemon=True).start()
     icon = app_icon_file()
     try:
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")), icon=str(icon) if icon.exists() else None)
@@ -1673,7 +2385,7 @@ def main():
             log(traceback.format_exc())
             message_box("Something went wrong launching Roblox. Details are in:\n" + str(LOG_FILE), error=True)
     else:
-        run_gui()
+        run_gui(after_update="--after-update" in args)
 
 
 if __name__ == "__main__":

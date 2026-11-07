@@ -1,10 +1,10 @@
 @echo off
 
-python -m pip install --upgrade pyinstaller pywebview
+python -m pip install --upgrade pyinstaller pywebview pystray pillow
 if errorlevel 1 goto :fail
 
 python -m PyInstaller --noconfirm --onefile --noconsole --name OrbitLauncher --icon ui\orbit.ico ^
-  --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" orbit_launcher.py
+  --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" --add-data "CHANGELOG.md;." --hidden-import pystray._win32 orbit_launcher.py
 if errorlevel 1 goto :fail
 
 echo.

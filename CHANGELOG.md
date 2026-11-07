@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.6.0
+- **Game library:** pin your favorite games with big thumbnails. One click plays them, and each game can use its own FastFlags and mod pack.
+- **Server finder:** see every open server with player counts, ping and FPS, then join the emptiest server or the best ping.
+- **Recent servers:** your last servers on the Home page, ready to rejoin.
+- **Stats:** a weekly recap you can save as an image, plus a full session history with server locations.
+- **Achievements:** 15 badges that unlock as you play, with a little celebration.
+- **Screenshots:** your Roblox screenshots in a gallery with a full-size viewer.
+- **Boost:** high priority for Roblox, a high performance power plan, and apps that open (and close) with Roblox.
+- **Command palette:** press Ctrl+K to search pages, games and actions.
+- **Sounds and backgrounds:** launch sound packs, a warp-speed background, nebula mode, or your own image.
+- **System tray:** Orbit stays by the clock with quick Launch, Rejoin and Library options.
+- **Backup & restore:** move all your settings, profiles, mods and stats to another PC in one file.
+
 ## v1.5.0
 - **Installer:** OrbitSetup.exe installs Orbit for you, with no admin needed. It adds Start menu and desktop shortcuts and puts an uninstall entry in Windows Settings > Apps.
 - **Auto-updates:** Orbit checks GitHub when it opens and downloads new versions in the background. A glowing button in the title bar installs them, and if you skip it they install the next time you open Orbit.

@@ -252,6 +252,109 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 .credit .handle { font-size: 19px; font-weight: 750; letter-spacing: -.01em; margin-top: 3px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .credit .ring { position: absolute !important; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),.22); box-shadow: 0 0 0 18px rgba(var(--accent-rgb),.04); }
 
+#bgImage { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: center/cover no-repeat; opacity: 0; transition: opacity .8s var(--ease); }
+#bgImage.show { opacity: 1; }
+#bgImage::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: var(--dim, .55); }
+#stars { transition: opacity .8s var(--ease); }
+body.bg-nebula #stars { opacity: 0; }
+body.bg-image #stars { opacity: .35; }
+body.bg-image .nebula { opacity: .35; }
+.nav-group { font-size: 10px; font-weight: 750; letter-spacing: .18em; color: var(--faint); padding: 9px 12px 4px; }
+.nav-group:first-child { padding-top: 0; }
+#nav { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; flex: 1 1 auto; min-height: 0; margin-bottom: 8px; gap: 1px; }
+#nav::-webkit-scrollbar { display: none; }
+.nav-item, .nav-indicator { height: 34px; }
+.sidebar { padding-top: 12px; padding-bottom: 12px; }
+.side-foot { flex: none; }
+.kbd-btn { align-self: center; margin-right: 10px; height: 28px; display: inline-flex; align-items: center; gap: 8px; padding: 0 6px 0 11px; border-radius: 9px; font-size: 12px; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); transition: all .25s var(--ease); }
+.kbd-btn:hover { color: var(--text); border-color: var(--line2); }
+.kbd-btn svg { width: 14px; height: 14px; }
+kbd { font-family: inherit; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 6px; background: rgba(var(--accent-rgb),.15); color: var(--text); border: 1px solid rgba(var(--accent-rgb),.3); }
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 14px; }
+.game { padding: 0; overflow: hidden; margin: 0; }
+.game .art { position: relative; aspect-ratio: 16 / 9; background: var(--panel2) center/cover; overflow: hidden; }
+.game .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(6,4,11,.85)); }
+.game .art .play { position: absolute; z-index: 2; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: var(--grad); box-shadow: 0 10px 30px -8px rgba(var(--accent-rgb),1); opacity: 0; transform: scale(.6); transition: all .4s var(--spring); }
+.game .art .play svg { width: 22px; height: 22px; margin-left: 3px; }
+.game:hover .art .play { opacity: 1; transform: scale(1); }
+.game .art .x { position: absolute; z-index: 2; right: 8px; top: 8px; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: rgba(0,0,0,.5); color: #fff; opacity: 0; transition: opacity .25s; }
+.game:hover .art .x { opacity: 1; }
+.game .art .x:hover { background: var(--bad); }
+.game .art .pt { position: absolute; z-index: 1; left: 12px; bottom: 9px; font-size: 12px; font-weight: 650; color: #fff; text-shadow: 0 1px 8px #000; }
+.game .meta { padding: 12px 14px 14px; }
+.game .gname { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game .meta .row { margin-top: 10px; gap: 8px; }
+.game .meta .btn { height: 31px; padding: 0 11px; font-size: 12.5px; }
+.game select.input { height: 31px; font-size: 12.5px; flex: 1; padding-left: 9px; }
+.mini-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: rgba(var(--accent-rgb),.13); border: 1px solid rgba(var(--accent-rgb),.3); color: var(--text); cursor: pointer; transition: all .25s; }
+.mini-chip:hover { background: rgba(var(--accent-rgb),.25); }
+.sv-head { display: flex; align-items: center; gap: 16px; }
+.sv-head .thumb { width: 150px; aspect-ratio: 16/9; border-radius: 12px; background: var(--panel2) center/cover; border: 1px solid var(--line); flex: none; }
+.sv-row { display: grid; grid-template-columns: 1fr 110px 80px 80px 92px; align-items: center; gap: 14px; padding: 9px 10px; border-top: 1px solid var(--line); border-radius: 10px; animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 18ms); }
+.sv-row:hover { background: rgba(var(--accent-rgb),.06); }
+.sv-head-row { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-top: 0; animation: none; }
+.cap { height: 6px; border-radius: 99px; background: var(--panel3); overflow: hidden; margin-top: 6px; }
+.cap i { display: block; height: 100%; border-radius: 99px; background: var(--grad); }
+.ping-good { color: var(--good); } .ping-mid { color: var(--warn); } .ping-bad { color: var(--bad); }
+.sv-row .btn { height: 30px; font-size: 12.5px; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 9px 4px; border-top: 1px solid var(--line); animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.list-row:first-child { border-top: 0; }
+.list-row .gi { width: 38px; height: 38px; border-radius: 10px; background: var(--panel2) center/cover; border: 1px solid var(--line); flex: none; }
+.list-row .tx { flex: 1; min-width: 0; } .list-row .tx b { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-row .tx span { font-size: 12px; color: var(--muted); }
+.list-row .btn { height: 30px; font-size: 12.5px; }
+.day-head { font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); padding: 14px 4px 4px; }
+.day-head:first-child { padding-top: 0; }
+.recap { position: relative; overflow: hidden; background: radial-gradient(80% 140% at 100% 0%, rgba(var(--accent-rgb),.28), transparent 60%), radial-gradient(60% 120% at 0% 100%, color-mix(in srgb, var(--accent2) 22%, transparent), transparent 60%), var(--panel); }
+.recap .big { font-size: 46px; font-weight: 850; letter-spacing: -.04em; line-height: 1; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.recap-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.recap-cards > div { padding: 12px 14px; border-radius: 12px; background: rgba(0,0,0,.2); border: 1px solid var(--line); }
+[data-mode="light"] .recap-cards > div { background: var(--panel2); }
+.recap-cards b { display: block; font-size: 17px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ach-sum { display: flex; align-items: center; gap: 22px; }
+.ring-prog { width: 92px; height: 92px; flex: none; }
+.ring-prog circle { fill: none; stroke-width: 9; }
+.ring-prog .bgc { stroke: var(--panel3); } .ring-prog .fg { stroke: url(#achGrad); stroke-linecap: round; transition: stroke-dashoffset 1.3s var(--ease); }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.ach { display: flex; gap: 14px; align-items: center; margin: 0; padding: 15px 16px; }
+.ach .ic { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; flex: none; background: rgba(var(--accent-rgb),.12); border: 1px solid rgba(var(--accent-rgb),.28); transition: transform .5s var(--spring); }
+.ach.done .ic { background: var(--grad); box-shadow: 0 8px 22px -8px rgba(var(--accent-rgb),1); border-color: transparent; }
+.ach:hover .ic { transform: rotate(-10deg) scale(1.1); }
+.ach:not(.done) .ic { filter: grayscale(1); opacity: .55; }
+.ach .tt { font-weight: 700; } .ach .dd { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.ach .bar { margin-top: 8px; } .ach .pg { font-size: 11px; color: var(--faint); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.shot { position: relative; aspect-ratio: 16/9; border-radius: 13px; overflow: hidden; background: var(--panel2) center/cover; border: 1px solid var(--line); cursor: zoom-in; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 25ms); transition: transform .35s var(--spring), box-shadow .3s, border-color .3s; }
+.shot:hover { transform: translateY(-3px) scale(1.02); border-color: rgba(var(--accent-rgb),.5); box-shadow: 0 16px 34px -18px rgba(var(--accent-rgb),.95); }
+.shot span { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 7px; font-size: 11.5px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.75)); opacity: 0; transition: opacity .25s; }
+.shot:hover span { opacity: 1; }
+#lightbox { position: fixed; inset: 0; z-index: 45; display: grid; grid-template-rows: 1fr auto; place-items: center; padding: 56px 40px 20px; background: rgba(3,2,8,.86); backdrop-filter: blur(10px); opacity: 0; visibility: hidden; transition: opacity .3s, visibility 0s .3s; }
+#lightbox.show { opacity: 1; visibility: visible; transition: opacity .3s; }
+#lightbox img { max-width: 100%; max-height: 100%; border-radius: 14px; box-shadow: 0 30px 80px -20px #000; transform: scale(.94); transition: transform .5s var(--spring); }
+#lightbox.show img { transform: none; }
+#lightbox .row { margin-top: 14px; }
+#lightbox .nav-arrow { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border-radius: 50%; background: rgba(255,255,255,.08); color: #fff; font-size: 20px; }
+#lightbox .nav-arrow:hover { background: rgba(var(--accent-rgb),.5); }
+#palette { position: fixed; inset: 0; z-index: 48; display: flex; justify-content: center; align-items: flex-start; padding-top: 90px; background: rgba(4,2,10,.5); backdrop-filter: blur(6px); opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
+#palette.show { opacity: 1; visibility: visible; transition: opacity .2s; }
+.pal { width: 560px; border-radius: 16px; background: var(--panel-solid); border: 1px solid var(--line2); box-shadow: 0 40px 90px -20px rgba(0,0,0,.8), 0 0 60px -30px rgba(var(--accent-rgb),1); overflow: hidden; transform: translateY(-10px) scale(.97); transition: transform .4s var(--spring); }
+#palette.show .pal { transform: none; }
+.pal input { width: 100%; height: 54px; padding: 0 18px; font-size: 16px; background: transparent; border: 0; border-bottom: 1px solid var(--line); outline: none; }
+.pal-list { max-height: 340px; overflow-y: auto; padding: 6px; }
+.pal-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; color: var(--muted); }
+.pal-item b { color: var(--text); font-weight: 600; } .pal-item .k { margin-left: auto; font-size: 11px; color: var(--faint); }
+.pal-item.on { background: rgba(var(--accent-rgb),.16); color: var(--text); }
+.pal-item .ico { width: 26px; text-align: center; font-size: 15px; }
+#wn .modal { width: 520px; }
+#wn .notes { max-height: 300px; overflow-y: auto; margin: 6px 0 18px; color: var(--muted); line-height: 1.55; }
+#wn .notes li { margin: 6px 0; } #wn .notes b { color: var(--text); }
+#wn .ver-badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; color: #fff; background: var(--grad); margin-bottom: 10px; }
+#fx { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.toast.ach-toast { padding: 12px 14px; border-color: rgba(var(--accent-rgb),.6); }
+.toast.ach-toast .em { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: var(--grad); flex: none; }
+.toast.ach-toast small { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .14em; color: var(--accent); text-transform: uppercase; }
+.app-row .gi { display: grid; place-items: center; font-size: 18px; }
 .upd-pill { position: relative; overflow: hidden; align-self: center; margin-right: 10px; height: 28px; padding: 0 13px 0 11px; border-radius: 99px; display: inline-flex; align-items: center; gap: 8px;
   font-size: 12px; font-weight: 650; color: #fff; background: linear-gradient(110deg, var(--accent), var(--accent2), var(--accent)); background-size: 220% 100%;
   animation: flow 4s ease infinite, pillIn .6s var(--spring) both; box-shadow: 0 0 20px -4px rgba(var(--accent-rgb),.95); transition: transform .3s var(--spring); }
@@ -298,13 +401,14 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 </style>
 </head>
 <body>
-<canvas id="stars"></canvas><div class="nebula"></div>
+<div id="bgImage"></div><canvas id="stars"></canvas><div class="nebula"></div><canvas id="fx"></canvas>
 <div id="app">
   <header class="titlebar">
     <div class="drag pywebview-drag-region">
       <svg width="24" height="24" viewBox="-50 -50 100 100"><defs><linearGradient id="tg" x1="0" x2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent2)"/></linearGradient></defs><ellipse rx="46" ry="14" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/><circle r="20" fill="#000" stroke="#f5f3ff" stroke-width="3"/><path d="M -46 0 A 46 14 0 0 0 46 0" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/></svg>
       <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span>
     </div>
+    <button class="kbd-btn" id="palBtn" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<kbd>Ctrl K</kbd></button>
     <button class="upd-pill" id="updPill" hidden><span class="fill"></span><span class="upd-dot"></span><span id="updText">Update ready</span></button>
     <div class="saved" id="saved">Saved</div>
     <button class="win-btn" id="minBtn" title="Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.3"/></svg></button>
@@ -312,8 +416,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
   </header>
 
   <aside class="sidebar">
-    <div class="nav-label">MENU</div>
-    <nav id="nav"><div class="nav-indicator" id="navInd"></div></nav>
+        <nav id="nav"><div class="nav-indicator" id="navInd"></div></nav>
     <div class="side-foot"><span class="dot" id="sideDot"></span><span id="sideStatus">Checking Roblox...</span></div>
   </aside>
 
@@ -347,8 +450,54 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         </div>
       </div>
       <div class="card rise" style="--i:3">
+        <div class="row" style="margin-bottom:8px"><h3 style="margin:0">Recent servers</h3><span class="spacer"></span><button class="btn ghost" id="seeTimeline">Full history</button></div>
+        <div id="recentList"></div>
+      </div>
+      <div class="card rise" style="--i:4">
         <div class="row"><h3 style="margin:0">Quick actions</h3><span class="spacer"></span>
           <button class="btn" id="openRoblox">Open Roblox folder</button><button class="btn" id="openLog">Open launcher log</button></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-library">
+      <div class="page-head rise row" style="--i:0"><div><h1>Library</h1><p>Your favorite games. Each one can have its own FastFlags and mod pack.</p></div><span class="spacer"></span>
+        <button class="btn primary" id="libAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add game</button></div>
+      <div class="lib-grid rise" style="--i:1" id="libGrid"></div>
+      <div class="card rise" style="--i:2;margin-top:14px" id="libSuggestCard"><h3>Recently played</h3><p class="sub">Add them to your library with one click.</p><div class="row" id="libSuggest"></div></div>
+    </section>
+
+    <section class="page" id="page-servers">
+      <div class="page-head rise" style="--i:0"><h1>Servers</h1><p>Find a server with room, or the one with the best connection, and jump straight in.</p></div>
+      <div class="card rise" style="--i:1">
+        <div class="row"><input class="input" id="svInput" placeholder="Paste a game link or place ID" style="flex:1"><button class="btn primary" id="svFind">Find servers</button></div>
+        <div class="row" id="svQuick" style="margin-top:10px"></div>
+      </div>
+      <div id="svResult"></div>
+    </section>
+
+    <section class="page" id="page-achievements">
+      <div class="page-head rise" style="--i:0"><h1>Achievements</h1><p>Unlocked automatically as you play through Orbit.</p></div>
+      <div class="card rise" style="--i:1"><div class="ach-sum">
+        <svg class="ring-prog" viewBox="0 0 100 100"><defs><linearGradient id="achGrad" x1="0" x2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent2)"/></linearGradient></defs>
+          <circle class="bgc" cx="50" cy="50" r="40"/><circle class="fg" id="achRing" cx="50" cy="50" r="40" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"/>
+          <text x="50" y="56" text-anchor="middle" font-size="20" font-weight="800" fill="currentColor" id="achPct">0%</text></svg>
+        <div><div class="big-num" id="achCount">0 / 15</div><div class="muted" id="achNext">Play a game to start unlocking.</div></div></div></div>
+      <div class="ach-grid rise" style="--i:2" id="achGrid"></div>
+    </section>
+
+    <section class="page" id="page-screens">
+      <div class="page-head rise row" style="--i:0"><div><h1>Screenshots</h1><p id="shotSub">Your Roblox screenshots, newest first.</p></div><span class="spacer"></span>
+        <button class="btn" id="shotFolder">Open folder</button><button class="btn" id="shotRefresh">Refresh</button></div>
+      <div class="shots rise" style="--i:1" id="shotGrid"></div>
+      <div class="row rise" style="--i:2;justify-content:center;margin-top:16px"><button class="btn" id="shotMore" hidden>Load more</button></div>
+    </section>
+
+    <section class="page" id="page-boost">
+      <div class="page-head rise" style="--i:0"><h1>Boost</h1><p>Squeeze out more performance and open your other apps automatically.</p></div>
+      <div class="card rise" style="--i:1" id="perfCard"></div>
+      <div class="card rise" style="--i:2">
+        <div class="row" style="margin-bottom:6px"><div><h3>Launch with Roblox</h3><p class="sub" style="margin:0">These open when Roblox starts through Orbit. Optionally close them when you stop playing.</p></div><span class="spacer"></span><button class="btn" id="appAdd">Add app</button></div>
+        <div id="appList"></div>
       </div>
     </section>
 
@@ -381,16 +530,22 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     </section>
 
     <section class="page" id="page-session">
-      <div class="page-head rise" style="--i:0"><h1>Session</h1><p>Server location, play time and crash recovery while you play.</p></div>
+      <div class="page-head rise" style="--i:0"><h1>Stats</h1><p>Your play time, weekly recap and full session history.</p></div>
       <div class="card rise" style="--i:1" id="sessionToggles"></div>
       <div class="grid3 rise" style="--i:2">
         <div class="card tilt"><div class="stat-label">Total play time</div><div class="big-num" id="statTotal">0m</div></div>
         <div class="card tilt"><div class="stat-label">Games played</div><div class="big-num" id="statGames">0</div></div>
         <div class="card tilt"><div class="stat-label">Sessions</div><div class="big-num" id="statSessions">0</div></div>
       </div>
-      <div class="card rise" style="--i:3">
+      <div class="card recap rise" style="--i:3" id="recapCard"></div>
+      <div class="card rise" style="--i:4">
         <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Most played</h3><span class="spacer"></span><button class="btn danger" id="resetStats">Reset</button></div>
         <div id="statsList"></div>
+      </div>
+      <div class="card rise" style="--i:5" id="timelineCard">
+        <h3 style="margin-bottom:10px">Session history</h3>
+        <div id="timeline"></div>
+        <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" id="tlMore" hidden>Show more</button></div>
       </div>
     </section>
 
@@ -418,18 +573,30 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="field" style="margin:0"><label>Accent</label><div class="swatches" id="swatches"></div><div class="swatch-name" id="swatchName"></div></div>
       </div>
       <div class="card rise" style="--i:2">
+        <h3>Background</h3><p class="sub">Pick the backdrop behind Orbit.</p>
+        <div class="field"><div id="bgSeg"></div></div>
+        <div id="bgImageOpts"><div class="row" style="margin-bottom:12px"><button class="btn" id="bgChoose">Choose image</button><span class="muted small" id="bgName"></span></div>
+          <div class="field" style="margin:0"><label>Dim</label><div class="range-wrap"><input type="range" id="bgDim" min="0" max="90"><div class="range-val" id="bgDimVal"></div></div></div></div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <h3>Sounds</h3><p class="sub">Played when you launch Roblox and unlock achievements.</p>
+        <div class="field"><div id="sndSeg"></div></div>
+        <div class="field" style="margin:0"><label>Volume</label><div class="range-wrap"><input type="range" id="sndVol" min="0" max="100"><div class="range-val" id="sndVolVal"></div><button class="btn" id="sndTest">Preview</button></div></div>
+      </div>
+      <div class="card rise" style="--i:4">
         <h3>Roblox icon</h3>
         <p class="sub" id="iconStatus">No custom icon chosen.</p>
         <div class="row" style="margin-bottom:6px"><button class="btn" id="chooseIcon">Choose .ico file</button><button class="btn danger" id="removeIcon">Remove</button></div>
         <div id="iconToggle"></div>
       </div>
-      <div class="card rise" style="--i:3">
+      <div class="card rise" style="--i:5">
         <h3>Shortcuts</h3>
         <p class="sub">To keep Orbit on your taskbar: open it, right-click its taskbar icon and choose <b>Pin to taskbar</b>. Or add shortcuts here.</p>
         <div class="toggle-row" style="padding-top:4px"><div class="t"><b>Orbit Launcher</b><span>Opens this window.</span></div>
           <button class="btn" data-sc="orbit:Desktop">Desktop</button><button class="btn" data-sc="orbit:Programs">Start menu</button></div>
         <div class="toggle-row"><div class="t"><b>Roblox (Orbit)</b><span>Opens Roblox through Orbit, with your custom icon.</span></div>
           <button class="btn" data-sc="roblox:Desktop">Desktop</button><button class="btn" data-sc="roblox:Programs">Start menu</button></div>
+        <div id="trayToggle"></div>
       </div>
     </section>
 
@@ -452,6 +619,10 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div id="autoUpdRow" style="margin-top:10px"></div>
         <div class="vstatus" id="updStatus"></div>
       </div>
+      <div class="card rise" style="--i:7">
+        <div class="row"><div><h3>Backup &amp; restore</h3><p class="sub" style="margin:0">Save your settings, profiles, mods, stats and achievements to one file, then load them on any PC.</p></div><span class="spacer"></span>
+          <button class="btn" id="bkExport">Export backup</button><button class="btn" id="bkImport">Restore</button></div>
+      </div>
     </section>
   </main>
 
@@ -470,6 +641,11 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 </div>
 
 <div id="toasts"></div>
+<div id="lightbox"><button class="nav-arrow" id="lbPrev" style="left:16px">‹</button><button class="nav-arrow" id="lbNext" style="right:16px">›</button>
+  <img id="lbImg" alt=""><div class="row"><button class="btn" id="lbOpen">Open</button><button class="btn" id="lbCopy">Copy image</button><button class="btn" id="lbShow">Show in folder</button><button class="btn ghost" id="lbClose">Close</button></div></div>
+<div id="palette"><div class="pal"><input id="palInput" placeholder="Search pages, games and actions..." spellcheck="false"><div class="pal-list" id="palList"></div></div></div>
+<div class="modal-wrap" id="wn"><div class="modal"><span class="ver-badge" id="wnVer"></span><h3 id="wnTitle">What's new</h3><div class="notes" id="wnNotes"></div>
+  <div class="row"><button class="btn primary" id="wnOk">Let's go</button></div></div></div>
 <div class="modal-wrap" id="modal"><div class="modal">
   <h3 id="mTitle"></h3><p id="mText"></p><input class="input" id="mInput">
   <div class="row"><button class="btn ghost" id="mCancel">Cancel</button><button class="btn primary" id="mOk">OK</button></div>
@@ -500,12 +676,19 @@ const ICONS = {
   appearance: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.6 0-1.4-1.2-1.6-1.2-2.8 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
   extensions: '<path d="M10 4a2 2 0 1 1 4 0v2h4a1 1 0 0 1 1 1v4h-2a2 2 0 1 0 0 4h2v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-4h2a2 2 0 1 0 0-4H5V7a1 1 0 0 1 1-1h4z"/>',
   credits: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  library: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
+  servers: '<rect x="3" y="4" width="18" height="6.5" rx="1.5"/><rect x="3" y="13.5" width="18" height="6.5" rx="1.5"/><path d="M7 7.2h.01M7 16.7h.01M11 7.2h6M11 16.7h6"/>',
+  achievements: '<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  screens: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-9 8"/>',
+  boost: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
   file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
   box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
-const PAGES = [["home", "Home"], ["flags", "FastFlags"], ["mods", "Mods"], ["session", "Session"],
-               ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"], ["credits", "Credits"]];
+const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["servers", "Servers"],
+               ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
+               ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
+               ["#Orbit"], ["credits", "Credits"]];
 
 let api = null, S = null, cfg = null, page = "home";
 const iconCache = {};
@@ -614,11 +797,25 @@ function starfield() {
     stars = Array.from({ length: 170 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: Math.random() ** 2 * .9 + .1, t: Math.random() * 6.3, s: Math.random() * .02 + .008 }));
   };
   resize(); addEventListener("resize", resize);
+  const warp = Array.from({ length: 260 }, () => ({ x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random() }));
   const frame = (ts) => {
     requestAnimationFrame(frame);
-    if (document.hidden || ts - last < 33) return;
+    const mode = (cfg && cfg.appearance.background) || "Starfield";
+    if (document.hidden || mode === "Nebula" || ts - last < (mode === "Warp" ? 16 : 33)) return;
     last = ts; x.clearRect(0, 0, W, H);
     px += (tx - px) * .06; py += (ty - py) * .06;
+    if (mode === "Warp") {
+      const cx = W / 2 + px * W * .25, cy = H / 2 + py * H * .25, f = Math.min(W, H) * .5;
+      for (const st of warp) {
+        const z0 = st.z; st.z -= .006; if (st.z <= .02) { st.x = Math.random() * 2 - 1; st.y = Math.random() * 2 - 1; st.z = 1; continue; }
+        const sx = cx + st.x / st.z * f, sy = cy + st.y / st.z * f, ox = cx + st.x / z0 * f, oy = cy + st.y / z0 * f;
+        if (sx < 0 || sx > W || sy < 0 || sy > H) { st.z = 1; continue; }
+        const al = Math.min(1, (1 - st.z) * 1.4);
+        x.strokeStyle = `rgba(${starRGB},${al})`; x.lineWidth = (1 - st.z) * 2.4 * dpr;
+        x.beginPath(); x.moveTo(ox, oy); x.lineTo(sx, sy); x.stroke();
+      }
+      return;
+    }
     for (const st of stars) {
       st.t += st.s * 3; st.x -= st.z * .12 * dpr; if (st.x < -2) { st.x = W + 2; st.y = Math.random() * H; }
       const al = (.2 + .8 * Math.abs(Math.sin(st.t))) * st.z, r = (st.z * 1.1 + .25) * dpr;
@@ -752,6 +949,7 @@ function spotlight() {
 function buildNav() {
   const nav = $("#nav");
   PAGES.forEach(([id, label]) => {
+    if (id.startsWith("#")) { nav.append(h("div", { class: "nav-group" }, id.slice(1).toUpperCase())); return; }
     const b = h("button", { class: "nav-item", "data-page": id });
     b.innerHTML = svg(id) + `<span>${label}</span>`;
     b.addEventListener("click", () => go(id));
@@ -766,7 +964,8 @@ function go(id) {
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
-     appearance: renderAppearance, extensions: () => {}, credits: () => {} })[id]?.();
+     appearance: renderAppearance, extensions: () => {}, credits: () => {}, library: renderLibrary, servers: renderServers,
+     achievements: renderAchievements, screens: renderScreens, boost: renderBoost })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -780,6 +979,7 @@ function renderHome() {
   $("#sideStatus").textContent = S.install ? "Roblox ready" : "Roblox not found";
   $("#sideDot").classList.toggle("off", !S.install);
   $("#regToggle").checked = !!S.registered;
+  renderRecent();
   const last = S.last_server;
   if (last && last.place_id) {
     $("#lastName").textContent = last.name || `Place ${last.place_id}`;
@@ -906,7 +1106,7 @@ function renderSession() {
     toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
-  renderStats();
+  renderStats(); renderRecap(); renderTimeline();
 }
 async function renderStats() {
   const data = S.playtime || {};
@@ -969,6 +1169,19 @@ function renderAppearance() {
   nameEl.textContent = a.accent;
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
+  const bgSeg = $("#bgSeg"); bgSeg.innerHTML = "";
+  bgSeg.append(segmented([["Starfield", "Starfield"], ["Warp", "Warp speed"], ["Nebula", "Nebula"], ["Image", "My image"]], a.background || "Starfield", async (v) => {
+    if (v === "Image" && !a.bg_file) { const r = await api.choose_background(); if (!r || r.error) { if (r && r.error) toast(r.error, "err"); renderAppearance(); return; } window._bgData = r.data; a.bg_file = r.file; }
+    a.background = v; save(); applyBackground(); $("#bgImageOpts").style.display = v === "Image" ? "" : "none";
+  }));
+  $("#bgImageOpts").style.display = a.background === "Image" ? "" : "none";
+  $("#bgName").textContent = a.bg_file ? "Custom image set ✓" : "";
+  const dim = Math.round((a.bg_dim ?? .55) * 100); $("#bgDim").value = dim; $("#bgDimVal").textContent = dim + "%"; $("#bgDim").style.setProperty("--fill", (dim / 90 * 100) + "%");
+  const snd = $("#sndSeg"); snd.innerHTML = "";
+  snd.append(segmented([["Warp", "Warp"], ["Nova", "Nova"], ["Pulse", "Pulse"], ["Chime", "Chime"], ["Off", "Off"]], cfg.sounds.pack, (v) => { cfg.sounds.pack = v; save(); sfx("launch", v); }));
+  const vol = Math.round((cfg.sounds.volume ?? .6) * 100); $("#sndVol").value = vol; $("#sndVolVal").textContent = vol + "%"; $("#sndVol").style.setProperty("--fill", vol + "%");
+  const tt = $("#trayToggle"); tt.innerHTML = "";
+  tt.append(toggleRow("Keep Orbit in the system tray", "Closing the window keeps Orbit by the clock with quick Launch, Rejoin and Library options. Takes effect next time Orbit opens.", a.tray !== false, (v) => { a.tray = v; save(); }));
   const it = $("#iconToggle"); it.innerHTML = "";
   it.append(toggleRow("Use it on the Roblox window", "Shows your icon on Roblox's title bar and taskbar while it runs. No Roblox files are changed.", a.custom_window_icon, (v) => { a.custom_window_icon = v; save(); }));
 }
@@ -984,17 +1197,400 @@ function renderCredits() {
 }
 
 
+let actx = null;
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(ctx, out, { f = 440, f2 = null, type = "sine", t = 0, d = .3, g = .3 }) {
+  const o = ctx.createOscillator(), v = ctx.createGain(), now = ctx.currentTime + t;
+  o.type = type; o.frequency.setValueAtTime(f, now); if (f2) o.frequency.exponentialRampToValueAtTime(f2, now + d);
+  v.gain.setValueAtTime(0.0001, now); v.gain.exponentialRampToValueAtTime(g, now + .015); v.gain.exponentialRampToValueAtTime(0.0001, now + d);
+  o.connect(v).connect(out); o.start(now); o.stop(now + d + .05);
+}
+function whoosh(ctx, out, d = .7, g = .5) {
+  const len = ctx.sampleRate * d, buf = ctx.createBuffer(1, len, ctx.sampleRate), data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), v = ctx.createGain(), now = ctx.currentTime;
+  bp.type = "bandpass"; bp.Q.value = 1.4; bp.frequency.setValueAtTime(260, now); bp.frequency.exponentialRampToValueAtTime(4200, now + d * .8);
+  v.gain.setValueAtTime(0.0001, now); v.gain.exponentialRampToValueAtTime(g, now + d * .35); v.gain.exponentialRampToValueAtTime(0.0001, now + d);
+  src.buffer = buf; src.connect(bp).connect(v).connect(out); src.start(now);
+}
+function sfx(kind, pack) {
+  const snd = cfg ? cfg.sounds : { pack: "Warp", volume: .6 };
+  pack = pack || snd.pack; if (pack === "Off") return;
+  const ctx = audio(); if (!ctx) return;
+  const out = ctx.createGain(); out.gain.value = Math.max(0, Math.min(1, snd.volume ?? .6)) * .9; out.connect(ctx.destination);
+  if (kind === "achievement") {
+    [523, 659, 784, 1047].forEach((f, i) => tone(ctx, out, { f, t: i * .09, d: .5, g: .22 }));
+    tone(ctx, out, { f: 2093, t: .36, d: .9, g: .06, type: "triangle" }); return;
+  }
+  if (kind === "ready") { tone(ctx, out, { f: 880, d: .25, g: .15 }); tone(ctx, out, { f: 1320, t: .1, d: .4, g: .12 }); return; }
+  if (pack === "Warp") { whoosh(ctx, out, .8, .45); tone(ctx, out, { f: 110, f2: 880, d: .7, g: .18, type: "sawtooth" }); tone(ctx, out, { f: 1760, t: .55, d: .5, g: .08 }); }
+  else if (pack === "Pulse") { tone(ctx, out, { f: 660, d: .12, g: .25, type: "square" }); tone(ctx, out, { f: 990, t: .13, d: .25, g: .2, type: "square" }); tone(ctx, out, { f: 1320, t: .3, d: .35, g: .12 }); }
+  else if (pack === "Chime") { [880, 1108.7, 1318.5].forEach((f, i) => tone(ctx, out, { f, t: i * .07, d: 1.2, g: .16 })); }
+  else if (pack === "Nova") { tone(ctx, out, { f: 220, f2: 55, d: .9, g: .35 }); whoosh(ctx, out, .5, .25); tone(ctx, out, { f: 1480, t: .05, d: .6, g: .07, type: "triangle" }); }
+}
+
+function burst(x0, y0, n = 90) {
+  const c = $("#fx"), ctx = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth + "px"; c.style.height = innerHeight + "px";
+  ctx.scale(dpr, dpr);
+  const cols = [getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(), getComputedStyle(document.documentElement).getPropertyValue("--accent2").trim(), "#ffffff"];
+  const ps = Array.from({ length: n }, () => { const a = Math.random() * 6.283, sp = 3 + Math.random() * 7; return { x: x0, y: y0, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3, s: 2 + Math.random() * 3, r: Math.random() * 6, c: cols[Math.floor(Math.random() * 3)], l: 1 }; });
+  const step = () => {
+    ctx.clearRect(0, 0, innerWidth, innerHeight); let alive = 0;
+    for (const p of ps) { if (p.l <= 0) continue; alive++; p.vy += .18; p.vx *= .985; p.x += p.vx; p.y += p.vy; p.l -= .012; p.r += .1;
+      ctx.save(); ctx.globalAlpha = Math.max(0, p.l); ctx.fillStyle = p.c; ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillRect(-p.s, -p.s / 2, p.s * 2, p.s); ctx.restore(); }
+    if (alive) requestAnimationFrame(step); else ctx.clearRect(0, 0, innerWidth, innerHeight);
+  };
+  requestAnimationFrame(step);
+}
+
+function applyBackground() {
+  const a = cfg.appearance, mode = a.background || "Starfield";
+  document.body.classList.toggle("bg-nebula", mode === "Nebula");
+  document.body.classList.toggle("bg-image", mode === "Image");
+  const el = $("#bgImage"); el.style.setProperty("--dim", a.bg_dim ?? .55);
+  if (mode === "Image") {
+    const show = (d) => { if (d) { el.style.backgroundImage = `url("${d}")`; el.classList.add("show"); } };
+    if (window._bgData) show(window._bgData); else api.background_data().then((d) => { window._bgData = d; show(d); });
+  } else el.classList.remove("show");
+  if (mode !== "Warp" && mode !== "Nebula") { const c = $("#stars"); c.getContext("2d").clearRect(0, 0, c.width, c.height); }
+}
+
+const gameCache = {};
+async function loadGames(pids) {
+  const need = pids.map(String).filter((p) => !(p in gameCache));
+  if (need.length) Object.assign(gameCache, await api.games_info(need));
+  pids.forEach((p) => { const g = gameCache[p]; if (g && g.icon) iconCache[p] = g.icon; });
+}
+const pt = (pid) => (S.playtime && S.playtime[pid] ? S.playtime[pid].seconds : 0);
+
+function emptyState(icon, title, sub) {
+  const d = h("div"); d.innerHTML = svg(icon);
+  return h("div", { class: "empty" }, d.firstChild, h("div", {}, title), sub ? h("div", { class: "small" }, sub) : null);
+}
+
+async function renderRecent() {
+  const box = $("#recentList"), list = await api.recent_servers(6);
+  box.innerHTML = "";
+  if (!list.length) { box.append(h("div", { class: "muted small" }, "Servers you join through Orbit show up here so you can hop back in.")); return; }
+  list.forEach((x, i) => {
+    const gi = h("div", { class: "gi", "data-pid": x.place_id });
+    box.append(h("div", { class: "list-row", style: `--i:${i}` }, gi,
+      h("div", { class: "tx" }, h("b", {}, x.name), h("span", {}, `${fmtAgo(x.end || x.start)} · ${fmtDur(x.seconds)}${x.location ? " · " + x.location : ""}`)),
+      h("button", { class: "btn", onclick: async () => { await saveNow(); sfx("launch"); const r = await api.join_server(x.place_id, x.job_id); r && r.error ? toast(r.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin")));
+  });
+  await loadGames([...new Set(list.map((x) => x.place_id))]);
+  $$(".gi", box).forEach((g) => { const u = iconCache[g.dataset.pid]; if (u) g.style.backgroundImage = `url("${u}")`; });
+}
+
+async function addToLibrary(text) {
+  if (!text) return;
+  const r = await api.lookup_game(text);
+  if (r.error) return toast(r.error, "err");
+  if (cfg.library.some((g) => String(g.pid) === r.pid)) { toast(`${r.name} is already in your library.`); return; }
+  cfg.library.push({ pid: r.pid, name: r.name, mod_profile: null }); save();
+  toast(`Added ${r.name} to your library.`, "ok"); renderLibrary();
+}
+async function renderLibrary() {
+  const grid = $("#libGrid"); grid.innerHTML = "";
+  if (!cfg.library.length) grid.append(h("div", { class: "card", style: "grid-column:1/-1;margin:0" }, emptyState("library", "Your library is empty.", "Click Add game, or add something you've played recently below.")));
+  await loadGames(cfg.library.map((g) => g.pid));
+  cfg.library.forEach((g, i) => {
+    const info = gameCache[g.pid] || {}, art = h("div", { class: "art", style: info.thumb || info.icon ? `background-image:url("${info.thumb || info.icon}")` : "" });
+    const play = h("button", { class: "play", title: "Play" }); play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+    play.onclick = () => playGame(g);
+    const x = h("button", { class: "x", title: "Remove" }, "✕");
+    x.onclick = async () => { if (await modal({ title: `Remove ${g.name}?`, text: "It only leaves your library. Stats and flag profiles stay.", ok: "Remove", danger: true })) { cfg.library = cfg.library.filter((y) => y !== g); save(); renderLibrary(); } };
+    art.append(play, x, h("div", { class: "pt" }, pt(g.pid) ? fmtDur(pt(g.pid)) + " played" : "Not played yet"));
+    const sel = h("select", { class: "input", title: "Mod pack for this game" }, h("option", { value: "" }, "Mods: default profile"),
+      S.mod_profiles.map((m) => h("option", { value: m }, "Mods: " + m)));
+    sel.value = g.mod_profile || ""; sel.onchange = () => { g.mod_profile = sel.value || null; save(); toast(`${g.name} will use ${sel.value || "your default"} mods.`, "ok"); };
+    const hasFlags = !!cfg.game_profiles[g.pid];
+    const flagsBtn = h("button", { class: "btn", title: hasFlags ? "Edit this game's FastFlags" : "Give this game its own FastFlags" }, hasFlags ? "Flags ✓" : "Flags");
+    flagsBtn.onclick = () => {
+      if (!cfg.game_profiles[g.pid]) { cfg.game_profiles[g.pid] = { name: g.name, presets: JSON.parse(JSON.stringify(cfg.presets)), custom_flags: JSON.parse(JSON.stringify(cfg.custom_flags)) }; save(); }
+      curProfile = String(g.pid); go("flags");
+    };
+    const card = h("div", { class: "card game tilt", style: `--i:${i}` }, art,
+      h("div", { class: "meta" }, h("div", { class: "gname", title: g.name }, info.name || g.name),
+        h("div", { class: "small muted" }, info.creator ? "by " + info.creator : " "),
+        h("div", { class: "row" }, h("button", { class: "btn primary", onclick: () => playGame(g) }, "Play"),
+          h("button", { class: "btn", onclick: () => { go("servers"); findServers(g.pid); } }, "Servers"), flagsBtn),
+        h("div", { class: "row" }, sel)));
+    grid.append(card);
+  });
+  const sug = $("#libSuggest"); sug.innerHTML = "";
+  const have = new Set(cfg.library.map((g) => String(g.pid)));
+  const recent = Object.entries(S.playtime || {}).filter(([pid]) => !have.has(pid)).sort((a, b) => (b[1].last_played || 0) - (a[1].last_played || 0)).slice(0, 8);
+  $("#libSuggestCard").style.display = recent.length ? "" : "none";
+  recent.forEach(([pid, e]) => sug.append(h("button", { class: "mini-chip", onclick: () => addToLibrary(pid) }, "+ " + (e.name || pid))));
+}
+async function playGame(g) {
+  await saveNow(); sfx("launch");
+  const r = await api.play_game(g.pid);
+  r && r.error ? toast(r.error, "err") : toast(`Launching ${g.name}...`, "ok");
+}
+
+let svData = null, svSort = "empty";
+function renderServers() {
+  const q = $("#svQuick"); q.innerHTML = "";
+  cfg.library.slice(0, 10).forEach((g) => q.append(h("button", { class: "mini-chip", onclick: () => findServers(g.pid) }, g.name)));
+  if (!cfg.library.length) q.append(h("span", { class: "muted small" }, "Tip: games in your Library show up here for one-click search."));
+  if (!svData) $("#svResult").innerHTML = "";
+}
+async function findServers(text) {
+  text = text || $("#svInput").value.trim(); if (!text) return;
+  $("#svInput").value = /^\d+$/.test(String(text)) ? `https://www.roblox.com/games/${text}` : text;
+  const res = $("#svResult"); res.innerHTML = "";
+  res.append(h("div", { class: "card" }, h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Scanning servers..."))));
+  const r = await api.servers(text);
+  if (r.error) { res.innerHTML = ""; toast(r.error, "err"); return; }
+  svData = r; drawServers();
+}
+function drawServers() {
+  const r = svData, res = $("#svResult"); res.innerHTML = "";
+  const list = [...r.servers];
+  if (svSort === "empty") list.sort((a, b) => a.playing - b.playing);
+  else if (svSort === "full") list.sort((a, b) => (b.playing / (b.max || 1)) - (a.playing / (a.max || 1)));
+  else list.sort((a, b) => (a.ping ?? 9999) - (b.ping ?? 9999));
+  const join = async (sv) => { await saveNow(); sfx("launch"); const x = await api.join_server(r.pid, sv.id); x && x.error ? toast(x.error, "err") : toast(`Joining a ${sv.playing}/${sv.max} server in ${r.name}...`, "ok"); };
+  const head = h("div", { class: "card rise", style: "--i:0" }, h("div", { class: "sv-head" }, h("div", { class: "thumb", style: r.thumb ? `background-image:url("${r.thumb}")` : "" }),
+    h("div", { style: "flex:1;min-width:0" }, h("h3", { style: "font-size:18px" }, r.name), h("div", { class: "muted small" }, `${r.servers.length} open servers found` + (r.note ? " · " + r.note : "")),
+      h("div", { class: "row", style: "margin-top:10px" },
+        h("button", { class: "btn primary", disabled: !list.length, onclick: () => join([...r.servers].sort((a, b) => a.playing - b.playing)[0]) }, "Join emptiest"),
+        h("button", { class: "btn", disabled: !list.length, onclick: () => join([...r.servers].sort((a, b) => (a.ping ?? 9999) - (b.ping ?? 9999))[0]) }, "Join best ping"),
+        h("button", { class: "btn ghost", onclick: () => findServers(r.pid) }, "Refresh")))));
+  res.append(head);
+  const card = h("div", { class: "card rise", style: "--i:1" });
+  const seg = segmented([["empty", "Most empty"], ["full", "Most full"], ["ping", "Best ping"]], svSort, (v) => { svSort = v; drawServers(); });
+  card.append(h("div", { class: "row", style: "margin-bottom:10px" }, h("h3", { style: "margin:0" }, "Servers"), h("span", { class: "spacer" }), seg));
+  if (!list.length) card.append(emptyState("servers", "No open servers right now.", r.note || "Everything is full. Try Refresh in a moment."));
+  else {
+    card.append(h("div", { class: "sv-row sv-head-row" }, h("span", {}, "Players"), h("span", { class: "num" }, "Ping"), h("span", { class: "num" }, "FPS"), h("span"), h("span")));
+    list.slice(0, 120).forEach((sv, i) => {
+      const pct = sv.max ? sv.playing / sv.max * 100 : 0, ping = sv.ping ?? null;
+      const pc = ping == null ? "muted" : ping < 80 ? "ping-good" : ping < 160 ? "ping-mid" : "ping-bad";
+      card.append(h("div", { class: "sv-row", style: `--i:${Math.min(i, 30)}` },
+        h("div", {}, h("b", {}, `${sv.playing} / ${sv.max}`), h("div", { class: "cap" }, h("i", { style: `width:${pct}%` }))),
+        h("div", { class: "num " + pc }, ping == null ? "–" : ping + " ms"), h("div", { class: "num muted" }, sv.fps ? String(sv.fps) : "–"), h("span"),
+        h("button", { class: "btn", onclick: () => join(sv) }, "Join")));
+    });
+    card.append(h("p", { class: "muted small", style: "margin:10px 0 0" }, "Ping is the average of the players already in that server, so it's a good hint for how close the server is."));
+  }
+  res.append(card);
+  requestAnimationFrame(() => seg._remeasure());
+}
+
+async function renderRecap() {
+  const box = $("#recapCard"), r = await api.weekly_recap(); box.innerHTML = "";
+  if (r.empty) { box.append(h("h3", {}, "Weekly recap"), h("p", { class: "sub", style: "margin:0" }, "Play through Orbit this week and your recap shows up here.")); return; }
+  const btn = h("button", { class: "btn primary" }, "Save as image");
+  btn.onclick = async () => { const x = await api.export_recap(); x.error ? toast(x.error, "err") : toast("Recap saved to Pictures\\Orbit.", "ok"); };
+  box.append(h("div", { class: "row" }, h("div", {}, h("div", { class: "stat-label" }, "Weekly recap · " + r.range), h("div", { class: "big" }, fmtDur(r.total)), h("div", { class: "muted", style: "margin-top:4px" }, "played this week")), h("span", { class: "spacer" }), btn),
+    h("div", { class: "recap-cards" },
+      h("div", {}, h("div", { class: "stat-label" }, "Top game"), h("b", {}, r.top_game || "-"), h("span", { class: "muted small" }, fmtDur(r.top_seconds))),
+      h("div", {}, h("div", { class: "stat-label" }, "Sessions"), h("b", {}, String(r.sessions)), h("span", { class: "muted small" }, `${r.days_played} day(s) · ${r.new_games} new game(s)`)),
+      h("div", {}, h("div", { class: "stat-label" }, "Best day"), h("b", {}, r.best_day), h("span", { class: "muted small" }, "longest " + fmtDur(r.longest)))));
+}
+let tlOffset = 0;
+async function renderTimeline(more) {
+  const box = $("#timeline"); if (!more) { box.innerHTML = ""; tlOffset = 0; }
+  const r = await api.sessions(tlOffset, 30); tlOffset += r.items.length;
+  if (!r.total) { box.append(h("div", { class: "muted small" }, "Every session you play through Orbit is listed here with its server location.")); $("#tlMore").hidden = true; return; }
+  let lastDay = box.dataset.lastDay || "";
+  r.items.forEach((x, i) => {
+    const d = new Date(x.start * 1000), day = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+    if (day !== lastDay) { box.append(h("div", { class: "day-head" }, day)); lastDay = day; }
+    const t = (ts) => new Date(ts * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    box.append(h("div", { class: "list-row", style: `--i:${i}` }, h("div", { class: "gi", "data-pid": x.place_id }),
+      h("div", { class: "tx" }, h("b", {}, x.name), h("span", {}, `${t(x.start)} – ${t(x.end)}${x.location ? " · " + x.location : ""}`)),
+      h("div", { class: "num", style: "font-weight:650" }, fmtDur(x.seconds)),
+      h("button", { class: "btn ghost", title: "Join this server again", onclick: async () => { await saveNow(); sfx("launch"); const y = await api.join_server(x.place_id, x.job_id); y && y.error ? toast(y.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin")));
+  });
+  box.dataset.lastDay = lastDay;
+  $("#tlMore").hidden = tlOffset >= r.total;
+  await loadGames([...new Set(r.items.map((x) => x.place_id))]);
+  $$(".gi", box).forEach((g) => { const u = iconCache[g.dataset.pid]; if (u) g.style.backgroundImage = `url("${u}")`; });
+}
+
+async function renderAchievements() {
+  const r = await api.achievements(), grid = $("#achGrid"); grid.innerHTML = "";
+  const done = r.list.filter((a) => a.unlocked).length, total = r.list.length;
+  $("#achCount").textContent = `${done} / ${total}`;
+  $("#achPct").textContent = Math.round(done / total * 100) + "%";
+  requestAnimationFrame(() => ($("#achRing").style.strokeDashoffset = 251.3 * (1 - done / total)));
+  const next = r.list.filter((a) => !a.unlocked).sort((a, b) => b.cur / b.goal - a.cur / a.goal)[0];
+  $("#achNext").textContent = next ? `Closest next: ${next.title}, ${Math.round(next.cur / next.goal * 100)}% there` : "You unlocked everything. Legendary.";
+  const sorted = [...r.list].sort((a, b) => (b.unlocked - a.unlocked) || (b.cur / b.goal - a.cur / a.goal));
+  sorted.forEach((a, i) => {
+    const bar = h("i"), fmt = (v) => Number.isInteger(a.goal) && a.goal > 1 && !/hour/i.test(a.desc) ? Math.floor(v) : (Math.round(v * 10) / 10);
+    grid.append(h("div", { class: "card ach tilt" + (a.unlocked ? " done" : ""), style: `--i:${i}` },
+      h("div", { class: "ic" }, a.unlocked ? a.icon : "🔒"),
+      h("div", { style: "flex:1;min-width:0" }, h("div", { class: "tt" }, a.title), h("div", { class: "dd" }, a.desc),
+        a.unlocked ? h("div", { class: "pg", style: "color:var(--accent)" }, "Unlocked " + new Date(a.at * 1000).toLocaleDateString())
+          : [h("div", { class: "bar" }, bar), h("div", { class: "pg" }, a.goal > 1 ? `${fmt(a.cur)} / ${a.goal}` : "Not yet")])));
+    setTimeout(() => (bar.style.width = (a.cur / a.goal * 100) + "%"), 300 + i * 30);
+  });
+}
+async function checkAchievements() {
+  const r = await api.achievements(); if (!r.new.length) return;
+  const items = r.list.filter((a) => r.new.includes(a.id));
+  sfx("achievement"); burst(innerWidth / 2, innerHeight / 3, 120);
+  if (items.length > 2) { achToast("🏆", `${items.length} achievements unlocked!`, "Check the Achievements page."); return; }
+  items.forEach((a, i) => setTimeout(() => achToast(a.icon, a.title, a.desc), i * 700));
+}
+function achToast(icon, title, desc) {
+  const t = h("div", { class: "toast ach-toast" }, h("div", { class: "em" }, icon), h("div", {}, h("small", {}, "Achievement unlocked"), h("b", {}, title), h("div", { class: "muted small" }, desc)));
+  t.style.cursor = "pointer"; t.onclick = () => go("achievements");
+  $("#toasts").append(t); setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 400); }, 5200);
+}
+
+let shotOffset = 0, shotItems = [], lbIndex = 0;
+async function renderScreens(more) {
+  const grid = $("#shotGrid");
+  if (!more) { grid.innerHTML = ""; shotOffset = 0; shotItems = []; }
+  if (!S.screens_dirs.length) { grid.append(h("div", { class: "card", style: "grid-column:1/-1" }, emptyState("screens", "No Roblox screenshots yet.", "Take one in-game with the camera button in the Roblox menu, then hit Refresh."))); $("#shotMore").hidden = true; return; }
+  const r = await api.screenshots(shotOffset, 24);
+  $("#shotSub").textContent = `${r.total} screenshot${r.total === 1 ? "" : "s"}, newest first.`;
+  r.items.forEach((it, i) => {
+    const idx = shotItems.length; shotItems.push(it);
+    const el = h("div", { class: "shot", style: `--i:${i};${it.thumb ? `background-image:url("${it.thumb}")` : ""}` }, h("span", {}, new Date(it.time * 1000).toLocaleString()));
+    el.onclick = () => openLightbox(idx); grid.append(el);
+  });
+  if (!r.total) grid.append(h("div", { class: "card", style: "grid-column:1/-1" }, emptyState("screens", "No Roblox screenshots yet.", "Take one in-game, then hit Refresh.")));
+  shotOffset += r.items.length; $("#shotMore").hidden = shotOffset >= r.total;
+}
+async function openLightbox(i) {
+  lbIndex = Math.max(0, Math.min(shotItems.length - 1, i)); const it = shotItems[lbIndex];
+  const lb = $("#lightbox"), img = $("#lbImg"); img.src = it.thumb || ""; lb.classList.add("show");
+  const full = await api.screenshot_full(it.path); if (full && shotItems[lbIndex] === it) img.src = full;
+}
+
+function renderBoost() {
+  const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
+  box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
+    toggleRow("High priority for Roblox", "Tells Windows to give Roblox the CPU first while you play.", p.high_priority, (v) => { p.high_priority = v; save(); }),
+    toggleRow("High performance power plan", "Switches Windows to its high performance power plan while Roblox runs, then switches back.", p.power_plan, (v) => { p.power_plan = v; save(); }));
+  const list = $("#appList"); list.innerHTML = "";
+  if (!cfg.launch_with.length) list.append(h("div", { class: "muted small", style: "padding:6px 0" }, "No apps yet. Add Discord, OBS, Spotify, or anything else you always open."));
+  cfg.launch_with.forEach((app, i) => list.append(h("div", { class: "list-row app-row", style: `--i:${i}` }, h("div", { class: "gi" }, "🚀"),
+    h("div", { class: "tx" }, h("b", {}, app.name), h("span", { class: "mono" }, app.path)),
+    h("span", { class: "muted small" }, "Close after"), switchEl(app.close_after, (v) => { app.close_after = v; save(); }),
+    h("button", { class: "btn ghost danger", onclick: () => { cfg.launch_with.splice(i, 1); save(); renderBoost(); } }, "Remove"))));
+}
+
+let palItems = [], palSel = 0;
+function palActions() {
+  const A = [];
+  PAGES.filter(([id]) => !id.startsWith("#")).forEach(([id, label]) => A.push({ ico: "→", t: `Go to ${label}`, k: "Page", run: () => go(id) }));
+  A.push({ ico: "▶", t: "Launch Roblox", k: "Action", run: () => $("#launchBtn").click() });
+  if (S.last_server && S.last_server.place_id) A.push({ ico: "↻", t: "Rejoin last server", k: S.last_server.name || "", run: () => $("#rejoinBtn").click() });
+  cfg.library.forEach((g) => { A.push({ ico: "🎮", t: `Play ${g.name}`, k: "Library", run: () => playGame(g) }); A.push({ ico: "🛰", t: `Find servers: ${g.name}`, k: "Servers", run: () => { go("servers"); findServers(g.pid); } }); });
+  [["Direct3D 11", "D3D11"], ["Vulkan", "Vulkan"], ["OpenGL", "OpenGL"], ["Automatic", "Auto"]].forEach(([v, l]) => A.push({ ico: "⚙", t: `Graphics API: ${l}`, k: "FastFlags", run: () => { cfg.presets.graphics_api = v; save(); toast(`Graphics API set to ${l}.`, "ok"); } }));
+  A.push({ ico: "◐", t: cfg.appearance.mode === "Light" ? "Switch to dark mode" : "Switch to light mode", k: "Appearance", run: () => { cfg.appearance.mode = cfg.appearance.mode === "Light" ? "Dark" : "Light"; applyTheme(); save(); } });
+  Object.keys(S.accents).forEach((n) => A.push({ ico: "●", t: `Accent: ${n}`, k: "Appearance", run: () => { cfg.appearance.accent = n; applyTheme(); save(); } }));
+  ["Starfield", "Warp", "Nebula"].forEach((n) => A.push({ ico: "✦", t: `Background: ${n}`, k: "Appearance", run: () => { cfg.appearance.background = n; applyBackground(); save(); } }));
+  A.push({ ico: "💬", t: cfg.discord.enabled ? "Turn off Discord status" : "Turn on Discord status", k: "Discord", run: () => { cfg.discord.enabled = !cfg.discord.enabled; save(); toast(`Discord status ${cfg.discord.enabled ? "on" : "off"}.`, "ok"); } });
+  A.push({ ico: "⬇", t: "Check for updates", k: "Orbit", run: () => checkUpdates(true) });
+  A.push({ ico: "📁", t: "Open Roblox folder", k: "Folders", run: () => api.open_roblox_folder() });
+  A.push({ ico: "🖼", t: "Open screenshots folder", k: "Folders", run: () => api.open_screenshots_folder() });
+  A.push({ ico: "💾", t: "Export backup", k: "Orbit", run: () => $("#bkExport").click() });
+  A.push({ ico: "📊", t: "Save weekly recap image", k: "Stats", run: async () => { const x = await api.export_recap(); x.error ? toast(x.error, "err") : toast("Recap saved.", "ok"); } });
+  return A;
+}
+function fuzzy(q, t) {
+  q = q.toLowerCase(); t = t.toLowerCase(); if (!q) return 1; if (t.includes(q)) return 100 - t.indexOf(q);
+  let i = 0, score = 0; for (const ch of t) { if (ch === q[i]) { i++; score++; } } return i === q.length ? score : 0;
+}
+function drawPalette() {
+  const q = $("#palInput").value.trim(), list = $("#palList");
+  palItems = palActions().map((a) => ({ ...a, s: fuzzy(q, a.t + " " + a.k) })).filter((a) => a.s > 0).sort((a, b) => b.s - a.s).slice(0, 40);
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1)); list.innerHTML = "";
+  if (!palItems.length) list.append(h("div", { class: "pal-item" }, "No matches"));
+  palItems.forEach((a, i) => { const el = h("div", { class: "pal-item" + (i === palSel ? " on" : "") }, h("span", { class: "ico" }, a.ico), h("b", {}, a.t), h("span", { class: "k" }, a.k));
+    el.onmouseenter = () => { palSel = i; $$(".pal-item", list).forEach((x, j) => x.classList.toggle("on", j === i)); }; el.onclick = () => runPal(i); list.append(el); });
+}
+function openPalette() { const p = $("#palette"); p.classList.add("show"); $("#palInput").value = ""; palSel = 0; drawPalette(); setTimeout(() => $("#palInput").focus(), 50); }
+function closePalette() { $("#palette").classList.remove("show"); }
+function runPal(i) { const a = palItems[i]; closePalette(); if (a) a.run(); }
+
+function mdToHtml(md) {
+  const esc = (x) => x.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const lines = esc(md || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const inline = (x) => x.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>");
+  return "<ul>" + lines.map((l) => "<li>" + inline(l.replace(/^[-*]\s*/, "")) + "</li>").join("") + "</ul>";
+}
+async function showWhatsNew() {
+  const r = await api.whats_new(); if (!r) return;
+  $("#wnVer").textContent = "v" + r.version;
+  $("#wnTitle").textContent = r.first ? "Welcome to Orbit" : "What's new";
+  $("#wnNotes").innerHTML = r.notes ? mdToHtml(r.notes) : "<p>Fresh update installed.</p>";
+  $("#wn").classList.add("show"); if (!r.first) burst(innerWidth / 2, 160, 70);
+  $("#wnOk").onclick = () => { $("#wn").classList.remove("show"); api.mark_seen(); };
+}
+
+function wireExtras() {
+  $("#palBtn").onclick = openPalette;
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#palette").classList.contains("show") ? closePalette() : openPalette(); return; }
+    if ($("#palette").classList.contains("show")) {
+      if (e.key === "Escape") closePalette();
+      else if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); palSel = (palSel + (e.key === "ArrowDown" ? 1 : -1) + palItems.length) % Math.max(1, palItems.length); drawPalette(); $(".pal-item.on")?.scrollIntoView({ block: "nearest" }); }
+      else if (e.key === "Enter") runPal(palSel);
+      return;
+    }
+    if ($("#lightbox").classList.contains("show")) {
+      if (e.key === "Escape") $("#lightbox").classList.remove("show");
+      if (e.key === "ArrowRight") openLightbox(lbIndex + 1);
+      if (e.key === "ArrowLeft") openLightbox(lbIndex - 1);
+    }
+  });
+  $("#palInput").oninput = () => { palSel = 0; drawPalette(); };
+  $("#palette").onclick = (e) => { if (e.target.id === "palette") closePalette(); };
+  $("#seeTimeline").onclick = () => { go("session"); setTimeout(() => $("#timelineCard").scrollIntoView({ behavior: "smooth" }), 450); };
+  $("#libAdd").onclick = async () => addToLibrary(await modal({ title: "Add a game", text: "Paste the game's link (roblox.com/games/...) or its place ID.", input: true, placeholder: "https://www.roblox.com/games/...", ok: "Add" }));
+  $("#svFind").onclick = () => findServers();
+  $("#svInput").onkeydown = (e) => { if (e.key === "Enter") findServers(); };
+  $("#tlMore").onclick = () => renderTimeline(true);
+  $("#shotMore").onclick = () => renderScreens(true);
+  $("#shotRefresh").onclick = async () => { S = Object.assign(S, { screens_dirs: (await api.get_state()).screens_dirs }); renderScreens(); };
+  $("#shotFolder").onclick = () => api.open_screenshots_folder();
+  $("#lbClose").onclick = () => $("#lightbox").classList.remove("show");
+  $("#lightbox").onclick = (e) => { if (e.target.id === "lightbox") $("#lightbox").classList.remove("show"); };
+  $("#lbPrev").onclick = () => openLightbox(lbIndex - 1); $("#lbNext").onclick = () => openLightbox(lbIndex + 1);
+  $("#lbOpen").onclick = () => api.open_screenshot(shotItems[lbIndex].path);
+  $("#lbShow").onclick = () => api.show_in_folder(shotItems[lbIndex].path);
+  $("#lbCopy").onclick = async () => { const r = await api.copy_image(shotItems[lbIndex].path); r && r.error ? toast(r.error, "err") : toast("Image copied.", "ok"); };
+  $("#appAdd").onclick = async () => { const r = await api.choose_app(); if (!r) return; if (r.error) return toast(r.error, "err"); cfg.launch_with.push({ path: r.path, name: r.name, close_after: false }); save(); renderBoost(); };
+  $("#bkExport").onclick = async () => { await saveNow(); const r = await api.export_backup(); if (!r) return; r.error ? toast(r.error, "err") : toast("Backup saved.", "ok"); };
+  $("#bkImport").onclick = async () => {
+    if (!(await modal({ title: "Restore a backup?", text: "This replaces your current settings, profiles, mods and stats with the ones in the backup.", ok: "Choose file", danger: true }))) return;
+    const r = await api.import_backup(); if (!r) return; if (r.error) return toast(r.error, "err");
+    toast("Backup restored. Reloading...", "ok"); setTimeout(() => api.reload_ui(), 900);
+  };
+  $("#bgChoose").onclick = async () => { const r = await api.choose_background(); if (!r) return; if (r.error) return toast(r.error, "err"); window._bgData = r.data; cfg.appearance.bg_file = r.file; cfg.appearance.background = "Image"; save(); applyBackground(); renderAppearance(); };
+  const dim = $("#bgDim"), dimVal = $("#bgDimVal");
+  dim.oninput = () => { cfg.appearance.bg_dim = dim.value / 100; dimVal.textContent = dim.value + "%"; dim.style.setProperty("--fill", (dim.value / 90 * 100) + "%"); $("#bgImage").style.setProperty("--dim", cfg.appearance.bg_dim); save(); };
+  const vol = $("#sndVol"), volVal = $("#sndVolVal");
+  vol.oninput = () => { cfg.sounds.volume = vol.value / 100; volVal.textContent = vol.value + "%"; vol.style.setProperty("--fill", vol.value + "%"); save(); };
+  $("#sndTest").onclick = () => sfx("launch");
+}
+
 function wireWindow() {
   attachRipple();
   $("#minBtn").onclick = () => api.minimize();
-  $("#closeBtn").onclick = async () => { if (S.mode !== "setup") await saveNow(); api.close(); };
+  $("#closeBtn").onclick = async () => { if (S.mode !== "setup") await saveNow(); const r = await api.close(); if (r === "hidden") toast("Orbit is in your system tray."); };
 }
 function wire() {
   wireWindow();
 
   $("#launchBtn").onclick = async () => {
     const b = $("#launchBtn"), label = $("span", b), icon = $("svg", b);
-    b.classList.add("loading"); icon.style.display = "none"; const sp = h("span", { class: "spinner" }); b.prepend(sp); label.textContent = "Launching...";
+    b.classList.add("loading"); icon.style.display = "none"; const sp = h("span", { class: "spinner" }); b.prepend(sp); label.textContent = "Launching..."; sfx("launch");
     await saveNow();
     const r = await api.launch("");
     if (r && r.error) toast(r.error, "err"); else $("#heroTitle").textContent = "Entering orbit...";
@@ -1079,7 +1675,7 @@ async function downloadUpdate() {
   window.updateProgress(0);
   const r = await api.download_update();
   if (r.error) { $("#updPill").hidden = true; updStatus(r.error, "err"); toast(r.error, "err"); return; }
-  S.pending_update = r.version; readyPill(r.version); toast(`Orbit v${r.version} is ready. Click the button up top to restart.`, "ok");
+  S.pending_update = r.version; readyPill(r.version); sfx("ready"); toast(`Orbit v${r.version} is ready. Click the button up top to restart.`, "ok");
 }
 async function checkUpdates(manual) {
   if (!S.update_source) { updStatus("Auto-updates turn on once Orbit is installed from your GitHub release (see the README)."); if (manual) toast("Updates aren't set up yet.", "err"); return; }
@@ -1138,9 +1734,11 @@ async function init() {
   applyTheme(); starfield();
   $("#ver").textContent = "v" + S.version;
   if (S.mode === "setup") { wireWindow(); renderSetup(); return; }
-  spotlight(); blackHole($("#bhCanvas"), $(".hero"));
-  buildNav(); wire(); wireUpdates(); renderCredits();
+  spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
+  buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits();
   go("home");
+  setTimeout(showWhatsNew, 900);
+  setTimeout(checkAchievements, 2600);
   setTimeout(() => checkUpdates(false), 1800);
   api.check_version().then((r) => {
     if (!r) return;

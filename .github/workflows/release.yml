@@ -49,11 +49,12 @@ jobs:
         if: steps.ver.outputs.exists == 'false'
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller pywebview
+          python -m pip install pyinstaller pywebview pystray pillow
           python -m py_compile orbit_launcher.py
           printf '{"repo": "%s", "version": "%s"}\n' "${{ github.repository }}" "${{ steps.ver.outputs.version }}" > ui/build.json
           python -m PyInstaller --noconfirm --onefile --noconsole --name OrbitLauncher --icon ui/orbit.ico \
-            --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" orbit_launcher.py
+            --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" --add-data "CHANGELOG.md;." \
+            --hidden-import pystray._win32 orbit_launcher.py
           cp dist/OrbitLauncher.exe dist/OrbitSetup.exe
           (cd dist && sha256sum OrbitLauncher.exe | cut -d' ' -f1 > OrbitLauncher.exe.sha256)
           ls -la dist
