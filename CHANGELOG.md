@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.2
+- **Setup fix:** setup no longer fails with "cannot find the file specified" on PCs where PowerShell isn't on the system PATH. Orbit now finds Windows tools directly.
+- **Setup fix:** if a shortcut can't be created, setup still finishes and tells you.
+- **Maximize:** Orbit and the installer can be maximized with the new title bar button or by double-clicking the title bar.
+
 ## v1.6.1
 - **Fixes:** Orbit now logs every startup step and any window error, which makes problems much easier to track down.
 - **Fixes:** session tracking no longer picks Roblox's crash-handler log by mistake.

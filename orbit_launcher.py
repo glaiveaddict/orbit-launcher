@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.6.2"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -219,6 +219,16 @@ def fetch_json(url, timeout=8):
                                                "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def sys_tool(name):
+    root = Path(os.environ.get("SystemRoot") or os.environ.get("windir") or r"C:\Windows")
+    known = {"powershell": root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe",
+             "explorer": root / "explorer.exe"}
+    for candidate in (known.get(name), root / "System32" / f"{name}.exe", root / "Sysnative" / f"{name}.exe"):
+        if candidate and candidate.exists():
+            return str(candidate)
+    return shutil.which(name) or name
 
 
 def fmt_duration(seconds):
@@ -546,7 +556,7 @@ def roblox_running():
     if not IS_WINDOWS:
         return False
     try:
-        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq RobloxPlayerBeta.exe", "/NH"],
+        out = subprocess.run([sys_tool("tasklist"), "/FI", "IMAGENAME eq RobloxPlayerBeta.exe", "/NH"],
                              capture_output=True, text=True, creationflags=CREATE_NO_WINDOW).stdout
         return "RobloxPlayerBeta.exe" in out
     except Exception:
@@ -689,7 +699,7 @@ def create_shortcut(location, name=SHORTCUT_NAME, launch=True, exe=None):
           f"$s.TargetPath={q(target)};$s.Arguments={q(arguments)};"
           f"$s.IconLocation={q(icon + ',0')};$s.Description={q(name)};"
           "$s.Save();Write-Output $p")
-    out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+    out = subprocess.run([sys_tool("powershell"), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
                          capture_output=True, text=True, creationflags=CREATE_NO_WINDOW)
     if out.returncode != 0:
         raise OSError(out.stderr.strip() or "PowerShell failed")
@@ -811,7 +821,7 @@ def process_running(image):
     if not IS_WINDOWS:
         return False
     try:
-        out = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {image}", "/NH"], capture_output=True,
+        out = subprocess.run([sys_tool("tasklist"), "/FI", f"IMAGENAME eq {image}", "/NH"], capture_output=True,
                              text=True, creationflags=CREATE_NO_WINDOW).stdout
         return image.lower() in out.lower()
     except Exception:
@@ -832,11 +842,11 @@ class PerfBoost:
         if not IS_WINDOWS or not self.perf.get("power_plan"):
             return
         try:
-            out = subprocess.run(["powercfg", "/getactivescheme"], capture_output=True, text=True,
+            out = subprocess.run([sys_tool("powercfg"), "/getactivescheme"], capture_output=True, text=True,
                                  creationflags=CREATE_NO_WINDOW).stdout
             m = re.search(r"([0-9a-fA-F-]{36})", out)
             self.prev_scheme = m.group(1) if m else None
-            subprocess.run(["powercfg", "/setactive", "SCHEME_MIN"], capture_output=True, creationflags=CREATE_NO_WINDOW)
+            subprocess.run([sys_tool("powercfg"), "/setactive", "SCHEME_MIN"], capture_output=True, creationflags=CREATE_NO_WINDOW)
             log("Switched to the high performance power plan")
         except Exception as e:
             log(f"Power plan change failed: {e}")
@@ -845,7 +855,7 @@ class PerfBoost:
         if self.priority_set or not IS_WINDOWS or not self.perf.get("high_priority") or not roblox_running():
             return
         self.priority_set = True
-        subprocess.run(["powershell", "-NoProfile", "-Command",
+        subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command",
                         "Get-Process RobloxPlayerBeta -ErrorAction SilentlyContinue | "
                         "ForEach-Object { try { $_.PriorityClass = 'High' } catch {} }"],
                        capture_output=True, creationflags=CREATE_NO_WINDOW)
@@ -853,7 +863,7 @@ class PerfBoost:
 
     def end(self):
         if self.prev_scheme:
-            subprocess.run(["powercfg", "/setactive", self.prev_scheme], capture_output=True,
+            subprocess.run([sys_tool("powercfg"), "/setactive", self.prev_scheme], capture_output=True,
                            creationflags=CREATE_NO_WINDOW)
             log("Restored the previous power plan")
             self.prev_scheme = None
@@ -879,7 +889,7 @@ def close_companions(started):
         if app.get("close_after"):
             name = Path(app.get("path") or "").name
             if name:
-                subprocess.run(["taskkill", "/IM", name, "/T"], capture_output=True, creationflags=CREATE_NO_WINDOW)
+                subprocess.run([sys_tool("taskkill"), "/IM", name, "/T"], capture_output=True, creationflags=CREATE_NO_WINDOW)
                 log(f"Closed {name}")
 
 
@@ -1069,7 +1079,7 @@ def install_extension():
 def open_browser_extensions(browser):
     page = {"chrome": "chrome://extensions", "msedge": "edge://extensions"}[browser]
     if IS_WINDOWS:
-        subprocess.Popen(["cmd", "/c", "start", "", browser, page], creationflags=CREATE_NO_WINDOW)
+        subprocess.Popen([sys_tool("cmd"), "/c", "start", "", browser, page], creationflags=CREATE_NO_WINDOW)
 
 
 def watch_for_updates(settings, known, place_id):
@@ -1695,6 +1705,7 @@ def startup_maintenance(settings):
 def run_install(options, progress):
     if not is_frozen():
         raise OSError("Setup only works from the built OrbitSetup.exe.")
+    warnings = []
     progress(.04, "Checking for the newest version...")
     source = Path(sys.executable)
     version = APP_VERSION
@@ -1710,17 +1721,24 @@ def run_install(options, progress):
         (UPDATE_DIR / "pending.json").unlink(missing_ok=True)
     if IS_WINDOWS:
         progress(.84, "Adding shortcuts...")
-        create_shortcut("Programs", APP_NAME, launch=False, exe=INSTALLED_EXE)
-        if options.get("desktop", True):
-            create_shortcut("Desktop", APP_NAME, launch=False, exe=INSTALLED_EXE)
+        for location in ["Programs"] + (["Desktop"] if options.get("desktop", True) else []):
+            try:
+                create_shortcut(location, APP_NAME, launch=False, exe=INSTALLED_EXE)
+            except Exception as e:
+                warnings.append(f"Couldn't add the {'Start menu' if location == 'Programs' else 'desktop'} shortcut")
+                log(f"Shortcut ({location}) failed: {e}")
         progress(.93, "Registering with Windows...")
-        write_uninstall_entry(INSTALLED_EXE, version)
-        settings = load_settings()
-        if settings["registration"].get("registered"):
-            register_protocols(settings, exe=INSTALLED_EXE)
+        try:
+            write_uninstall_entry(INSTALLED_EXE, version)
+            settings = load_settings()
+            if settings["registration"].get("registered"):
+                register_protocols(settings, exe=INSTALLED_EXE)
+        except Exception as e:
+            warnings.append("Couldn't register with Windows Settings > Apps")
+            log(f"Registration failed: {e}")
     progress(1, "Done")
     log(f"Installed {version} to {INSTALL_DIR}")
-    return {"version": version, "path": str(INSTALLED_EXE)}
+    return {"version": version, "path": str(INSTALLED_EXE), "warnings": warnings}
 
 
 def run_uninstall():
@@ -1738,12 +1756,12 @@ def run_uninstall():
     ps = ("foreach($f in 'Desktop','Programs'){$d=[Environment]::GetFolderPath($f);"
           f"foreach($n in '{APP_NAME}.lnk','{SHORTCUT_NAME}.lnk'){{Remove-Item -LiteralPath (Join-Path $d $n) "
           "-ErrorAction SilentlyContinue}}")
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=CREATE_NO_WINDOW)
+    subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", ps], creationflags=CREATE_NO_WINDOW)
     _delete_tree(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
     if u.MessageBoxW(None, "Also delete your Orbit settings, mod profiles and play time?", APP_NAME, 0x4 | 0x20) == 6:
         shutil.rmtree(DATA_DIR, ignore_errors=True)
     if is_frozen() and Path(sys.executable).parent.resolve() == INSTALL_DIR.resolve():
-        subprocess.Popen(f'cmd /c ping 127.0.0.1 -n 3 > nul & rmdir /s /q "{INSTALL_DIR}"',
+        subprocess.Popen(f'"{sys_tool("cmd")}" /c ping 127.0.0.1 -n 3 > nul & rmdir /s /q "{INSTALL_DIR}"',
                          creationflags=CREATE_NO_WINDOW | 0x00000008)
     u.MessageBoxW(None, f"{APP_NAME} was uninstalled.", APP_NAME, 0x40)
 
@@ -1824,7 +1842,7 @@ def app_icon_file():
 
 def copy_to_clipboard(text):
     if IS_WINDOWS:
-        subprocess.run(["clip"], input=text.encode("utf-16-le"), creationflags=CREATE_NO_WINDOW)
+        subprocess.run([sys_tool("clip")], input=text.encode("utf-16-le"), creationflags=CREATE_NO_WINDOW)
 
 
 def open_path(path):
@@ -2177,7 +2195,7 @@ class Api:
 
     def show_in_folder(self, path):
         if _is_screenshot(path) and IS_WINDOWS:
-            subprocess.Popen(["explorer", "/select,", str(Path(path))])
+            subprocess.Popen([sys_tool("explorer"), "/select,", str(Path(path))])
 
     def open_screenshots_folder(self):
         dirs = screenshot_dirs()
@@ -2188,7 +2206,7 @@ class Api:
         if not _is_screenshot(path) or not IS_WINDOWS:
             return {"error": "Can't copy that file."}
         p = str(Path(path)).replace("'", "''")
-        subprocess.run(["powershell", "-NoProfile", "-STA", "-Command",
+        subprocess.run([sys_tool("powershell"), "-NoProfile", "-STA", "-Command",
                         "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
                         f"[System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('{p}'))"],
                        capture_output=True, creationflags=CREATE_NO_WINDOW)
@@ -2289,6 +2307,17 @@ class Api:
     def minimize(self):
         self._window.minimize()
 
+    def toggle_maximize(self):
+        self._maximized = not getattr(self, "_maximized", False)
+        try:
+            if self._maximized:
+                self._window.maximize()
+            else:
+                self._window.restore()
+        except Exception as e:
+            log(f"Maximize failed: {e}")
+        return self._maximized
+
     def close(self):
         if self._tray is not None and self._settings["appearance"].get("tray", True) and not self._quitting:
             self._window.hide()
@@ -2369,7 +2398,8 @@ def _run_gui(mode, after_update, selftest):
     size = (1080, 700) if mode == "app" else (760, 600)
     title = APP_NAME if mode == "app" else f"{APP_NAME} Setup"
     window = webview.create_window(title, html=html, js_api=api, width=size[0], height=size[1],
-                                   resizable=False, frameless=True, easy_drag=False, background_color=bg)
+                                   resizable=True, min_size=(size[0] - 60, size[1] - 60), frameless=True,
+                                   easy_drag=False, background_color=bg)
     api._window = window
     if selftest:
         def finish_selftest():
