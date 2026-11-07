@@ -83,6 +83,8 @@ jobs:
           sleep 4
           powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$bmp=New-Object System.Drawing.Bitmap 900,160; \$g=[System.Drawing.Graphics]::FromImage(\$bmp); \$g.CopyFromScreen([int]((\$b.Width-900)/2),0,0,0,\$bmp.Size); \$bmp.Save('toast-preview.png')"
           wait
+          timeout 8 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Ashburn, Virginia, US" --badge
+          echo "badge exit: $? (124 = still running when stopped, which is expected)"
           echo "== launcher.log =="
           cat "$LOCALAPPDATA/OrbitLauncher/launcher.log" 2>/dev/null
           python - <<'PY'

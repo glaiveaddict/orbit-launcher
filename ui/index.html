@@ -1114,6 +1114,7 @@ function renderSession() {
   const s = cfg.session, box = $("#sessionToggles"); box.innerHTML = "";
   box.append(
     toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
+    toggleRow("Server badge while playing", "A small pill at the top of the screen shows the game and server location for as long as you're in that server. Clicks pass through it, and it hides when Roblox isn't in front.", s.server_badge !== false, (v) => { s.server_badge = v; save(); }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
   renderStats(); renderRecap(); renderTimeline();

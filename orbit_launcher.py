@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.6"
+APP_VERSION = "1.6.7"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -44,6 +44,7 @@ ACHIEVEMENTS_FILE = DATA_DIR / "achievements.json"
 THUMBS_DIR = DATA_DIR / "Thumbs"
 SHOW_FLAG = DATA_DIR / "show.flag"
 MONITOR_FILE = DATA_DIR / "monitor.json"
+GUI_FILE = DATA_DIR / "window.json"
 ICON_FILE = DATA_DIR / "roblox_icon.ico"
 EXTENSIONS_DIR = DATA_DIR / "Extensions"
 EXTENSION_NAME = "orbit_preview"
@@ -130,6 +131,7 @@ DEFAULT_SETTINGS = {
         "server_popup": True,
         "track_playtime": True,
         "crash_rejoin": True,
+        "server_badge": True,
     },
     "appearance": {
         "mode": "Dark",
@@ -283,9 +285,10 @@ def self_command(*args):
 
 def spawn_self(*args):
     try:
-        subprocess.Popen(self_command(*args), creationflags=CREATE_NO_WINDOW, env=child_env())
+        return subprocess.Popen(self_command(*args), creationflags=CREATE_NO_WINDOW, env=child_env())
     except OSError as e:
         log(f"Could not start {args[:1]}: {e}")
+        return None
 
 
 _GAME_CACHE = {}
@@ -915,8 +918,27 @@ def close_companions(started):
                 log(f"Closed {name}")
 
 
+BADGE_FILE = DATA_DIR / "badge.json"
+
+
 def spawn_toast(title, body):
     spawn_self(TOAST_FLAG, title, body)
+
+
+def close_badge():
+    data = load_json(BADGE_FILE, {}) or {}
+    pid = data.get("pid")
+    if pid and IS_WINDOWS:
+        subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
+                       creationflags=CREATE_NO_WINDOW)
+    BADGE_FILE.unlink(missing_ok=True)
+
+
+def show_badge(title, body):
+    close_badge()
+    proc = spawn_self(TOAST_FLAG, title, body, "--badge")
+    if proc:
+        save_json(BADGE_FILE, {"pid": proc.pid})
 
 
 class SessionMonitor:
@@ -989,19 +1011,24 @@ class SessionMonitor:
         location = server_location(game["ip"])
         game["location"] = location
         log(f"Server location: {location or 'unknown'} ({game['ip']})")
-        if not location or self.game is not game or game.get("quiet") or not self.session.get("server_popup"):
+        if not location or self.game is not game:
             return
         for _ in range(10):
             if game["name"]:
                 break
             time.sleep(0.5)
-        spawn_toast(game["name"] or "Joined a game", location)
+        if self.session.get("server_popup") and not game.get("quiet"):
+            spawn_toast(game["name"] or "Joined a game", location)
+            time.sleep(7)
+        if self.session.get("server_badge", True) and self.game is game:
+            show_badge(game["name"] or "Roblox", location)
 
     def on_leave(self, at=None, record=True):
         game, self.game = self.game, None
         if not game:
             return
         seconds = max(0, (at or time.time()) - game["joined"])
+        close_badge()
         if record and self.session.get("track_playtime"):
             record_playtime(game["place_id"], game["name"], seconds)
             record_session(game, seconds)
@@ -1238,24 +1265,40 @@ def acquire_monitor_lock(wait=0.0):
         time.sleep(0.5)
 
 
+def orbit_pids():
+    try:
+        out = subprocess.run([sys_tool("tasklist"), "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq OrbitLauncher.exe"],
+                             capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout
+    except Exception as e:
+        log(f"Couldn't list Orbit processes: {e}")
+        return set()
+    pids = set()
+    for row in out.splitlines():
+        parts = [x.strip('"') for x in row.split('","')]
+        if len(parts) > 1 and parts[1].isdigit():
+            pids.add(int(parts[1]))
+    return pids
+
+
+def window_pids():
+    data = load_json(GUI_FILE, {}) or {}
+    return {int(x) for x in data.get("pids", []) if str(x).isdigit()}
+
+
 def stop_stale_copies():
     if not IS_WINDOWS or not is_frozen():
         return
-    me = str(Path(sys.executable).resolve()).replace("'", "''")
-    keep = ",".join(str(x) for x in {os.getpid(), os.getppid()})
-    script = (f"$keep=@({keep}); $me='{me}'; "
-              "Get-CimInstance Win32_Process -Filter \"Name='OrbitLauncher.exe'\" | "
-              "Where-Object { $keep -notcontains $_.ProcessId -and $keep -notcontains $_.ParentProcessId -and "
-              "($_.ExecutablePath -ne $me -or $_.CommandLine -like '*--orbit-launch*') } | "
-              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; "
-              "\"$($_.ProcessId) $($_.ExecutablePath)\" }")
-    try:
-        out = subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", script], capture_output=True,
-                             text=True, timeout=25, creationflags=CREATE_NO_WINDOW).stdout.strip()
-        if out:
-            log("Stopped old Orbit trackers: " + "; ".join(sorted(set(out.splitlines()))))
-    except Exception as e:
-        log(f"Couldn't check for old Orbit trackers: {e}")
+    keep = {os.getpid(), os.getppid()}
+    gui = window_pids()
+    if not gui:
+        log("Orbit's window isn't registered yet; leaving other Orbit processes alone")
+        return
+    targets = orbit_pids() - keep - gui
+    for pid in sorted(targets):
+        subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
+                       creationflags=CREATE_NO_WINDOW)
+    if targets:
+        log("Stopped old Orbit trackers: " + ", ".join(str(p) for p in sorted(targets)))
 
 
 def claim_monitor():
@@ -1300,9 +1343,10 @@ def headless_main(uri):
         if owns_monitor is None:
             token = claim_monitor()
             stop_stale_copies()
-            owns_monitor = acquire_monitor_lock(wait=12)
+            owns_monitor = acquire_monitor_lock(wait=8)
             if not owns_monitor:
-                log("Another Orbit is still tracking this session")
+                log("An older tracker didn't let go; tracking this session anyway")
+                owns_monitor = True
         if not owns_monitor or not SessionMonitor.wanted(settings):
             break
         monitor = SessionMonitor(settings, launch_time)
@@ -2014,6 +2058,90 @@ def show_toast(title, body, seconds=6.5):
     root.mainloop()
 
 
+def roblox_in_front():
+    if not IS_WINDOWS:
+        return True
+    try:
+        u = ctypes.windll.user32
+        u.GetForegroundWindow.restype = ctypes.c_void_p
+        hwnd = u.GetForegroundWindow()
+        buf = ctypes.create_unicode_buffer(64)
+        u.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
+        u.GetWindowTextW(hwnd, buf, 64)
+        return buf.value == "Roblox"
+    except Exception:
+        return True
+
+
+def show_badge_window(title, body):
+    import tkinter as tk
+    import tkinter.font as tkfont
+    appearance = load_settings()["appearance"]
+    c = theme_colors(appearance)
+    accent2 = ACCENTS.get(appearance.get("accent"), ACCENTS["Void"])[1]
+    key = "#010203"
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.configure(bg=key)
+    try:
+        root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
+        root.attributes("-alpha", 0.0)
+    except tk.TclError:
+        pass
+    f_name = tkfont.Font(family="Segoe UI Semibold", size=10)
+    f_loc = tkfont.Font(family="Segoe UI", size=10)
+    name = title if len(title) <= 30 else title[:29] + "…"
+    sep = "   ·   "
+    w = 44 + f_name.measure(name) + f_loc.measure(sep + body) + 16
+    h = 30
+    cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+    pts = lambda x1, y1, x2, y2, r: [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2,
+                                     x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+    cv.create_polygon(pts(0, 0, w - 1, h - 1, 15), smooth=True, splinesteps=20, fill=c["accent"], outline="")
+    cv.create_polygon(pts(1, 1, w - 2, h - 2, 14), smooth=True, splinesteps=20, fill=c["panel"], outline="")
+    cx, cy = 20, h // 2
+    cv.create_oval(cx - 8, cy - 8, cx + 8, cy + 8, fill=c["accent"], outline="")
+    cv.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill="#05030a", outline="#f5f3ff", width=1)
+    cv.create_line(cx - 10, cy + 2, cx + 10, cy - 2, fill=accent2, width=2)
+    x = 36
+    cv.create_text(x, cy, text=name, anchor="w", font=f_name, fill=c["fg"])
+    x += f_name.measure(name)
+    cv.create_text(x, cy, text=sep, anchor="w", font=f_loc, fill=c["muted"])
+    x += f_loc.measure(sep)
+    cv.create_text(x, cy, text=body, anchor="w", font=f_loc, fill=c["fg"])
+    sw = root.winfo_screenwidth()
+    root.geometry(f"{w}x{h}+{(sw - w) // 2}+6")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    if hwnd and IS_WINDOWS:
+        try:
+            u = ctypes.windll.user32
+            style = u.GetWindowLongW(hwnd, -20)
+            u.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+    state = {"alpha": 0.0}
+
+    def tick():
+        target = 0.9 if roblox_in_front() else 0.0
+        state["alpha"] += (target - state["alpha"]) * 0.35
+        if abs(state["alpha"] - target) < 0.02:
+            state["alpha"] = target
+        try:
+            root.attributes("-alpha", state["alpha"])
+            root.attributes("-topmost", True)
+        except tk.TclError:
+            return
+        root.after(120 if state["alpha"] in (0.0, 0.9) else 30, tick)
+
+    tick()
+    root.mainloop()
+
+
 def ui_file():
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     return base / "ui" / "index.html"
@@ -2576,6 +2704,7 @@ def _run_gui(mode, after_update, selftest):
             SHOW_FLAG.write_text(str(time.time()))
             return
         SHOW_FLAG.unlink(missing_ok=True)
+        save_json(GUI_FILE, {"pids": [os.getpid(), os.getppid()], "version": APP_VERSION, "time": int(time.time())})
         startup_maintenance(settings)
     if not _ensure_webview():
         return
@@ -2642,7 +2771,10 @@ def main():
         title = args[i + 1] if len(args) > i + 1 else APP_NAME
         body = args[i + 2] if len(args) > i + 2 else ""
         try:
-            show_toast(title, body)
+            if "--badge" in args:
+                show_badge_window(title, body)
+            else:
+                show_toast(title, body)
         except Exception:
             log("Toast failed:\n" + traceback.format_exc())
     elif LAUNCH_FLAG in args:

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.7
+- **Server badge:** a small pill at the top of your screen shows the game and server location for as long as you're in that server. Clicks pass through it, and it hides when you tab out of Roblox. Turn it off in Stats.
+- **Fix:** old background trackers are now always replaced, even on PCs where Windows' process info service (WMI) doesn't respond. If one still won't let go, Orbit tracks your session anyway.
+
 ## v1.6.6
 - **Fix:** Orbit now stays connected after you press **Launch Roblox**. Games you pick inside Roblox afterwards are tracked, including teleports between places.
 - **Fix:** Orbit follows the real game log instead of the short helper log Roblox creates when you join from the website while Roblox is already open.
