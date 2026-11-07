@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -47,6 +47,8 @@ SHOW_FLAG = DATA_DIR / "show.flag"
 MONITOR_FILE = DATA_DIR / "monitor.json"
 GUI_FILE = DATA_DIR / "window.json"
 CURRENT_FILE = DATA_DIR / "current.json"
+PROBLEMS_FILE = DATA_DIR / "problems.json"
+ROBLOX_VERSION_FILE = DATA_DIR / "roblox_version.json"
 BACKGROUND_FILE = DATA_DIR / "background.json"
 ATTACH_FLAG = "--orbit-attach"
 BACKGROUND_FLAG = "--background"
@@ -123,7 +125,10 @@ DEFAULT_SETTINGS = {
     "apply_mods": True,
     "library": [],
     "launch_with": [],
-    "performance": {"high_priority": False, "power_plan": False},
+    "performance": {"high_priority": False, "power_plan": False, "boost": False, "boost_level": "Max",
+                    "boost_profiles": True, "fps_cap": None, "graphics_quality": None, "gpu_high": False,
+                    "game_mode": False, "no_dvr": False, "gpu_applied": False, "boost_backup": {}, "win_backup": {}},
+    "smart_join": False,
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
     "saved_servers": [],
@@ -146,6 +151,7 @@ DEFAULT_SETTINGS = {
         "badge_ping": True,
         "badge_timer": True,
         "break_minutes": 0,
+        "sort_screenshots": False,
     },
     "appearance": {
         "mode": "Dark",
@@ -158,11 +164,12 @@ DEFAULT_SETTINGS = {
         "close_to_tray": False,
         "custom_colors": ["#9d6bff", "#d946ef"],
         "splash": True,
+        "ui_scale": "Normal",
     },
     "updates": {"auto": True},
     "registration": {"registered": False, "backups": {}},
 }
-FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles"}
+FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles", "boost_backup", "win_backup"}
 
 
 def log(msg):
@@ -586,11 +593,186 @@ def apply_all(settings, version_dir=None, place_id=None):
     folder = mods_folder_for(settings, place_id)
     for d in dirs:
         write_flags(d, flags)
+        try:
+            apply_system_boost(settings, d)
+        except Exception as e:
+            log(f"System boost failed: {e}")
         n = sync_mods(d, folder)
         _, _, prof = profile_for(settings, place_id)
         log(f"Applied {len(flags)} flag(s){' [' + prof + ' profile]' if prof else ''} "
             f"and {n} mod file(s) to {d.name}")
     return dirs
+
+
+GBS_FILE = LOCALAPPDATA / "Roblox" / "GlobalBasicSettings_13.xml"
+BOOST_KEYS = ("graphics_api", "msaa", "texture_quality", "lighting_quality", "remove_grass", "low_poly_meshes")
+QUICK_PRESETS = {
+    "Potato": {"graphics_api": "Direct3D 11", "msaa": "1x", "texture_quality": "0 (lowest)", "lighting_quality": "1",
+               "remove_grass": True, "low_poly_meshes": True},
+    "Balanced": {"graphics_api": "Direct3D 11", "msaa": "1x", "texture_quality": "2", "lighting_quality": "Automatic",
+                 "remove_grass": True, "low_poly_meshes": False},
+    "Quality": {"graphics_api": "Automatic", "msaa": "4x", "texture_quality": "3 (highest)", "lighting_quality": "21",
+                "remove_grass": False, "low_poly_meshes": False},
+    "Reset": {k: DEFAULT_PRESETS[k] for k in BOOST_KEYS},
+}
+WIN_TWEAKS = {
+    "game_mode": [(r"Software\Microsoft\GameBar", "AutoGameModeEnabled", 1)],
+    "no_dvr": [(r"System\GameConfigStore", "GameDVR_Enabled", 0),
+               (r"Software\Microsoft\Windows\CurrentVersion\GameDVR", "AppCaptureEnabled", 0)],
+}
+GPU_PREF_KEY = r"Software\Microsoft\DirectX\UserGpuPreferences"
+
+
+def _reg_get(path, name):
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as k:
+            return winreg.QueryValueEx(k, name)[0]
+    except OSError:
+        return None
+
+
+def _reg_set(path, name, value):
+    kind = winreg.REG_SZ if isinstance(value, str) else winreg.REG_DWORD
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as k:
+        winreg.SetValueEx(k, name, 0, kind, value)
+
+
+def _reg_del(path, name):
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as k:
+            winreg.DeleteValue(k, name)
+    except OSError:
+        pass
+
+
+def write_gbs(perf):
+    cap, quality = perf.get("fps_cap"), perf.get("graphics_quality")
+    if (cap is None and not quality) or not GBS_FILE.exists() or roblox_running():
+        return False
+    text = GBS_FILE.read_text(encoding="utf-8", errors="ignore")
+    new = text
+    if cap is not None:
+        new = re.sub(r'(<int name="FramerateCap">)-?\d+(</int>)', rf"\g<1>{int(cap)}\g<2>", new)
+    if quality:
+        q = max(1, min(10, int(quality)))
+        new = re.sub(r'(<token name="SavedQualityLevel">)\d+(</token>)', rf"\g<1>{q}\g<2>", new)
+        new = re.sub(r'(<int name="GraphicsQualityLevel">)\d+(</int>)', rf"\g<1>{q}\g<2>", new)
+    if new == text:
+        return False
+    backup = DATA_DIR / "GlobalBasicSettings_13.orbit-backup.xml"
+    if not backup.exists():
+        shutil.copy2(GBS_FILE, backup)
+    GBS_FILE.write_text(new, encoding="utf-8")
+    log(f"Set Roblox frame rate cap to {cap if cap is not None else 'unchanged'} and graphics quality to {quality or 'unchanged'}")
+    return True
+
+
+def apply_win_tweaks(perf):
+    backup = perf.setdefault("win_backup", {})
+    changed = False
+    for key, entries in WIN_TWEAKS.items():
+        for path, name, value in entries:
+            slot = path + "|" + name
+            if perf.get(key):
+                if slot not in backup:
+                    backup[slot] = _reg_get(path, name)
+                if _reg_get(path, name) != value:
+                    _reg_set(path, name, value)
+                    changed = True
+            elif slot in backup:
+                old = backup.pop(slot)
+                if old is None:
+                    _reg_del(path, name)
+                else:
+                    _reg_set(path, name, old)
+                changed = True
+    return changed
+
+
+def set_gpu_pref(version_dir, on):
+    exe = str(Path(version_dir) / "RobloxPlayerBeta.exe") if version_dir else None
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, GPU_PREF_KEY) as k:
+            names, i = [], 0
+            while True:
+                try:
+                    names.append(winreg.EnumValue(k, i)[0])
+                    i += 1
+                except OSError:
+                    break
+    except OSError:
+        names = []
+    for name in names:
+        if name.lower().endswith("robloxplayerbeta.exe") and (not on or name != exe or not Path(name).exists()):
+            _reg_del(GPU_PREF_KEY, name)
+    if on and exe:
+        _reg_set(GPU_PREF_KEY, exe, "GpuPreference=2;")
+
+
+def apply_system_boost(settings, version_dir=None):
+    if not IS_WINDOWS:
+        return
+    perf = settings.setdefault("performance", {})
+    write_gbs(perf)
+    before = json.dumps(perf.get("win_backup", {}), sort_keys=True)
+    apply_win_tweaks(perf)
+    if perf.get("gpu_high") or perf.get("gpu_applied"):
+        set_gpu_pref(version_dir, bool(perf.get("gpu_high")))
+        perf["gpu_applied"] = bool(perf.get("gpu_high"))
+    if json.dumps(perf.get("win_backup", {}), sort_keys=True) != before:
+        save_settings(settings)
+
+
+def set_boost(settings, on, level="Max"):
+    perf = settings["performance"]
+    targets = [settings["presets"]]
+    if perf.get("boost_profiles", True):
+        targets += [g.setdefault("presets", {}) for g in settings["game_profiles"].values()]
+    if on:
+        if not perf.get("boost"):
+            perf["boost_backup"] = {"presets": {k: settings["presets"].get(k) for k in BOOST_KEYS},
+                                    "profiles": {pid: {k: g.get("presets", {}).get(k) for k in BOOST_KEYS}
+                                                 for pid, g in settings["game_profiles"].items()},
+                                    "perf": {k: perf.get(k) for k in ("high_priority", "power_plan", "gpu_high",
+                                                                     "game_mode", "no_dvr", "fps_cap",
+                                                                     "graphics_quality")}}
+        preset = QUICK_PRESETS["Potato" if level == "Max" else "Balanced"]
+        for t in targets:
+            t.update(preset)
+        perf.update({"boost": True, "boost_level": level, "high_priority": True, "power_plan": True,
+                     "gpu_high": True, "game_mode": True, "no_dvr": True})
+        if perf.get("fps_cap") is None:
+            perf["fps_cap"] = 240
+        if not perf.get("graphics_quality"):
+            perf["graphics_quality"] = 1 if level == "Max" else 4
+    else:
+        backup = perf.pop("boost_backup", None) or {}
+        settings["presets"].update({k: v for k, v in (backup.get("presets") or {}).items() if v is not None})
+        for pid, old in (backup.get("profiles") or {}).items():
+            if pid in settings["game_profiles"]:
+                pre = settings["game_profiles"][pid].setdefault("presets", {})
+                for k, v in old.items():
+                    if v is None:
+                        pre.pop(k, None)
+                    else:
+                        pre[k] = v
+        for k, v in (backup.get("perf") or {}).items():
+            perf[k] = v
+        perf["boost"] = False
+    save_settings(settings)
+    if not roblox_running():
+        apply_all(settings)
+    else:
+        apply_system_boost(settings, (player_dirs()[:1] or [None])[0])
+    log(f"FPS boost {'on (' + level + ')' if on else 'off'}")
+
+
+def apply_quick_preset(settings, name, place_id=None):
+    if name not in QUICK_PRESETS:
+        raise ValueError("Unknown preset")
+    target = settings["game_profiles"][str(place_id)].setdefault("presets", {}) if place_id else settings["presets"]
+    target.update(QUICK_PRESETS[name])
+    save_settings(settings)
 
 
 def roblox_running():
@@ -853,9 +1035,13 @@ def record_session(game, seconds):
     data = load_json(SESSIONS_FILE, [])
     if not isinstance(data, list):
         data = []
-    data.append({"place_id": str(game["place_id"]), "job_id": game.get("job_id"),
-                 "name": game.get("name") or f"Place {game['place_id']}", "start": int(game["joined"]),
-                 "end": int(game["joined"] + seconds), "seconds": int(seconds), "location": game.get("location")})
+    entry = {"place_id": str(game["place_id"]), "job_id": game.get("job_id"),
+             "name": game.get("name") or f"Place {game['place_id']}", "start": int(game["joined"]),
+             "end": int(game["joined"] + seconds), "seconds": int(seconds), "location": game.get("location")}
+    summary = ping_summary(game.get("pings") or [])
+    if summary:
+        entry["ping"] = summary
+    data.append(entry)
     save_json(SESSIONS_FILE, data[-1500:])
 
 
@@ -1005,7 +1191,9 @@ class SessionMonitor:
             self.on_leave(at)
         joined = at or time.time()
         game = {"place_id": place_id, "job_id": job_id, "ip": ip, "joined": joined,
-                "name": None, "located": False, "quiet": False}
+                "name": None, "located": False, "quiet": False, "pings": []}
+        if not quiet or time.time() - joined < 6 * 3600:
+            threading.Thread(target=self._ping_loop, args=(game,), daemon=True).start()
         if not getattr(self, "play_start", None):
             self.play_start = joined
         self.game = game
@@ -1018,7 +1206,7 @@ class SessionMonitor:
         if game is not None and self.game is game:
             save_json(CURRENT_FILE, {"place_id": game["place_id"], "job_id": game["job_id"], "name": game.get("name"),
                                      "joined": int(game["joined"]), "location": game.get("location"),
-                                     "icon": game.get("icon")})
+                                     "icon": game.get("icon"), "ip": game.get("ip")})
 
     def _join_details(self, game):
         info = game_info(game["place_id"])
@@ -1033,6 +1221,27 @@ class SessionMonitor:
             self._discord(build_activity(self.discord, game["place_id"], game["job_id"], info, game["joined"]))
         time.sleep(1.5)
         self._locate(game)
+
+    def _ping_loop(self, game):
+        time.sleep(4)
+        while self.game is game:
+            ms = ping_ms(game.get("ip"))
+            if self.game is not game:
+                break
+            game["pings"].append([int(time.time()), ms])
+            del game["pings"][:-720]
+            time.sleep(10)
+
+    def note_problem(self, line):
+        m = DISCONNECT_RE.search(line)
+        if not m:
+            return
+        code = int(m.group(1))
+        if code in IGNORED_CODES or getattr(self, "last_code", None) == code:
+            return
+        self.last_code = code
+        game = self.game or {}
+        record_problem(explain_code(code), game, line)
 
     def on_udmux(self, ip):
         game = self.game
@@ -1070,6 +1279,8 @@ class SessionMonitor:
         if record and self.session.get("track_playtime"):
             record_playtime(game["place_id"], game["name"], seconds)
             record_session(game, seconds)
+        if record and self.session.get("sort_screenshots"):
+            threading.Thread(target=sort_screenshots, daemon=True).start()
         self._discord(None)
 
     def check_break(self):
@@ -1132,6 +1343,8 @@ class SessionMonitor:
         if m:
             self.on_udmux(m.group(1))
             return
+        if "rror Code" in line or "isconnect" in line:
+            self.note_problem(line)
         if any(marker in line for marker in LEAVE_MARKERS):
             self.on_leave(self._line_time(line))
 
@@ -1221,6 +1434,14 @@ class SessionMonitor:
                 g = self.game
                 self.crashed = {"place_id": g["place_id"], "job_id": g["job_id"],
                                 "name": g["name"] or f"Place {g['place_id']}"}
+            if self.game and not handed:
+                try:
+                    found = diagnose_exit(log_path, self.launch_time)
+                    if found:
+                        record_problem(found, self.game, None)
+                        spawn_toast(found["title"], found["tip"])
+                except Exception as e:
+                    log(f"Crash check failed: {e}")
             self.on_leave(record=not handed)
             if self.ipc:
                 self.ipc.close()
@@ -1410,6 +1631,10 @@ class AutoAttach:
         if time.time() - self.last_guard > 30:
             self.last_guard = time.time()
             self.guard_links()
+            try:
+                check_roblox_update(load_settings())
+            except Exception as e:
+                log(f"Roblox update check failed: {e}")
         if not roblox_running():
             self.replaced = False
             self.seen = 0
@@ -1527,18 +1752,16 @@ def current_game():
     return load_json(LAST_SERVER_FILE, None) or {}
 
 
-def run_hotkey(action):
-    if not (load_settings().get("hotkeys") or {}).get("enabled", True):
+def run_hotkey(action, force=False):
+    if not force and not (load_settings().get("hotkeys") or {}).get("enabled", True):
         return
     log(f"Hotkey: {action}")
     game = current_game()
     if action == "rejoin" and game.get("place_id"):
         spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], game.get("job_id")))
     elif action == "new" and game.get("place_id"):
-        servers, _ = list_servers(game["place_id"], pages=1)
-        choices = [x for x in servers if x["id"] != game.get("job_id") and x["playing"] < x["max"]]
-        if choices:
-            pick = sorted(choices, key=lambda x: (x["ping"] if x["ping"] is not None else 999, x["playing"]))[0]
+        pick, _ = pick_server(game["place_id"], {game.get("job_id")}, skip_full=False)
+        if pick:
             spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], pick["id"]))
         else:
             spawn_toast("No other servers", "Couldn't find another open server right now.")
@@ -1579,6 +1802,14 @@ def calendar_data():
     return days
 
 
+def _ping_groups(sess):
+    out = {}
+    for x in sess:
+        if x.get("ping") and x.get("location"):
+            out.setdefault(x["location"], []).append(x["ping"]["avg"])
+    return out
+
+
 def game_stats(pid):
     pid = str(pid)
     sess = [x for x in _sessions() if str(x.get("place_id")) == pid]
@@ -1596,6 +1827,9 @@ def game_stats(pid):
         "longest": max([x.get("seconds", 0) for x in sess] or [0]),
         "first": min([x["start"] for x in sess] or [0]), "last": max([x.get("end", 0) for x in sess] or [play.get("last_played", 0)]),
         "locations": sorted(locs.items(), key=lambda kv: -kv[1])[:8], "recent": list(reversed(sess))[:15],
+        "ping_by_location": sorted(((loc, round(sum(v) / len(v)), len(v)) for loc, v in _ping_groups(sess).items()),
+                                   key=lambda x: x[1])[:8],
+        "last_ping": next((x["ping"] for x in reversed(sess) if x.get("ping")), None),
     }
 
 
@@ -1690,6 +1924,15 @@ def health_checks(settings):
         add("background", "Background helper is running", alive,
             "Tracks Roblox even when this window is closed." if alive else "Start with Windows is on but the helper isn't running.",
             "Start helper")
+    if players:
+        want = build_flags(settings)
+        have = load_json(players[0] / "ClientSettings" / "ClientAppSettings.json", None)
+        add("flags", "Your FastFlags are on the current Roblox", not want or have == want,
+            "Roblox has your latest flags." if not want or have == want else "Roblox's flag file doesn't match your settings (Roblox may have updated).",
+            "Re-apply now", "warn")
+    recent = [x for x in (load_json(PROBLEMS_FILE, []) or []) if x.get("time", 0) > time.time() - 7 * 86400]
+    add("problems", "No Roblox problems this week", not recent,
+        "No crashes or disconnects recorded." if not recent else f"{len(recent)} problem(s) recorded. See Recent problems below.", None, "warn")
     if settings["discord"].get("enabled"):
         has_id = bool(settings["discord"].get("client_id", "").strip())
         add("discord", "Discord status is set up", has_id,
@@ -1717,6 +1960,11 @@ def apply_health_fix(cid, settings):
         spawn_self(ATTACH_FLAG)
     elif cid == "background":
         spawn_self(BACKGROUND_FLAG)
+    elif cid == "flags":
+        if roblox_running():
+            write_flags(player_dirs()[0], build_flags(settings))
+        else:
+            apply_all(settings)
     return True
 
 
@@ -1771,6 +2019,327 @@ def repair(kind, settings):
         log("Started the official Roblox installer")
         return "The official Roblox installer is running."
     raise ValueError("Unknown repair")
+
+
+DISCONNECT_RE = re.compile(r"(?:Error Code|[Dd]isconnect(?:ion)?(?: with)? reason(?: received)?)\s*[:=]?\s*(\d{3})")
+IGNORED_CODES = {285, 286}
+CODES = {
+    260: ("Bad data from the server", "The game server sent something your Roblox couldn't read. Rejoining usually fixes it."),
+    264: ("Signed in somewhere else", "The same account joined a game on another device or tab."),
+    266: ("Connection timed out", "Your connection to the server stalled. Check your Wi-Fi or try a server with better ping."),
+    267: ("Kicked by the game", "The game itself removed you. That's the game's rules, not Orbit or Roblox."),
+    268: ("Kicked for unexpected behavior", "Roblox didn't like something on your client. Make sure no cheats or injectors are running."),
+    271: ("Server closed", "The server shut down or the game kicked everyone."),
+    272: ("Content failed to load", "Turn mods off in Orbit (Mods page) and try again; a broken mod file can cause this."),
+    273: ("Account opened elsewhere", "Your account launched another Roblox session, which closed this one."),
+    274: ("Server shutting down", "The game's developer shut the server down, often for an update."),
+    275: ("Server closed for an update", "The game updated. Just join again."),
+    277: ("Lost connection", "Your internet dropped or lagged too long. Try a closer server (Region hopper on the Servers page)."),
+    278: ("Idle kick", "Roblox disconnects you after 20 minutes without moving."),
+    279: ("Couldn't connect", "Your firewall, VPN or network blocked the connection. Try a different network or turn off your VPN."),
+    280: ("Roblox is out of date", "Roblox needs an update. Launching through Orbit installs it."),
+    282: ("Disconnected", "The server dropped you. Rejoin or try another server."),
+    517: ("Server unavailable", "That server is gone or full. Try another one."),
+    524: ("Not allowed to join", "That server is private, or you don't have access."),
+    529: ("Roblox is having issues", "Roblox's own servers are struggling. Check status.roblox.com and try again soon."),
+    610: ("Couldn't join that server", "The server ended or the link expired. Try joining the game normally."),
+    772: ("Server full", "That server is full. Smart join or the Servers page can find one with room."),
+    773: ("Teleport blocked", "The game tried to send you somewhere you can't go."),
+}
+CRASH_PATTERNS = [
+    (re.compile(r"DXGI_ERROR_DEVICE_(?:REMOVED|HUNG|RESET)|[Dd]evice (?:removed|lost)|D3D11.*fail", re.I),
+     "graphics", "Your graphics driver crashed", "Update your GPU driver, or set Graphics API to Direct3D 11 or Vulkan in FastFlags."),
+    (re.compile(r"bad_alloc|out of memory|OutOfMemory|memory allocation failed", re.I),
+     "memory", "Roblox ran out of memory", "Close other apps (browsers use a lot), or turn on FPS Boost to lower texture quality."),
+    (re.compile(r"Vulkan.*(?:fail|error)|vkCreate\w+ failed", re.I),
+     "vulkan", "Vulkan failed to start", "Set Graphics API back to Auto or Direct3D 11 in FastFlags."),
+    (re.compile(r"Failed to load (?:texture|sound|font|mesh)|ContentProvider.*failed", re.I),
+     "content", "Some game files failed to load", "If you use mods, turn them off on the Mods page and try again."),
+]
+
+
+def explain_code(code):
+    title, tip = CODES.get(code, (f"Disconnected (error {code})", "Rejoin or try a different server."))
+    return {"kind": "disconnect", "code": code, "title": title, "tip": tip}
+
+
+def diagnose_exit(log_path, launch_time):
+    text = ""
+    if log_path and Path(log_path).exists():
+        with open(log_path, "rb") as f:
+            f.seek(max(0, Path(log_path).stat().st_size - 400_000))
+            text = f.read().decode("utf-8", "ignore")
+    for rx, kind, title, tip in CRASH_PATTERNS:
+        if rx.search(text):
+            return {"kind": kind, "title": title, "tip": tip}
+    crash_logs = [p for p in ROBLOX_LOGS.glob("*CrashHandler*.log") if p.stat().st_mtime > launch_time] \
+        if ROBLOX_LOGS.is_dir() else []
+    codes = [int(c) for c in DISCONNECT_RE.findall(text[-60_000:]) if int(c) not in IGNORED_CODES]
+    if codes and not crash_logs:
+        return None
+    if crash_logs:
+        return {"kind": "crash", "title": "Roblox crashed",
+                "tip": "No clear cause in the log. Try Clear cache on the Health page, update your GPU driver, or turn mods off."}
+    return None
+
+
+def record_problem(found, game, line):
+    data = load_json(PROBLEMS_FILE, [])
+    if not isinstance(data, list):
+        data = []
+    data.append({**found, "time": int(time.time()), "place_id": str(game.get("place_id") or ""),
+                 "name": game.get("name"), "location": game.get("location"), "job_id": game.get("job_id"),
+                 "line": (line or "").strip()[:240]})
+    save_json(PROBLEMS_FILE, data[-50:])
+    log(f"Problem: {found['title']}" + (f" (code {found.get('code')})" if found.get("code") else ""))
+
+
+def ping_summary(pings):
+    vals = [v for _, v in pings if v is not None]
+    if not pings or not vals:
+        return None
+    step = max(1, len(pings) // 60)
+    return {"avg": round(sum(vals) / len(vals)), "min": min(vals), "max": max(vals),
+            "loss": round(100 * (len(pings) - len(vals)) / len(pings)),
+            "samples": [v for _, v in pings[::step]][:60]}
+
+
+def pick_server(place_id, exclude=(), skip_full=True):
+    servers, note = list_servers(place_id, pages=1)
+    ok = [x for x in servers if x["id"] not in exclude and (not skip_full or x["playing"] <= x["max"] - 2)]
+    if not ok:
+        return None, note
+    return sorted(ok, key=lambda x: (x["ping"] if x["ping"] is not None else 999, -x["playing"]))[0], note
+
+
+US_EAST = {"Virginia", "New York", "New Jersey", "Georgia", "Florida", "North Carolina", "South Carolina", "Pennsylvania",
+           "Massachusetts", "Maryland", "Delaware", "Connecticut", "District of Columbia", "Washington, D.C.", "Maine",
+           "New Hampshire", "Vermont", "Rhode Island", "West Virginia", "Ohio", "Michigan", "Tennessee", "Kentucky"}
+US_WEST = {"California", "Washington", "Oregon", "Nevada", "Arizona", "Utah", "Idaho", "Montana", "Wyoming",
+           "New Mexico", "Alaska", "Hawaii"}
+REGIONS = {
+    "US East": lambda region, cc: cc == "US" and region in US_EAST,
+    "US Central": lambda region, cc: cc == "US" and region not in US_EAST and region not in US_WEST,
+    "US West": lambda region, cc: cc == "US" and region in US_WEST,
+    "Europe": lambda region, cc: cc in {"GB", "DE", "NL", "FR", "PL", "ES", "IT", "SE", "IE", "BE", "AT", "CH",
+                                        "DK", "FI", "NO", "PT", "CZ", "RO"},
+    "Asia": lambda region, cc: cc in {"JP", "SG", "HK", "IN", "KR", "TW", "MY", "TH", "ID", "PH", "VN", "AE"},
+    "Oceania": lambda region, cc: cc in {"AU", "NZ"},
+    "South America": lambda region, cc: cc in {"BR", "AR", "CL", "CO", "PE"},
+}
+
+
+def in_region(location, name):
+    parts = [x.strip() for x in (location or "").split(",")]
+    if len(parts) < 2 or name not in REGIONS:
+        return False
+    return REGIONS[name](parts[-2] if len(parts) >= 3 else "", parts[-1])
+
+
+class RegionHop:
+    current = None
+
+    def __init__(self, place_id, region, tries=8):
+        self.place_id, self.region, self.tries = str(place_id), region, tries
+        self.tried, self.seen = set(), []
+        self.status, self.done, self.ok, self.cancelled = "Starting...", False, False, False
+
+    def state(self):
+        return {"region": self.region, "status": self.status, "done": self.done, "ok": self.ok,
+                "tried": len(self.tried), "tries": self.tries, "seen": self.seen[-8:]}
+
+    def run(self):
+        try:
+            self._run()
+        except Exception as e:
+            self.status = f"Stopped: {e}"
+            log("Region hop error:\n" + traceback.format_exc())
+        self.done = True
+
+    def _run(self):
+        cur = load_json(CURRENT_FILE, None) or {}
+        if cur.get("place_id") == self.place_id and in_region(cur.get("location"), self.region):
+            self.ok, self.status = True, f"You're already in {self.region} ({cur['location']})."
+            return
+        for attempt in range(self.tries):
+            if self.cancelled:
+                self.status = "Cancelled."
+                return
+            self.status = f"Finding a server ({attempt + 1}/{self.tries})..."
+            sv, note = pick_server(self.place_id, self.tried | {cur.get("job_id")})
+            if not sv:
+                self.status = note or "No more open servers to try."
+                return
+            self.tried.add(sv["id"])
+            self.status = f"Joining server {attempt + 1} of {self.tries}..."
+            spawn_self(LAUNCH_FLAG, rejoin_uri(self.place_id, sv["id"]))
+            end, location = time.time() + 55, None
+            while time.time() < end and not self.cancelled:
+                cur = load_json(CURRENT_FILE, None) or {}
+                if cur.get("job_id") == sv["id"] and cur.get("location"):
+                    location = cur["location"]
+                    break
+                time.sleep(1)
+            if not location:
+                self.seen.append("No answer")
+                continue
+            self.seen.append(location)
+            if in_region(location, self.region):
+                self.ok, self.status = True, f"Found one: {location}"
+                spawn_toast(f"You're in {self.region}", location)
+                return
+            self.status = f"{location} isn't in {self.region}, trying another..."
+            time.sleep(2)
+        self.status = f"Tried {len(self.tried)} servers without finding {self.region}. This game may not have servers there right now."
+
+
+def screenshot_game(path, sessions):
+    t = path.stat().st_mtime
+    for x in sessions:
+        if x.get("start", 0) - 30 <= t <= x.get("end", 0) + 60:
+            return x.get("name")
+    return None
+
+
+def sort_screenshots():
+    sessions = _sessions()
+    moved = 0
+    for folder in screenshot_dirs():
+        for f in list(folder.iterdir()):
+            if not f.is_file() or f.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                continue
+            name = screenshot_game(f, sessions)
+            if not name:
+                continue
+            clean = re.sub(r'[<>:"/\\|?*]', "", name).strip().strip(".")[:60] or "Other"
+            dest = folder / clean / f.name
+            if dest.exists():
+                continue
+            dest.parent.mkdir(exist_ok=True)
+            try:
+                f.rename(dest)
+                moved += 1
+            except OSError:
+                continue
+    if moved:
+        log(f"Sorted {moved} screenshot(s) into game folders")
+    return moved
+
+
+MOD_ROOTS = ("content/", "PlatformContent/", "ExtraContent/")
+
+
+def export_mod_pack(name, dest):
+    import zipfile
+    folder = PROFILES_DIR / name
+    files = [f for f in folder.rglob("*") if f.is_file()] if folder.is_dir() else []
+    if not files:
+        raise ValueError("That mod profile is empty.")
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("orbit_pack.json", json.dumps({"name": name, "made": int(time.time()), "version": APP_VERSION}))
+        for f in files:
+            z.write(f, "files/" + f.relative_to(folder).as_posix())
+    return len(files)
+
+
+def import_mod_pack(src):
+    import zipfile
+    with zipfile.ZipFile(src) as z:
+        names = z.namelist()
+        if "orbit_pack.json" not in names:
+            raise ValueError("That file isn't an Orbit mod pack.")
+        meta = json.loads(z.read("orbit_pack.json") or b"{}")
+        total = sum(i.file_size for i in z.infolist())
+        if total > 300 * 1024 * 1024:
+            raise ValueError("That pack is too big (over 300 MB).")
+        base = re.sub(r'[<>:"/\\|?*]', "", str(meta.get("name") or Path(src).stem)).strip().strip(".") or "Imported"
+        name, n = base, 2
+        while (PROFILES_DIR / name).exists():
+            name, n = f"{base} ({n})", n + 1
+        dest = (PROFILES_DIR / name).resolve()
+        count = 0
+        for item in names:
+            if not item.startswith("files/") or item.endswith("/"):
+                continue
+            rel = item[len("files/"):]
+            if not rel.startswith(MOD_ROOTS):
+                continue
+            target = (dest / rel).resolve()
+            if not str(target).startswith(str(dest)):
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(item) as fsrc, open(target, "wb") as fdst:
+                shutil.copyfileobj(fsrc, fdst)
+            count += 1
+        if not count:
+            shutil.rmtree(dest, ignore_errors=True)
+            raise ValueError("That pack has no usable files.")
+    log(f"Imported mod pack '{name}' ({count} files)")
+    return name, count
+
+
+def check_roblox_update(settings):
+    players = player_dirs()
+    if not players:
+        return None
+    current = players[0].name
+    info = load_json(ROBLOX_VERSION_FILE, {}) or {}
+    if info.get("version") == current:
+        if not (players[0] / "ClientSettings" / "ClientAppSettings.json").exists() and build_flags(settings):
+            write_flags(players[0], build_flags(settings))
+            log(f"Put FastFlags back into {current}")
+        return None
+    previous = info.get("version")
+    save_json(ROBLOX_VERSION_FILE, {"version": current, "previous": previous, "at": int(time.time())})
+    if not previous:
+        return None
+    log(f"Roblox updated from {previous} to {current}")
+    if roblox_running():
+        write_flags(players[0], build_flags(settings))
+    else:
+        apply_all(settings, players[0])
+    spawn_toast("Roblox updated", "Orbit put your FastFlags and mods back on the new version.")
+    return current
+
+
+class MiniApi:
+    def __init__(self):
+        self._window = None
+        self._ping = {"ip": None, "ms": None, "at": 0}
+
+    def state(self):
+        cur = load_json(CURRENT_FILE, None)
+        settings = load_settings()
+        c = theme_colors(settings["appearance"])
+        out = {"current": cur, "last": load_json(LAST_SERVER_FILE, None), "accent": accent_pair(settings["appearance"]),
+               "light": settings["appearance"].get("mode") == "Light", "bg": c["bg"]}
+        if cur and roblox_running():
+            out["ping"] = self._ping["ms"] if self._ping.get("ip") == cur.get("job_id") else None
+            if time.time() - self._ping["at"] > 5:
+                self._ping["at"] = time.time()
+                threading.Thread(target=self._measure, args=(cur.get("job_id"), cur.get("ip")), daemon=True).start()
+        return out
+
+    def _measure(self, job, ip):
+        ms = ping_ms(ip)
+        self._ping.update({"ip": job, "ms": ms})
+
+    def rejoin(self):
+        run_hotkey("rejoin", True)
+        return True
+
+    def hop(self):
+        run_hotkey("new", True)
+        return True
+
+    def open_main(self):
+        SHOW_FLAG.write_text(str(time.time()))
+        return True
+
+    def close(self):
+        if self._window:
+            self._window.destroy()
+        return True
 
 
 def claim_monitor():
@@ -2013,11 +2582,23 @@ def screenshot_dirs():
     return out
 
 
-def list_screenshots():
+def list_screenshots(game=None):
     files = []
     for folder in screenshot_dirs():
-        files += [p for p in folder.iterdir() if p.suffix.lower() in (".png", ".jpg", ".jpeg") and p.is_file()]
+        subs = [folder] + [d for d in folder.iterdir() if d.is_dir()]
+        for d in subs:
+            if game and (d == folder or d.name != game):
+                continue
+            files += [p for p in d.iterdir() if p.suffix.lower() in (".png", ".jpg", ".jpeg") and p.is_file()]
     return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def screenshot_games():
+    names = set()
+    for folder in screenshot_dirs():
+        names.update(d.name for d in folder.iterdir() if d.is_dir() and any(
+            p.suffix.lower() in (".png", ".jpg", ".jpeg") for p in d.iterdir()))
+    return sorted(names, key=str.lower)
 
 
 def _is_screenshot(path):
@@ -2770,6 +3351,8 @@ class Api:
         self._window = None
         self._mode = mode
         self._tray = None
+        self._mini = None
+        self._mini_api = None
         self._quitting = False
         self._tray_hint = False
         self._ready = threading.Event()
@@ -2813,6 +3396,8 @@ class Api:
             "icon_set": ICON_FILE.exists(),
             "allowlist": sorted(ALLOWLIST),
             "accents": ACCENTS,
+            "quick_presets": QUICK_PRESETS,
+            "regions": list(REGIONS),
             "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
             "credits": [{"role": r, "handle": h} for r, h in CREDITS],
             "ext_path": str(EXTENSIONS_DIR / EXTENSION_NAME),
@@ -3030,9 +3615,19 @@ class Api:
         return {"current": current, "playtime": load_json(PLAYTIME_FILE, {}), "last_server": load_json(LAST_SERVER_FILE, None),
                 "registered": is_registered(), "install": (player_dirs()[:1] or [None])[0] and player_dirs()[0].name}
 
-    def play_game(self, pid):
+    def play_game(self, pid, smart=None):
         if not str(pid).isdigit():
             return {"error": "Unknown game."}
+        if smart if smart is not None else self._settings.get("smart_join"):
+            try:
+                sv, _ = pick_server(pid)
+                if sv:
+                    log(f"Smart join picked a {sv['playing']}/{sv['max']} server at {sv['ping']} ms")
+                    r = self.launch(rejoin_uri(pid, sv["id"]))
+                    return {"smart": {"playing": sv["playing"], "max": sv["max"], "ping": sv["ping"]}} \
+                        if r is True or (isinstance(r, dict) and not r.get("error")) else r
+            except Exception as e:
+                log(f"Smart join failed, joining normally: {e}")
         return self.launch(rejoin_uri(pid))
 
     def join_server(self, pid, job):
@@ -3091,16 +3686,18 @@ class Api:
         except Exception as e:
             return self._err(e)
 
-    def screenshots(self, offset=0, count=24):
-        files = list_screenshots()
+    def screenshots(self, offset=0, count=24, game=None):
+        files = list_screenshots(game or None)
+        roots = {d.resolve() for d in screenshot_dirs()}
         items = []
         for f in files[offset:offset + count]:
             try:
                 items.append({"path": str(f), "name": f.name, "time": int(f.stat().st_mtime),
-                              "thumb": data_url(f, max_side=480)})
+                              "thumb": data_url(f, max_side=480),
+                              "game": None if f.parent.resolve() in roots else f.parent.name})
             except Exception:
                 continue
-        return {"items": items, "total": len(files)}
+        return {"items": items, "total": len(files), "games": screenshot_games() if not offset else None}
 
     def screenshot_full(self, path):
         if not _is_screenshot(path):
@@ -3272,6 +3869,118 @@ class Api:
         save_settings(self._settings)
         return saved
 
+    def set_boost(self, on, level="Max"):
+        try:
+            set_boost(self._settings, bool(on), level if level in ("Max", "Balanced") else "Max")
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def apply_system(self):
+        try:
+            save_settings(self._settings)
+            apply_system_boost(self._settings, (player_dirs()[:1] or [None])[0])
+            return {"settings": self._settings, "pending": roblox_running()}
+        except Exception as e:
+            return self._err(e)
+
+    def quick_preset(self, name, pid=None):
+        try:
+            apply_quick_preset(self._settings, name, pid)
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def boost_status(self):
+        perf = self._settings["performance"]
+        gbs = GBS_FILE.exists()
+        cap = None
+        if gbs:
+            m = re.search(r'<int name="FramerateCap">(-?\d+)</int>', GBS_FILE.read_text(encoding="utf-8", errors="ignore"))
+            cap = int(m.group(1)) if m else None
+        return {"gbs": gbs, "roblox_cap": cap, "running": roblox_running(), "windows": IS_WINDOWS,
+                "boost": bool(perf.get("boost"))}
+
+    def region_hop(self, pid, region):
+        if RegionHop.current and not RegionHop.current.done:
+            return {"error": "A region hop is already running."}
+        if region not in REGIONS or not str(pid).isdigit():
+            return {"error": "Pick a region and a game."}
+        RegionHop.current = RegionHop(pid, region)
+        threading.Thread(target=RegionHop.current.run, daemon=True).start()
+        return RegionHop.current.state()
+
+    def hop_state(self):
+        return RegionHop.current.state() if RegionHop.current else None
+
+    def hop_cancel(self):
+        if RegionHop.current:
+            RegionHop.current.cancelled = True
+        return True
+
+    def regions(self):
+        return list(REGIONS)
+
+    def problems(self):
+        data = load_json(PROBLEMS_FILE, [])
+        return list(reversed(data))[:20] if isinstance(data, list) else []
+
+    def clear_problems(self):
+        PROBLEMS_FILE.unlink(missing_ok=True)
+        return True
+
+    def sort_screenshots(self):
+        try:
+            return {"moved": sort_screenshots()}
+        except Exception as e:
+            return self._err(e)
+
+    def export_mod_pack(self, name):
+        try:
+            picked = self._dialog("SAVE", save_filename=f"{name}.orbitpack", file_types=("Orbit mod pack (*.orbitpack)",))
+            if not picked:
+                return None
+            dest = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            return {"count": export_mod_pack(name, dest), "path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def import_mod_pack(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Orbit mod pack (*.orbitpack)",))
+            if not picked:
+                return None
+            name, count = import_mod_pack(Path(picked[0] if isinstance(picked, (list, tuple)) else picked))
+            return {"name": name, "count": count, "profiles": list_mod_profiles()}
+        except Exception as e:
+            return self._err(e)
+
+    def toggle_mini(self):
+        try:
+            import webview
+            if self._mini and self._mini_api._window:
+                try:
+                    self._mini.destroy()
+                except Exception:
+                    pass
+                self._mini = None
+                return False
+            self._mini_api = MiniApi()
+            html = (ui_file().parent / "mini.html").read_text(encoding="utf-8")
+            sw = 1920
+            try:
+                sw = ctypes.windll.user32.GetSystemMetrics(0) if IS_WINDOWS else 1920
+            except Exception:
+                pass
+            self._mini = webview.create_window("Orbit Mini", html=html, js_api=self._mini_api, width=320, height=118,
+                                               x=sw - 340, y=60, resizable=False, frameless=True, easy_drag=True,
+                                               on_top=True, background_color=theme_colors(self._settings["appearance"])["bg"])
+            self._mini_api._window = self._mini
+            self._mini.events.closed += lambda: setattr(self, "_mini", None)
+            return True
+        except Exception as e:
+            return self._err(e)
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -3386,6 +4095,11 @@ def _run_gui(mode, after_update, selftest):
         def finish_selftest():
             ready = api._ready.wait(90)
             time.sleep(2)
+            if mode == "app":
+                r = api.toggle_mini()
+                if r is not True:
+                    api._ui_errors.append(f"mini player: {r}")
+                time.sleep(2)
             _write_selftest(mode, ready, api._ui_errors)
             log(f"Self-test {'passed' if ready and not api._ui_errors else 'FAILED'} ({mode})")
             window.destroy()

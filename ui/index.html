@@ -264,7 +264,7 @@ body.bg-image .nebula { opacity: .35; }
 #nav { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; flex: 1 1 auto; min-height: 0; margin-bottom: 8px; gap: 1px; }
 #nav::-webkit-scrollbar { display: none; }
 .nav-item, .nav-indicator { height: 34px; }
-.sidebar { padding-top: 12px; padding-bottom: 12px; }
+.sidebar { padding-top: 12px; padding-bottom: 12px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
 .side-foot { flex: none; }
 .kbd-btn { align-self: center; margin-right: 10px; height: 28px; display: inline-flex; align-items: center; gap: 8px; padding: 0 6px 0 11px; border-radius: 9px; font-size: 12px; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); transition: all .25s var(--ease); }
 .kbd-btn:hover { color: var(--text); border-color: var(--line2); }
@@ -468,6 +468,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .hk-row kbd { font: 600 12px var(--mono, ui-monospace, monospace); padding: 4px 8px; border-radius: 7px; border: 1px solid var(--line); background: rgba(var(--accent-rgb), .1); min-width: 92px; text-align: center; }
 #splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #05030a; pointer-events: none; transition: opacity .6s ease .1s; }
 #splash.done { opacity: 0; }
+#splash[hidden] { display: none; }
 #splash .sp-core { position: relative; width: 120px; height: 120px; }
 #splash .sp-disk { position: absolute; inset: -60px; border-radius: 50%; background: conic-gradient(from 0deg, transparent, var(--accent), var(--accent2), #fff, var(--accent), transparent 70%); filter: blur(14px); transform: scaleY(.32) scale(.1); opacity: 0; animation: spDisk 1.5s cubic-bezier(.2, .8, .2, 1) forwards, spSpin 1.2s linear infinite; }
 #splash .sp-hole { position: absolute; inset: 22px; border-radius: 50%; background: #000; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 0 30px 6px var(--accent); transform: scale(0); animation: spHole .9s cubic-bezier(.3, 1.6, .5, 1) .15s forwards; }
@@ -478,6 +479,43 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 @keyframes spHole { to { transform: scale(1); } }
 @keyframes spRing { from { opacity: .9; transform: scale(.6); } to { opacity: 0; transform: scale(3.2); } }
 @keyframes spName { from { opacity: 0; letter-spacing: 1.2em; } to { opacity: .9; letter-spacing: .5em; } }
+
+.boost-hero { position: relative; overflow: hidden; }
+.boost-hero::before { content: ""; position: absolute; inset: -40% -10% auto auto; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(var(--accent-rgb), .28), transparent 65%); pointer-events: none; transition: opacity .6s; opacity: .5; }
+.boost-hero.on::before { opacity: 1; animation: boostPulse 2.4s ease-in-out infinite; }
+@keyframes boostPulse { 50% { transform: scale(1.12); } }
+.boost-top { display: flex; align-items: center; gap: 18px; position: relative; }
+.boost-btn { position: relative; width: 92px; height: 92px; border-radius: 50%; border: 0; cursor: pointer; flex: none; color: #fff; font: 800 13px var(--font, inherit); letter-spacing: .04em;
+  background: radial-gradient(circle at 50% 50%, #05030a 38%, transparent 40%), conic-gradient(from var(--a, 0deg), var(--accent), var(--accent2), var(--accent)); box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 10px 40px -12px var(--accent); transition: transform .35s var(--spring), box-shadow .35s; }
+.boost-btn:hover { transform: scale(1.06); }
+.boost-btn.on { animation: boostSpin 2.2s linear infinite; box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 0 46px -6px var(--accent2); }
+.boost-btn span { position: relative; }
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes boostSpin { to { --a: 360deg; } }
+.boost-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; margin-top: 14px; position: relative; }
+.boost-list div { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.boost-list div.on { color: var(--text); }
+.boost-list i { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10px; background: rgba(255,255,255,.06); flex: none; }
+.boost-list .on i { background: rgba(74, 222, 128, .18); color: #4ade80; }
+.preset-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.preset { flex: 1; min-width: 130px; border: 1px solid var(--line); border-radius: 13px; padding: 12px; background: rgba(255,255,255,.02); text-align: left; color: var(--text); cursor: pointer; transition: transform .3s var(--spring), border-color .25s; font: inherit; }
+.preset:hover { transform: translateY(-2px); border-color: var(--accent); }
+.preset b { display: block; font-weight: 700; margin-bottom: 2px; }
+.preset span { color: var(--muted); font-size: 12px; }
+.hop-status { margin-top: 10px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.hop-seen { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.hop-seen span { font-size: 11.5px; padding: 3px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.hop-seen span.hit { border-color: #4ade80; color: #4ade80; }
+.spark { width: 100%; height: 90px; display: block; }
+.ping-tag { font-size: 11.5px; padding: 2px 7px; border-radius: 6px; font-weight: 650; background: rgba(255,255,255,.05); }
+.ping-good { color: #4ade80; } .ping-mid { color: #fbbf24; } .ping-bad { color: #fb7185; }
+.prob-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); align-items: center; }
+.prob-row:first-of-type { border-top: 0; }
+.prob-row .pi { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: rgba(251, 113, 133, .14); color: #fb7185; font-weight: 800; }
+.prob-row b { display: block; } .prob-row span { color: var(--muted); font-size: 12.5px; }
+.shot-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.shot .gtag { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(5, 3, 10, .7); color: #fff; }
+.mini-btn svg { width: 15px; height: 15px; }
 </style>
 </head>
 <body>
@@ -488,6 +526,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <svg width="24" height="24" viewBox="-50 -50 100 100"><defs><linearGradient id="tg" x1="0" x2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent2)"/></linearGradient></defs><ellipse rx="46" ry="14" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/><circle r="20" fill="#000" stroke="#f5f3ff" stroke-width="3"/><path d="M -46 0 A 46 14 0 0 0 46 0" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/></svg>
       <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span>
     </div>
+    <button class="win-btn mini-btn" id="miniBtn" title="Mini player (small always-on-top window)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/></svg></button>
     <button class="kbd-btn" id="palBtn" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<kbd>Ctrl K</kbd></button>
     <button class="upd-pill" id="updPill" hidden><span class="fill"></span><span class="upd-dot"></span><span id="updText">Update ready</span></button>
     <div class="saved" id="saved">Saved</div>
@@ -557,6 +596,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row"><input class="input" id="svInput" placeholder="Paste a game link or place ID" style="flex:1"><button class="btn primary" id="svFind">Find servers</button></div>
         <div class="row" id="svQuick" style="margin-top:10px"></div>
       </div>
+      <div class="card rise" style="--i:1" id="smartCard"></div>
       <div id="svResult"></div>
     </section>
 
@@ -572,13 +612,16 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 
     <section class="page" id="page-screens">
       <div class="page-head rise row" style="--i:0"><div><h1>Screenshots</h1><p id="shotSub">Your Roblox screenshots, newest first.</p></div><span class="spacer"></span>
-        <button class="btn" id="shotFolder">Open folder</button><button class="btn" id="shotRefresh">Refresh</button></div>
+        <button class="btn" id="shotSort">Sort by game</button><button class="btn" id="shotFolder">Open folder</button><button class="btn" id="shotRefresh">Refresh</button></div>
+      <div class="rise" style="--i:1" id="shotTop"></div>
       <div class="shots rise" style="--i:1" id="shotGrid"></div>
       <div class="row rise" style="--i:2;justify-content:center;margin-top:16px"><button class="btn" id="shotMore" hidden>Load more</button></div>
     </section>
 
     <section class="page" id="page-boost">
-      <div class="page-head rise" style="--i:0"><h1>Boost</h1><p>Squeeze out more performance and open your other apps automatically.</p></div>
+      <div class="page-head rise" style="--i:0"><h1>Boost</h1><p>Squeeze out more FPS and open your other apps automatically.</p></div>
+      <div class="card boost-hero rise" style="--i:1" id="fpsCard"></div>
+      <div class="card rise" style="--i:1" id="fpsTune"></div>
       <div class="card rise" style="--i:1" id="perfCard"></div>
       <div class="card rise" style="--i:2">
         <div class="row" style="margin-bottom:6px"><div><h3>Launch with Roblox</h3><p class="sub" style="margin:0">These open when Roblox starts through Orbit. Optionally close them when you stop playing.</p></div><span class="spacer"></span><button class="btn" id="appAdd">Add app</button></div>
@@ -597,6 +640,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         </div>
         <p class="sub" style="margin:10px 0 0">Game profiles apply when you join that game from the website or with Rejoin. Teleporting to another game inside Roblox keeps the flags you launched with.</p>
       </div>
+      <div class="card rise" style="--i:1" id="presetCard"></div>
       <div id="flagsBody"></div>
     </section>
 
@@ -605,6 +649,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:1" id="modsToggleCard"></div>
       <div class="card rise" style="--i:2">
         <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Mod profiles</h3><span class="spacer"></span>
+          <button class="btn" id="packImport">Import pack</button><button class="btn" id="packExport">Share this profile</button>
           <button class="btn" id="openModsBtn">Open folder</button><button class="btn danger" id="delModBtn">Delete profile</button></div>
         <div class="row" id="modChips"></div>
       </div>
@@ -670,6 +715,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <div class="field" style="margin:0"><label>Dim</label><div class="range-wrap"><input type="range" id="bgDim" min="0" max="90"><div class="range-val" id="bgDimVal"></div></div></div></div>
       </div>
       <div class="card rise" style="--i:3" id="splashCard"></div>
+      <div class="card rise" style="--i:3" id="shareCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Sounds</h3><p class="sub">Played when you launch Roblox and unlock achievements.</p>
         <div class="field"><div id="sndSeg"></div></div>
@@ -707,6 +753,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <button class="btn" id="healthRun">Run checks again</button></div>
       <div class="card rise" style="--i:1"><div class="health-score"><div class="big-num" id="healthScore">–</div><div><b id="healthTitle">Checking...</b><div class="muted small" id="healthSub"></div></div></div></div>
       <div class="card rise" style="--i:2" id="healthList"></div>
+      <div class="card rise" style="--i:2" id="probCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Repair Roblox</h3><p class="sub">Tools for when Roblox acts up. None of these touch your Orbit settings unless it says so.</p>
         <div class="repair-grid">
@@ -899,6 +946,8 @@ function applyTheme() {
   root.style.setProperty("--accent2", c2);
   root.style.setProperty("--accent-rgb", hexRgb(c1));
   const [r, g, b] = hexRgb(c1).split(",").map(Number);
+  const z = { Compact: .9, Large: 1.1 }[a.ui_scale] || 1, app = $("#app");
+  if (app) { app.style.zoom = z === 1 ? "" : z; app.style.height = z === 1 ? "" : `calc(100vh / ${z})`; }
   root.style.setProperty("--on-accent", (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.72 ? "#120a1f" : "#ffffff");
   starRGB = a.mode === "Light" ? hexRgb(c1) : "225,215,255";
   bhColors = [hexRgb(c1).split(",").map(Number), hexRgb(c2).split(",").map(Number)];
@@ -1176,8 +1225,18 @@ function normalize(val, options) {
   const hit = options.find(([v]) => v.split(" ")[0].replace(/x$/, "") === val.split(" ")[0].replace(/x$/, ""));
   return hit ? hit[0] : "Automatic";
 }
+const PRESET_INFO = { Potato: "Most FPS. Lowest textures, lighting and detail.", Balanced: "More FPS, still looks decent.", Quality: "Best looks. Needs a strong PC.", Reset: "Back to Roblox's own choices." };
+function renderPresets() {
+  const box = $("#presetCard"), t = target(); box.innerHTML = "";
+  const row = h("div", { class: "preset-row" });
+  Object.keys(S.quick_presets).forEach((name) => row.append(h("button", { class: "preset", onclick: () => {
+    Object.assign(t.presets, S.quick_presets[name]); save(); renderFlags();
+    toast(`${name} preset applied to ${curProfile ? (cfg.game_profiles[curProfile]?.name || "this game") : "your default flags"}.`, "ok");
+  } }, h("b", {}, name === "Reset" ? "Reset" : name), h("span", {}, PRESET_INFO[name]))));
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Quick presets"), h("p", { class: "sub" }, "One click sets the graphics options below. Applies to the profile you picked above."), row);
+}
 function renderFlags() {
-  renderProfileSel();
+  renderProfileSel(); renderPresets();
   const t = target(), p = t.presets, body = $("#flagsBody");
   body.innerHTML = "";
   const gfx = h("div", { class: "card rise", style: "--i:2" }, h("h3", { style: "margin-bottom:14px" }, "Graphics"));
@@ -1341,6 +1400,7 @@ function renderAppearance() {
     nameEl.after(h("div", { class: "custom-colors", id: "customColors" }, pick(0), pick(1), prev, h("span", { class: "muted small" }, "Main and glow color. Also used for the in-game badge.")));
   }
   const spc = $("#splashCard"); spc.innerHTML = "";
+  renderShare();
   spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
@@ -1509,11 +1569,45 @@ async function renderLibrary() {
 async function playGame(g) {
   await saveNow(); sfx("launch");
   const r = await api.play_game(g.pid);
-  r && r.error ? toast(r.error, "err") : toast(`Launching ${g.name}...`, "ok");
+  if (r && r.error) return toast(r.error, "err");
+  toast(r && r.smart ? `Smart join: ${g.name}, ${r.smart.playing}/${r.smart.max} players${r.smart.ping != null ? ", ~" + r.smart.ping + " ms" : ""}` : `Launching ${g.name}...`, "ok");
 }
 
 let svData = null, svSort = "empty";
+function renderSmart() {
+  const box = $("#smartCard"); box.innerHTML = "";
+  box.append(toggleRow("Smart join", "Play buttons in Orbit pick the open server with the best ping instead of letting Roblox choose.", !!cfg.smart_join, (v) => { cfg.smart_join = v; save(); }));
+}
+let hopTimer = null;
+function hopCard(pid, name) {
+  const card = h("div", { class: "card rise", style: "--i:1" });
+  const sel = h("select", { class: "input", style: "min-width:170px" }, ...(S.regions || []).map((r) => h("option", { value: r }, r)));
+  let saved = ""; try { saved = localStorage.getItem("orbitHopRegion") || ""; } catch (e) {}
+  sel.value = saved || "US East";
+  const go_ = h("button", { class: "btn primary" }, "Hop to region"), status = h("div", { class: "hop-status" }), seen = h("div", { class: "hop-seen" });
+  const draw = (st) => {
+    status.innerHTML = ""; seen.innerHTML = "";
+    if (!st) return;
+    if (!st.done) status.append(h("span", { class: "spinner", style: "color:var(--accent)" }));
+    status.append(h("span", { class: st.ok ? "ping-good" : st.done ? "muted" : "" }, st.status));
+    if (!st.done) status.append(h("button", { class: "btn ghost", onclick: () => api.hop_cancel() }, "Cancel"));
+    st.seen.forEach((loc) => seen.append(h("span", { class: loc !== "No answer" && st.ok && loc === st.seen[st.seen.length - 1] ? "hit" : "" }, loc)));
+    go_.disabled = !st.done;
+  };
+  const poll = async () => { const st = await api.hop_state(); draw(st); if (st && !st.done) hopTimer = setTimeout(poll, 1500); else if (st && st.ok) sfx("ready"); };
+  go_.onclick = async () => {
+    try { localStorage.setItem("orbitHopRegion", sel.value); } catch (e) {}
+    await saveNow(); const r = await api.region_hop(pid, sel.value);
+    if (r.error) return toast(r.error, "err");
+    toast(`Hopping through ${name} servers until one is in ${sel.value}. Keep Roblox open.`); draw(r); clearTimeout(hopTimer); hopTimer = setTimeout(poll, 1500);
+  };
+  card.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Region hopper"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Joins servers one by one and stops when it lands in the region you pick. Each try takes a few seconds.")), sel, go_), status, seen);
+  api.hop_state().then((st) => { if (st && !st.done) { draw(st); hopTimer = setTimeout(poll, 1500); } });
+  return card;
+}
 function renderServers() {
+  renderSmart();
   const q = $("#svQuick"); q.innerHTML = "";
   cfg.library.slice(0, 10).forEach((g) => q.append(h("button", { class: "mini-chip", onclick: () => findServers(g.pid) }, g.name)));
   if (!cfg.library.length) q.append(h("span", { class: "muted small" }, "Tip: games in your Library show up here for one-click search."));
@@ -1541,7 +1635,7 @@ function drawServers() {
         h("button", { class: "btn primary", disabled: !list.length, onclick: () => join([...r.servers].sort((a, b) => a.playing - b.playing)[0]) }, "Join emptiest"),
         h("button", { class: "btn", disabled: !list.length, onclick: () => join([...r.servers].sort((a, b) => (a.ping ?? 9999) - (b.ping ?? 9999))[0]) }, "Join best ping"),
         h("button", { class: "btn ghost", onclick: () => findServers(r.pid) }, "Refresh")))));
-  res.append(head);
+  res.append(head, hopCard(r.pid, r.name));
   const card = h("div", { class: "card rise", style: "--i:1" });
   const seg = segmented([["empty", "Most empty"], ["full", "Most full"], ["ping", "Best ping"]], svSort, (v) => { svSort = v; drawServers(); });
   card.append(h("div", { class: "row", style: "margin-bottom:10px" }, h("h3", { style: "margin:0" }, "Servers"), h("span", { class: "spacer" }), seg));
@@ -1626,16 +1720,25 @@ function achToast(icon, title, desc) {
   $("#toasts").append(t); setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 400); }, 5200);
 }
 
-let shotOffset = 0, shotItems = [], lbIndex = 0;
+let shotOffset = 0, shotItems = [], lbIndex = 0, shotGame = "";
+function drawShotTop(games) {
+  const top = $("#shotTop"); top.innerHTML = "";
+  top.append(h("div", { class: "card", style: "margin-bottom:12px" }, toggleRow("Sort new screenshots by game", "After each session, Orbit moves that session's screenshots into a folder named after the game.", !!cfg.session.sort_screenshots, (v) => { cfg.session.sort_screenshots = v; save(); })));
+  if (!games || !games.length) return;
+  const row = h("div", { class: "shot-filter" });
+  [["", "All"], ...games.map((g) => [g, g])].forEach(([val, label]) => row.append(h("button", { class: "mini-chip" + (shotGame === val ? " on" : ""), style: shotGame === val ? "border-color:var(--accent);color:var(--accent)" : "", onclick: () => { shotGame = val; renderScreens(); } }, label)));
+  top.append(row);
+}
 async function renderScreens(more) {
   const grid = $("#shotGrid");
   if (!more) { grid.innerHTML = ""; shotOffset = 0; shotItems = []; }
   if (!S.screens_dirs.length) { grid.append(h("div", { class: "card", style: "grid-column:1/-1" }, emptyState("screens", "No Roblox screenshots yet.", "Take one in-game with the camera button in the Roblox menu, then hit Refresh."))); $("#shotMore").hidden = true; return; }
-  const r = await api.screenshots(shotOffset, 24);
+  const r = await api.screenshots(shotOffset, 24, shotGame);
+  if (!more) drawShotTop(r.games);
   $("#shotSub").textContent = `${r.total} screenshot${r.total === 1 ? "" : "s"}, newest first.`;
   r.items.forEach((it, i) => {
     const idx = shotItems.length; shotItems.push(it);
-    const el = h("div", { class: "shot", style: `--i:${i};${it.thumb ? `background-image:url("${it.thumb}")` : ""}` }, h("span", {}, new Date(it.time * 1000).toLocaleString()));
+    const el = h("div", { class: "shot", style: `--i:${i};${it.thumb ? `background-image:url("${it.thumb}")` : ""}` }, ...(it.game && !shotGame ? [h("div", { class: "gtag" }, it.game)] : []), h("span", {}, new Date(it.time * 1000).toLocaleString()));
     el.onclick = () => openLightbox(idx); grid.append(el);
   });
   if (!r.total) grid.append(h("div", { class: "card", style: "grid-column:1/-1" }, emptyState("screens", "No Roblox screenshots yet.", "Take one in-game, then hit Refresh.")));
@@ -1647,7 +1750,55 @@ async function openLightbox(i) {
   const full = await api.screenshot_full(it.path); if (full && shotItems[lbIndex] === it) img.src = full;
 }
 
+const FPS_CAPS = [["", "Roblox's choice"], ["60", "60"], ["144", "144"], ["240", "240"], ["9999", "Unlimited"]];
+const QUALITIES = [["", "Roblox's choice"], ["1", "Lowest"], ["3", "Low"], ["5", "Medium"], ["8", "High"], ["10", "Max"]];
+function syncSettings(r) { if (r && r.settings) for (const k of Object.keys(r.settings)) cfg[k] = r.settings[k]; }
+async function applySystem(msg) {
+  await saveNow(); const r = await api.apply_system();
+  if (r && r.error) return toast(r.error, "err");
+  syncSettings(r); if (msg) toast(r.pending ? msg + " Takes effect next time Roblox starts." : msg, "ok");
+}
+function renderFps() {
+  const p = cfg.performance, box = $("#fpsCard"); box.innerHTML = "";
+  box.classList.toggle("on", !!p.boost);
+  const btn = h("button", { class: "boost-btn" + (p.boost ? " on" : "") }, h("span", {}, p.boost ? "ON" : "BOOST"));
+  const level = segmented([["Max", "Max FPS"], ["Balanced", "Balanced"]], p.boost_level || "Max", async (v) => {
+    p.boost_level = v; if (p.boost) { await saveNow(); const r = await api.set_boost(true, v); if (r.error) return toast(r.error, "err"); syncSettings(r); renderBoost(); toast(`Boost switched to ${v === "Max" ? "Max FPS" : "Balanced"}.`, "ok"); } else save();
+  });
+  btn.onclick = async () => {
+    btn.disabled = true; await saveNow(); sfx(p.boost ? "ready" : "launch");
+    const r = await api.set_boost(!p.boost, p.boost_level || "Max"); btn.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    syncSettings(r); renderBoost();
+    if (cfg.performance.boost) { const rr = btn.getBoundingClientRect(); burst(rr.left + rr.width / 2, rr.top + rr.height / 2, 60); }
+    toast(cfg.performance.boost ? "FPS Boost is on. It kicks in next time Roblox starts." : "FPS Boost is off. Your previous settings are back.", "ok");
+  };
+  const items = [
+    ["Low-cost graphics flags", p.boost], ["FPS cap: " + (p.fps_cap == null ? "Roblox's choice" : p.fps_cap >= 9999 ? "Unlimited" : p.fps_cap), p.fps_cap != null],
+    ["Graphics quality: " + (p.graphics_quality ? (QUALITIES.find((q) => q[0] === String(p.graphics_quality)) || [0, p.graphics_quality])[1] : "Roblox's choice"), !!p.graphics_quality],
+    ["Roblox gets high CPU priority", p.high_priority], ["High performance power plan", p.power_plan], ["Uses your fastest GPU", p.gpu_high],
+    ["Windows Game Mode", p.game_mode], ["Xbox background recording off", p.no_dvr]];
+  box.append(h("div", { class: "boost-top" }, btn, h("div", { style: "flex:1;min-width:0" },
+    h("h3", { style: "font-size:20px;margin-bottom:4px" }, p.boost ? "FPS Boost is on" : "FPS Boost"),
+    h("p", { class: "sub", style: "margin:0 0 10px" }, p.boost ? "Everything below is set for speed. Click again to put your old settings back." : "One click sets Roblox and Windows up for the most frames. Everything can be undone."),
+    level)), h("div", { class: "boost-list" }, ...items.map(([t, on]) => h("div", { class: on ? "on" : "" }, h("i", {}, on ? "✓" : ""), t))));
+  requestAnimationFrame(() => level._remeasure());
+}
+function renderFpsTune() {
+  const p = cfg.performance, box = $("#fpsTune"); box.innerHTML = "";
+  const capSeg = segmented(FPS_CAPS, p.fps_cap == null ? "" : String(p.fps_cap), (v) => { p.fps_cap = v === "" ? null : Number(v); applySystem(v === "9999" ? "FPS unlocked. Above 240 can make some PCs run hotter, so drop it if things get unstable." : "FPS cap saved."); renderFps(); });
+  const qSeg = segmented(QUALITIES, p.graphics_quality ? String(p.graphics_quality) : "", (v) => { p.graphics_quality = v === "" ? null : Number(v); applySystem("Graphics quality saved."); renderFps(); });
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Fine-tune"), h("p", { class: "sub" }, "Orbit writes these into Roblox's own settings before it starts, so they work in every game. Roblox has to be launched through Orbit (or restarted) to pick them up."),
+    h("div", { class: "field" }, h("label", {}, "Frame rate cap"), capSeg),
+    h("div", { class: "field" }, h("label", {}, "Roblox graphics quality"), qSeg),
+    toggleRow("Use my fastest graphics card", "On laptops with two GPUs, makes Windows run Roblox on the powerful one.", p.gpu_high, (v) => { p.gpu_high = v; applySystem(v ? "Roblox will use your high performance GPU." : "GPU choice is back to Windows' default."); renderFps(); }),
+    toggleRow("Windows Game Mode", "Tells Windows to prioritize the game you're playing.", p.game_mode, (v) => { p.game_mode = v; applySystem(v ? "Game Mode is on." : "Game Mode is back to how it was."); renderFps(); }),
+    toggleRow("Turn off Xbox background recording", "Stops Windows recording gameplay in the background, which costs FPS. Your old setting comes back when you turn this off.", p.no_dvr, (v) => { p.no_dvr = v; applySystem(v ? "Background recording is off." : "Background recording is back to how it was."); renderFps(); }),
+    toggleRow("Boost my game profiles too", "When FPS Boost is on, games with their own FastFlags profile get boosted as well.", p.boost_profiles !== false, (v) => { p.boost_profiles = v; save(); }));
+  requestAnimationFrame(() => { capSeg._remeasure(); qSeg._remeasure(); });
+}
 function renderBoost() {
+  renderFps(); renderFpsTune();
   const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
     toggleRow("High priority for Roblox", "Tells Windows to give Roblox the CPU first while you play.", p.high_priority, (v) => { p.high_priority = v; save(); }),
@@ -1736,19 +1887,23 @@ async function openGame(pid) {
   if (!g.locations.length) locCard.append(h("p", { class: "sub", style: "margin:0" }, "Locations show up here after you play this game through Orbit."));
   const top = g.locations.length ? g.locations[0][1] : 1;
   g.locations.forEach(([loc, n]) => { const bar = h("i"); locCard.append(h("div", { class: "loc-bar" }, h("span", {}, loc), h("div", { class: "bar" }, bar), h("span", { class: "muted num" }, String(n)))); setTimeout(() => (bar.style.width = n / top * 100 + "%"), 200); });
+  body.append(locCard);
+  if (g.last_ping || g.ping_by_location.length) body.append(pingCard(g));
   const hist = h("div", { class: "card rise", style: "--i:4" }, h("h3", { style: "margin-bottom:8px" }, "Recent sessions"));
   if (!g.recent.length) hist.append(h("p", { class: "sub", style: "margin:0" }, "No sessions recorded yet."));
   g.recent.forEach((x, i) => hist.append(h("div", { class: "list-row", style: `--i:${i}` },
     h("div", { class: "tx" }, h("b", {}, new Date(x.start * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })), h("span", {}, x.location || "Unknown location")),
+    x.ping ? h("span", { class: "ping-tag " + pingClass(x.ping.avg) }, x.ping.avg + " ms") : h("span"),
     h("div", { class: "num", style: "font-weight:650" }, fmtDur(x.seconds)), starBtn(x),
     h("button", { class: "btn ghost", onclick: async () => { await saveNow(); sfx("launch"); const y = await api.join_server(x.place_id, x.job_id); y && y.error ? toast(y.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin"))));
-  body.append(locCard, hist);
+  body.append(hist);
 }
 
 async function resync() {
   const st = await api.get_state(); Object.assign(cfg, st.settings); S.registered = st.registered;
 }
 async function renderHealth() {
+  renderProblems();
   const list = $("#healthList"); list.innerHTML = "";
   list.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Running checks...")));
   const checks = await api.health(); list.innerHTML = "";
@@ -1820,6 +1975,74 @@ function playSplash() {
   setTimeout(() => fresh.classList.add("done"), 1500);
   setTimeout(() => (fresh.hidden = true), 2300);
 }
+const pingClass = (ms) => ms == null ? "muted" : ms < 80 ? "ping-good" : ms < 150 ? "ping-mid" : "ping-bad";
+function sparkline(samples) {
+  const W = 600, H = 90, vals = samples.filter((v) => v != null), max = Math.max(100, ...vals) * 1.15, n = Math.max(2, samples.length);
+  const x = (i) => (i / (n - 1)) * W, y = (v) => H - (v / max) * (H - 8) - 4;
+  let d = "", area = "", started = false;
+  samples.forEach((v, i) => { if (v == null) { started = false; return; } d += (started ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); started = true; });
+  const pts = samples.map((v, i) => [v, i]).filter(([v]) => v != null);
+  if (pts.length) area = `M${x(pts[0][1])} ${H} ` + pts.map(([v, i]) => `L${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ") + ` L${x(pts[pts.length - 1][1])} ${H}Z`;
+  const lost = samples.map((v, i) => v == null ? `<line x1="${x(i)}" x2="${x(i)}" y1="0" y2="${H}" stroke="#fb7185" stroke-opacity=".5" stroke-dasharray="3 3"/>` : "").join("");
+  const el = h("div"); el.innerHTML = `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="spk" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".45"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    <line x1="0" x2="${W}" y1="${y(80)}" y2="${y(80)}" stroke="#4ade80" stroke-opacity=".35" stroke-dasharray="4 4"/>${lost}<path d="${area}" fill="url(#spk)"/><path d="${d}" fill="none" stroke="var(--accent2)" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+  return el.firstChild;
+}
+function pingCard(g) {
+  const card = h("div", { class: "card rise", style: "--i:3" }, h("h3", {}, "Ping"));
+  if (g.last_ping) {
+    const lp = g.last_ping;
+    card.append(h("div", { class: "row", style: "margin-bottom:6px" }, h("span", { class: "muted small" }, "Last session"), h("span", { class: "spacer" }),
+      h("span", { class: "ping-tag " + pingClass(lp.avg) }, `avg ${lp.avg} ms`), h("span", { class: "ping-tag" }, `best ${lp.min}`), h("span", { class: "ping-tag" }, `worst ${lp.max}`),
+      h("span", { class: "ping-tag " + (lp.loss > 5 ? "ping-bad" : "") }, `${lp.loss}% lost`)), sparkline(lp.samples));
+  }
+  if (g.ping_by_location.length) {
+    card.append(h("div", { class: "stat-label", style: "margin-top:14px" }, "Average ping by server location"));
+    const worst = Math.max(...g.ping_by_location.map((x) => x[1]), 100);
+    g.ping_by_location.forEach(([loc, ms, n]) => { const bar = h("i"); card.append(h("div", { class: "loc-bar" }, h("span", {}, loc), h("div", { class: "bar" }, bar), h("span", { class: "num " + pingClass(ms) }, ms + ""))); setTimeout(() => (bar.style.width = ms / worst * 100 + "%"), 200); });
+  }
+  return card;
+}
+
+async function renderProblems() {
+  const box = $("#probCard"), list = await api.problems(); box.innerHTML = "";
+  box.append(h("div", { class: "row", style: "margin-bottom:6px" }, h("h3", { style: "margin:0" }, "Recent problems"), h("span", { class: "spacer" }),
+    list.length ? h("button", { class: "btn ghost", onclick: async () => { await api.clear_problems(); renderHealth(); } }, "Clear") : h("span")));
+  if (!list.length) { box.append(h("p", { class: "sub", style: "margin:0" }, "When Roblox crashes or kicks you, Orbit reads the log and explains what happened here.")); return; }
+  list.forEach((x, i) => box.append(h("div", { class: "prob-row", style: `--i:${i}` }, h("div", { class: "pi" }, x.code ? String(x.code).slice(0, 3) : "!"),
+    h("div", {}, h("b", {}, x.title), h("span", {}, x.tip), h("div", { class: "muted small", style: "margin-top:2px" }, `${fmtAgo(x.time)}${x.name ? " · " + x.name : ""}${x.location ? " · " + x.location : ""}`)),
+    x.place_id && x.job_id ? h("button", { class: "btn ghost", onclick: async () => { await saveNow(); const r = await api.join_server(x.place_id, x.job_id); r && r.error ? toast(r.error, "err") : toast("Rejoining..."); } }, "Rejoin") : h("span"))));
+}
+
+function themeCode() {
+  const a = cfg.appearance, pick = { mode: a.mode, accent: a.accent, custom_colors: a.custom_colors, background: a.background === "Image" ? "Starfield" : a.background, ui_scale: a.ui_scale, sounds: cfg.sounds.pack };
+  return "ORBIT-THEME-" + btoa(unescape(encodeURIComponent(JSON.stringify(pick)))).replace(/=+$/, "");
+}
+function readThemeCode(code) {
+  const m = String(code || "").trim().match(/^ORBIT-THEME-([A-Za-z0-9+/]+)$/);
+  if (!m) throw new Error("That isn't an Orbit theme code.");
+  const t = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+  const a = cfg.appearance, hex = /^#[0-9a-f]{6}$/i;
+  if (t.mode === "Light" || t.mode === "Dark") a.mode = t.mode;
+  if (t.accent === "Custom" && Array.isArray(t.custom_colors) && t.custom_colors.length === 2 && t.custom_colors.every((c) => hex.test(c))) { a.accent = "Custom"; a.custom_colors = t.custom_colors; }
+  else if (S.accents[t.accent]) a.accent = t.accent;
+  if (["Starfield", "Warp", "Nebula"].includes(t.background)) a.background = t.background;
+  if (["Compact", "Normal", "Large"].includes(t.ui_scale)) a.ui_scale = t.ui_scale;
+  if (["Warp", "Nova", "Pulse", "Chime", "Off"].includes(t.sounds)) cfg.sounds.pack = t.sounds;
+}
+function renderShare() {
+  const box = $("#shareCard"); box.innerHTML = "";
+  const scale = segmented([["Compact", "Compact"], ["Normal", "Normal"], ["Large", "Large"]], cfg.appearance.ui_scale || "Normal", (v) => { cfg.appearance.ui_scale = v; applyTheme(); save(); });
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Size & sharing"),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Interface size"), h("span", {}, "Makes everything in Orbit smaller or bigger.")), scale),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Theme code"), h("span", {}, "Copy your colors, theme, background and sounds as a code friends can paste into their Orbit.")),
+      h("button", { class: "btn", onclick: async () => { await api.copy_text(themeCode()); toast("Theme code copied. Send it to a friend.", "ok"); } }, "Copy my theme"),
+      h("button", { class: "btn", onclick: async () => {
+        const code = await modal({ title: "Use a theme code", text: "Paste a code that starts with ORBIT-THEME-.", input: true, placeholder: "ORBIT-THEME-...", ok: "Apply" });
+        if (!code) return; try { readThemeCode(code); applyTheme(); applyBackground(); save(); renderAppearance(); toast("Theme applied.", "ok"); } catch (e) { toast(e.message || "That code didn't work.", "err"); }
+      } }, "Paste a code")));
+  requestAnimationFrame(() => scale._remeasure());
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
@@ -1834,6 +2057,10 @@ function palActions() {
   A.push({ ico: "💬", t: cfg.discord.enabled ? "Turn off Discord status" : "Turn on Discord status", k: "Discord", run: () => { cfg.discord.enabled = !cfg.discord.enabled; save(); toast(`Discord status ${cfg.discord.enabled ? "on" : "off"}.`, "ok"); } });
   A.push({ ico: "⬇", t: "Check for updates", k: "Orbit", run: () => checkUpdates(true) });
   A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
+  A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: "Boost", run: async () => { const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
+  A.push({ ico: "▣", t: "Mini player", k: "Window", run: () => $("#miniBtn").click() });
+  A.push({ ico: "🎯", t: cfg.smart_join ? "Turn off Smart join" : "Turn on Smart join", k: "Servers", run: () => { cfg.smart_join = !cfg.smart_join; save(); toast(`Smart join ${cfg.smart_join ? "on" : "off"}.`, "ok"); } });
+  Object.keys(S.quick_presets || {}).forEach((n) => A.push({ ico: "⚙", t: `FastFlags preset: ${n}`, k: "FastFlags", run: () => { Object.assign(cfg.presets, S.quick_presets[n]); save(); toast(`${n} preset applied.`, "ok"); } }));
   A.push({ ico: "🧹", t: "Clear Roblox cache", k: "Repair", run: () => { go("health"); setTimeout(() => $('[data-repair="cache"]').click(), 300); } });
   Object.entries(S.playtime || {}).forEach(([pid, e]) => A.push({ ico: "📈", t: `Stats: ${e.name || pid}`, k: "Game", run: () => openGame(pid) }));
   (cfg.saved_servers || []).forEach((x) => A.push({ ico: "★", t: `Join saved ${x.name}${x.location ? " (" + x.location + ")" : ""}`, k: "Saved", run: () => api.join_server(x.place_id, x.job_id) }));
@@ -1995,6 +2222,10 @@ function wire() {
   });
 
   $("#healthRun").onclick = () => renderHealth();
+  $("#miniBtn").onclick = async () => { const r = await api.toggle_mini(); if (r && r.error) toast(r.error, "err"); };
+  $("#shotSort").onclick = async () => { const r = await api.sort_screenshots(); if (r.error) return toast(r.error, "err"); toast(r.moved ? `Moved ${r.moved} screenshot${r.moved === 1 ? "" : "s"} into game folders.` : "Nothing to sort. Only screenshots taken during a tracked session can be matched to a game.", r.moved ? "ok" : ""); shotGame = ""; renderScreens(); };
+  $("#packExport").onclick = async () => { await saveNow(); const r = await api.export_mod_pack(cfg.mod_profile); if (!r) return; r.error ? toast(r.error, "err") : toast(`Saved ${r.count} file${r.count === 1 ? "" : "s"} as a mod pack. Friends can open it with Import pack.`, "ok"); };
+  $("#packImport").onclick = async () => { const r = await api.import_mod_pack(); if (!r) return; if (r.error) return toast(r.error, "err"); S.mod_profiles = r.profiles; cfg.mod_profile = r.name; save(); renderMods(); toast(`Imported "${r.name}" (${r.count} files). It's now your active mod profile.`, "ok"); };
   $$("[data-repair]").forEach((b) => (b.onclick = () => runRepair(b.dataset.repair, b)));
   $("#gameBack").onclick = () => go(gameBack);
   $("#extPath").value = S.ext_path;

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+:root { --accent: #9d6bff; --accent2: #d946ef; --bg: #0b0714; --fg: #f3efff; --muted: #a59cc0; --line: rgba(255,255,255,.09); }
+:root.light { --bg: #f6f3ff; --fg: #1d1530; --muted: #6b6185; --line: rgba(20,10,40,.1); }
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font: 13px "Segoe UI", system-ui, sans-serif; user-select: none; }
+body { border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), var(--bg); }
+.top { display: flex; align-items: center; gap: 9px; }
+.hole { width: 26px; height: 26px; border-radius: 50%; flex: none; position: relative; background: radial-gradient(circle, #000 42%, var(--accent) 47%, transparent 72%); animation: spin 6s linear infinite; }
+.hole::after { content: ""; position: absolute; inset: 10px -4px; border-radius: 50%; border-top: 2px solid var(--accent2); transform: rotate(-18deg); }
+@keyframes spin { to { filter: hue-rotate(25deg); } }
+.t { flex: 1; min-width: 0; }
+.name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.loc { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.x { background: none; border: 0; color: var(--muted); font-size: 14px; cursor: pointer; width: 22px; height: 22px; border-radius: 6px; }
+.x:hover { background: rgba(244, 63, 94, .2); color: #fb7185; }
+.row { display: flex; align-items: center; gap: 6px; }
+.num { font-weight: 650; font-variant-numeric: tabular-nums; padding: 3px 8px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 12px; }
+.sp { flex: 1; }
+button.b { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); padding: 4px 9px; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; cursor: pointer; transition: transform .2s, border-color .2s, background .2s; }
+button.b:hover { border-color: var(--accent); transform: translateY(-1px); }
+button.b.p { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; }
+.good { color: #4ade80; } .mid { color: #fbbf24; } .bad { color: #fb7185; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="hole"></div>
+    <div class="t"><div class="name" id="name">Not in a game</div><div class="loc" id="loc">Join a game and it shows up here</div></div>
+    <button class="x" id="x" title="Close mini player">✕</button>
+  </div>
+  <div class="row">
+    <span class="num" id="timer">0:00</span><span class="num" id="ping">– ms</span><span class="sp"></span>
+    <button class="b" id="rejoin" title="Rejoin this server">Rejoin</button>
+    <button class="b" id="hop" title="Hop to a new server">New</button>
+    <button class="b p" id="open" title="Open Orbit">Orbit</button>
+  </div>
+<script>
+let api = null, cur = null;
+const $ = (s) => document.querySelector(s);
+function fmt(sec) { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`; }
+async function refresh() {
+  let st; try { st = await api.state(); } catch (e) { return; }
+  const r = document.documentElement;
+  r.style.setProperty("--accent", st.accent[0]); r.style.setProperty("--accent2", st.accent[1]); r.style.setProperty("--bg", st.bg);
+  r.classList.toggle("light", !!st.light);
+  cur = st.current;
+  if (cur) {
+    $("#name").textContent = cur.name || "Roblox"; $("#loc").textContent = cur.location || "Finding server location...";
+    const p = $("#ping"); p.textContent = st.ping == null ? "··· ms" : st.ping + " ms";
+    p.className = "num " + (st.ping == null ? "" : st.ping < 80 ? "good" : st.ping < 150 ? "mid" : "bad");
+  } else {
+    $("#name").textContent = "Not in a game";
+    $("#loc").textContent = st.last && st.last.name ? `Last: ${st.last.name}` : "Join a game and it shows up here";
+    $("#ping").textContent = "– ms"; $("#ping").className = "num"; $("#timer").textContent = "0:00";
+  }
+  $("#hop").disabled = !cur;
+}
+function tick() { if (cur && cur.joined) $("#timer").textContent = fmt(Date.now() / 1000 - cur.joined); }
+function boot() {
+  if (api || !(window.pywebview && window.pywebview.api)) return;
+  api = window.pywebview.api;
+  $("#x").onclick = () => api.close();
+  $("#rejoin").onclick = () => api.rejoin();
+  $("#hop").onclick = () => api.hop();
+  $("#open").onclick = () => api.open_main();
+  refresh(); setInterval(refresh, 2000); setInterval(tick, 1000);
+}
+window.addEventListener("pywebviewready", boot);
+setTimeout(boot, 300);
+</script>
+</body>
+</html>

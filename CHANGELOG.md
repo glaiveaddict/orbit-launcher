@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.9.0
+- **FPS Boost:** one button on the Boost page sets Roblox and Windows up for the most frames. It switches to performance-friendly graphics flags, sets Roblox's own frame rate cap and graphics quality, gives Roblox high priority and the high performance power plan, runs it on your fastest GPU, turns on Game Mode and turns off Xbox background recording. Pick Max FPS or Balanced. Turning it off puts every old setting back.
+- **Fine-tune:** choose a frame rate cap (60, 144, 240 or unlimited) and Roblox graphics quality yourself, and toggle each Windows tweak on its own.
+- **Quick presets:** Potato, Balanced, Quality or Reset on the FastFlags page, per game too.
+- **Smart join:** Play buttons can pick the open server with the best ping.
+- **Region hopper:** pick a region (US East, Europe, Asia...) and Orbit hops through servers until it lands in one there.
+- **Ping history:** every session records your ping. Game pages show a ping graph and your average ping per server location.
+- **Crash reader:** when Roblox crashes or kicks you, Orbit reads the log and explains why (lost connection, graphics driver, out of memory, error codes) in Health > Recent problems.
+- **Roblox update watch:** when Roblox updates, Orbit puts your FastFlags and mods back automatically and lets you know.
+- **Share your setup:** copy a theme code for friends, and export or import mod profiles as .orbitpack files.
+- **Screenshot sorting:** move screenshots into folders by game, automatically after each session if you like, and filter by game.
+- **Interface size:** Compact, Normal or Large.
+- **Mini player:** a small always-on-top window with the game, server location, ping, timer, Rejoin and New server. Open it with the button at the top.
+- **Fix:** turning off the startup animation no longer leaves a blank screen.
+
 ## v1.8.0
 - **Live ping and session timer on the server badge:** see your ping to the server (green, yellow or red) and how long you've been in it, right on the Roblox screen. Both can be turned off in Stats.
 - **Health page:** checks that Roblox, links, overlays, tracking and the background helper are all working, with a Fix button for anything that isn't.
