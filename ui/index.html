@@ -355,6 +355,15 @@ kbd { font-family: inherit; font-size: 10.5px; font-weight: 700; padding: 2px 6p
 .toast.ach-toast .em { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: var(--grad); flex: none; }
 .toast.ach-toast small { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .14em; color: var(--accent); text-transform: uppercase; }
 .app-row .gi { display: grid; place-items: center; font-size: 18px; }
+.now { display: flex; align-items: center; gap: 16px; border-color: rgba(var(--accent-rgb),.45); background: linear-gradient(90deg, rgba(var(--accent-rgb),.16), transparent 70%), var(--panel); }
+.now .gi { width: 58px; height: 58px; border-radius: 14px; background: var(--panel2) center/cover; border: 1px solid var(--line); flex: none; }
+.now .live { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .16em; color: #fb7185; }
+.now .live i { width: 7px; height: 7px; border-radius: 50%; background: #fb7185; box-shadow: 0 0 10px #fb7185; animation: blink 1.4s ease-in-out infinite; }
+.now .nm { font-size: 18px; font-weight: 750; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now .loc { color: var(--muted); margin-top: 2px; } .now .loc b { color: var(--text); font-weight: 650; }
+.now .timer { margin-left: auto; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.warn-card { display: flex; align-items: center; gap: 14px; border-color: rgba(251,191,36,.45); background: linear-gradient(90deg, rgba(251,191,36,.12), transparent 70%), var(--panel); }
+.warn-card .wi { font-size: 22px; }
 .upd-pill { position: relative; overflow: hidden; align-self: center; margin-right: 10px; height: 28px; padding: 0 13px 0 11px; border-radius: 99px; display: inline-flex; align-items: center; gap: 8px;
   font-size: 12px; font-weight: 650; color: #fff; background: linear-gradient(110deg, var(--accent), var(--accent2), var(--accent)); background-size: 220% 100%;
   animation: flow 4s ease infinite, pillIn .6s var(--spring) both; box-shadow: 0 0 20px -4px rgba(var(--accent-rgb),.95); transition: transform .3s var(--spring); }
@@ -434,6 +443,8 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           </div>
         </div>
       </div>
+      <div class="card now rise" style="--i:1;display:none" id="nowCard"></div>
+      <div class="card warn-card rise" style="--i:1;display:none" id="fsWarn"></div>
       <div class="grid2">
         <div class="card tilt rise" style="--i:1">
           <h3>Last server</h3>
@@ -984,7 +995,30 @@ async function loadIcons(pids) {
   const need = pids.filter((p) => !(p in iconCache));
   if (need.length) Object.assign(iconCache, await api.game_icons(need));
 }
+let nowTimer = null;
+function renderNow() {
+  const card = $("#nowCard"), cur = S.current;
+  clearInterval(nowTimer);
+  if (!cur || !cur.place_id) { card.style.display = "none"; return; }
+  card.style.display = "";
+  const gi = h("div", { class: "gi", style: cur.icon ? `background-image:url("${cur.icon}")` : "" });
+  const timer = h("div", { class: "timer" });
+  const tick = () => { const sec = Math.max(0, Math.floor(Date.now() / 1000 - cur.joined)); const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60; timer.textContent = (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
+  card.innerHTML = "";
+  card.append(gi, h("div", { style: "min-width:0" }, h("div", { class: "live" }, h("i"), "NOW PLAYING"), h("div", { class: "nm" }, cur.name || "Joining..."),
+    h("div", { class: "loc" }, "Server: ", h("b", {}, cur.location || "finding location..."))), timer);
+  tick(); nowTimer = setInterval(tick, 1000);
+}
+function renderFsWarn() {
+  const w = $("#fsWarn"), on = !!(cfg.presets && cfg.presets.exclusive_fullscreen);
+  w.style.display = on ? "" : "none"; if (!on) return;
+  w.innerHTML = "";
+  w.append(h("div", { class: "wi" }, "⚠️"), h("div", { style: "flex:1" }, h("b", {}, "Exclusive fullscreen is on"),
+    h("div", { class: "muted small" }, "In exclusive fullscreen (Alt+Enter), Windows doesn't let anything draw over Roblox, so the server banner and badge can't show. Normal fullscreen works fine.")),
+    h("button", { class: "btn primary", onclick: () => { cfg.presets.exclusive_fullscreen = false; save(); renderFsWarn(); toast("Exclusive fullscreen is off. It applies next time Roblox starts.", "ok"); } }, "Turn it off"));
+}
 function renderHome() {
+  renderNow(); renderFsWarn();
   $("#installText").textContent = S.install ? `Roblox found · ${S.install}` : "Roblox isn't installed yet. Get it from roblox.com/download.";
   $("#sideStatus").textContent = S.install ? "Roblox ready" : "Roblox not found";
   $("#sideDot").classList.toggle("off", !S.install);
@@ -1009,7 +1043,7 @@ const FLAG_COMBOS = {
   texture_quality: ["Texture quality", [["Automatic", "Auto"], ["0 (lowest)", "Lowest"], ["1", "Low"], ["2", "Medium"], ["3 (highest)", "Highest"]]],
 };
 const FLAG_CHECKS = [
-  ["exclusive_fullscreen", "Exclusive fullscreen", "Alt+Enter switches to real fullscreen instead of borderless."],
+  ["exclusive_fullscreen", "Exclusive fullscreen", "Alt+Enter switches to real fullscreen instead of borderless. Overlays like Orbit's server badge and Discord can't show over it."],
   ["disable_dpi_scale", "Ignore display scaling", "Renders at full resolution on high-DPI screens."],
   ["remove_grass", "Remove grass", "Hides terrain grass for a cleaner look and a bit more FPS."],
   ["gray_sky", "Plain gray sky", "Replaces the skybox with flat gray."],
@@ -1114,6 +1148,7 @@ function renderSession() {
   const s = cfg.session, box = $("#sessionToggles"); box.innerHTML = "";
   box.append(
     toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
+    ...(cfg.presets.exclusive_fullscreen ? [h("div", { class: "vstatus err" }, "Exclusive fullscreen is on in FastFlags, so the banner and badge can't show over the game while it's in exclusive fullscreen (Alt+Enter).")] : []),
     toggleRow("Server badge while playing", "A small pill at the top of the screen shows the game and server location for as long as you're in that server. Clicks pass through it, and it hides when Roblox isn't in front.", s.server_badge !== false, (v) => { s.server_badge = v; save(); }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
@@ -1756,14 +1791,16 @@ async function init() {
   buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits();
   go("home");
   api.ui_ready("app");
-  let liveSig = JSON.stringify([S.playtime, S.last_server]);
+  let liveSig = JSON.stringify([S.playtime, S.last_server]), curSig = JSON.stringify(S.current || null);
   const liveTick = async () => {
     if (!["home", "session", "achievements"].includes(page)) return;
     await refreshLive();
+    const c = JSON.stringify(S.current || null);
+    if (c !== curSig) { curSig = c; if (page === "home") renderNow(); }
     const sig = JSON.stringify([S.playtime, S.last_server]);
     if (sig !== liveSig) { liveSig = sig; ({ home: renderHome, session: renderSession, achievements: renderAchievements })[page]?.(); checkAchievements(); }
   };
-  setInterval(liveTick, 15000);
+  setInterval(liveTick, 4000);
   window.addEventListener("focus", liveTick);
   setTimeout(showWhatsNew, 900);
   setTimeout(checkAchievements, 2600);

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.9
+- **Fix:** live tracking works again. v1.6.7 mistook real Roblox game logs for short helper logs and ignored them, so nothing showed during play.
+- **Now playing card:** Home shows the game you're in, its server location and a live timer while you play.
+- **Fix:** you now get the location banner even when Orbit attaches to a game that's already running.
+- **Exclusive fullscreen warning:** Home and Stats tell you when exclusive fullscreen is blocking overlays, with a one-click fix.
+- **Fix:** tracker processes left behind by very old Orbit versions (including script versions) are now shut down too.
+
 ## v1.6.8
 - **The X button now fully closes Orbit.** No more hunting for the tray icon to quit.
 - **Updates install when you close:** if an update has finished downloading, closing Orbit installs it, so the next time you open Orbit it's already on the new version.

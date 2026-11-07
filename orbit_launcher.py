@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.8"
+APP_VERSION = "1.6.9"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -45,6 +45,7 @@ THUMBS_DIR = DATA_DIR / "Thumbs"
 SHOW_FLAG = DATA_DIR / "show.flag"
 MONITOR_FILE = DATA_DIR / "monitor.json"
 GUI_FILE = DATA_DIR / "window.json"
+CURRENT_FILE = DATA_DIR / "current.json"
 ICON_FILE = DATA_DIR / "roblox_icon.ico"
 EXTENSIONS_DIR = DATA_DIR / "Extensions"
 EXTENSION_NAME = "orbit_preview"
@@ -981,15 +982,24 @@ class SessionMonitor:
             self.on_leave(at)
         joined = at or time.time()
         game = {"place_id": place_id, "job_id": job_id, "ip": ip, "joined": joined,
-                "name": None, "located": False, "quiet": quiet}
+                "name": None, "located": False, "quiet": False}
         self.game = game
+        self._publish(game)
         log(f"Joined place {place_id}" + (" (already in progress)" if quiet else ""))
         save_json(LAST_SERVER_FILE, {"place_id": place_id, "job_id": job_id, "name": None, "time": int(joined)})
         threading.Thread(target=self._join_details, args=(game,), daemon=True).start()
 
+    def _publish(self, game):
+        if game is not None and self.game is game:
+            save_json(CURRENT_FILE, {"place_id": game["place_id"], "job_id": game["job_id"], "name": game.get("name"),
+                                     "joined": int(game["joined"]), "location": game.get("location"),
+                                     "icon": game.get("icon")})
+
     def _join_details(self, game):
         info = game_info(game["place_id"])
         game["name"] = info["name"]
+        game["icon"] = info.get("icon")
+        self._publish(game)
         last = load_json(LAST_SERVER_FILE, {})
         if last.get("job_id") == game["job_id"]:
             last["name"] = info["name"]
@@ -1011,6 +1021,7 @@ class SessionMonitor:
             game["located"] = True
         location = server_location(game["ip"])
         game["location"] = location
+        self._publish(game)
         log(f"Server location: {location or 'unknown'} ({game['ip']})")
         if not location or self.game is not game:
             return
@@ -1030,6 +1041,7 @@ class SessionMonitor:
             return
         seconds = max(0, (at or time.time()) - game["joined"])
         close_badge()
+        CURRENT_FILE.unlink(missing_ok=True)
         if record and self.session.get("track_playtime"):
             record_playtime(game["place_id"], game["name"], seconds)
             record_session(game, seconds)
@@ -1049,16 +1061,17 @@ class SessionMonitor:
         if path in cache:
             return cache[path]
         try:
-            if path.stat().st_size > 30000:
+            size = path.stat().st_size
+            if size > 8000:
                 cache[path] = False
                 return False
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return False
-        done = "RobloxStarter destroyed" in text or "Deeplinking NoReload" in text
-        if done:
-            cache[path] = "NoReload" in text
-        return "NoReload" in text
+        handoff = "Deeplinking NoReload!" in text
+        if handoff or "SingleSurfaceApp" in text or "Joining game" in text:
+            cache[path] = handoff
+        return handoff
 
     def _newest_log(self):
         logs = self._candidate_logs()
@@ -1286,10 +1299,29 @@ def window_pids():
     return {int(x) for x in data.get("pids", []) if str(x).isdigit()}
 
 
+def stop_legacy_trackers(keep):
+    keep_list = ",".join(str(x) for x in keep)
+    script = (f"$keep=@({keep_list}); "
+              "Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%--orbit-launch%'\" | "
+              "Where-Object { $keep -notcontains $_.ProcessId -and $keep -notcontains $_.ParentProcessId } | "
+              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; "
+              "\"$($_.ProcessId) $($_.Name)\" }")
+    try:
+        r = subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", script], capture_output=True, text=True,
+                           timeout=40, creationflags=CREATE_NO_WINDOW)
+        if r.stdout.strip():
+            log("Stopped legacy Orbit trackers: " + "; ".join(r.stdout.split("\n")).strip("; "))
+        if r.stderr.strip():
+            log("Legacy tracker check: " + r.stderr.strip()[:300])
+    except Exception as e:
+        log(f"Legacy tracker check failed: {e}")
+
+
 def stop_stale_copies():
     if not IS_WINDOWS or not is_frozen():
         return
     keep = {os.getpid(), os.getppid()}
+    threading.Thread(target=stop_legacy_trackers, args=(keep,), daemon=True).start()
     gui = window_pids()
     if not gui:
         log("Orbit's window isn't registered yet; leaving other Orbit processes alone")
@@ -2061,7 +2093,7 @@ def show_toast(title, body, seconds=6.5):
 
 
 def roblox_in_front():
-    if not IS_WINDOWS:
+    if not IS_WINDOWS or os.environ.get("ORBIT_BADGE_ALWAYS"):
         return True
     try:
         u = ctypes.windll.user32
@@ -2427,7 +2459,11 @@ class Api:
         self._window.destroy()
 
     def live_state(self):
-        return {"playtime": load_json(PLAYTIME_FILE, {}), "last_server": load_json(LAST_SERVER_FILE, None),
+        current = load_json(CURRENT_FILE, None)
+        if current and not roblox_running():
+            CURRENT_FILE.unlink(missing_ok=True)
+            current = None
+        return {"current": current, "playtime": load_json(PLAYTIME_FILE, {}), "last_server": load_json(LAST_SERVER_FILE, None),
                 "registered": is_registered(), "install": (player_dirs()[:1] or [None])[0] and player_dirs()[0].name}
 
     def play_game(self, pid):

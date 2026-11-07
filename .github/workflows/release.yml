@@ -79,12 +79,29 @@ jobs:
           echo "== spawn (restart) test =="
           cat selftest-spawn.json 2>/dev/null || echo "(no result)"
           echo
-          dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Ashburn, Virginia, US" &
-          sleep 4
-          powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \$b=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds; \$bmp=New-Object System.Drawing.Bitmap 900,160; \$g=[System.Drawing.Graphics]::FromImage(\$bmp); \$g.CopyFromScreen([int]((\$b.Width-900)/2),0,0,0,\$bmp.Size); \$bmp.Save('toast-preview.png')"
+          cat > render_check.py <<'PY'
+          import base64, io, sys
+          from PIL import ImageGrab
+          name = sys.argv[1]
+          img = ImageGrab.grab()
+          W = img.width
+          crop = img.crop((W // 2 - 360, 0, W // 2 + 360, 130)).convert("RGB")
+          px = crop.load()
+          purple = sum(1 for x in range(crop.width) for y in range(crop.height)
+                       if px[x, y][2] > 150 and px[x, y][0] > 90 and px[x, y][1] < 140)
+          print(f"RENDER {name}: purple pixels at top center = {purple}")
+          small = crop.resize((crop.width // 2, crop.height // 2))
+          buf = io.BytesIO(); small.save(buf, "PNG")
+          print(f"IMG {name} " + base64.b64encode(buf.getvalue()).decode())
+          PY
+          dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" &
+          sleep 3
+          python render_check.py banner
           wait
-          timeout 8 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Ashburn, Virginia, US" --badge
-          echo "badge exit: $? (124 = still running when stopped, which is expected)"
+          ORBIT_BADGE_ALWAYS=1 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge &
+          sleep 4
+          python render_check.py badge
+          taskkill //IM OrbitLauncher.exe //F > /dev/null 2>&1
           echo "== launcher.log =="
           cat "$LOCALAPPDATA/OrbitLauncher/launcher.log" 2>/dev/null
           python - <<'PY'
