@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.3"
+APP_VERSION = "1.6.4"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2448,8 +2448,7 @@ def _run_gui(mode, after_update, selftest):
     size = (1080, 700) if mode == "app" else (760, 600)
     title = APP_NAME if mode == "app" else f"{APP_NAME} Setup"
     window = webview.create_window(title, html=html, js_api=api, width=size[0], height=size[1],
-                                   resizable=True, min_size=(size[0] - 60, size[1] - 60), frameless=True,
-                                   easy_drag=False, background_color=bg)
+                                   resizable=False, frameless=True, easy_drag=False, background_color=bg)
     api._window = window
     if selftest:
         def finish_selftest():

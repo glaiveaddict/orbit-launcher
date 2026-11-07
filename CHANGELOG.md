@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.6.4
+- **Fix:** the title bar (minimize, maximize and close) is no longer cut off at the top of the window. The maximize button still makes Orbit fill the screen.
+
 ## v1.6.3
 - **Fix:** the server location popup and stats now work even if an older copy of Orbit was still running. Orbit shuts down stale copies and takes over tracking.
 - **Fix:** Orbit ignores Roblox's crash-handler log and always follows the real game log.
