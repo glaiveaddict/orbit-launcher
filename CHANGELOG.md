@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.9.1
+- **Fix:** the server badge and live tracking could stop working with FPS Boost on. With Roblox on high priority and an unlimited frame rate, Windows' own tools slowed down so much that Orbit mistook its tracker for a dead one and replaced it, and the badge never got drawn. Orbit now checks processes directly (instantly, no slow Windows tools) and keeps its own badge and tracker responsive.
+- **Gentler priority:** Roblox now gets above-normal priority instead of high, so your PC, Discord and overlays stay smooth.
+- A warning on the Boost page when the frame rate cap is set to Unlimited.
+
 ## v1.9.0
 - **FPS Boost:** one button on the Boost page sets Roblox and Windows up for the most frames. It switches to performance-friendly graphics flags, sets Roblox's own frame rate cap and graphics quality, gives Roblox high priority and the high performance power plan, runs it on your fastest GPU, turns on Game Mode and turns off Xbox background recording. Pick Max FPS or Balanced. Turning it off puts every old setting back.
 - **Fine-tune:** choose a frame rate cap (60, 144, 240 or unlimited) and Roblox graphics quality yourself, and toggle each Windows tweak on its own.

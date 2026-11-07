@@ -1776,7 +1776,7 @@ function renderFps() {
   const items = [
     ["Low-cost graphics flags", p.boost], ["FPS cap: " + (p.fps_cap == null ? "Roblox's choice" : p.fps_cap >= 9999 ? "Unlimited" : p.fps_cap), p.fps_cap != null],
     ["Graphics quality: " + (p.graphics_quality ? (QUALITIES.find((q) => q[0] === String(p.graphics_quality)) || [0, p.graphics_quality])[1] : "Roblox's choice"), !!p.graphics_quality],
-    ["Roblox gets high CPU priority", p.high_priority], ["High performance power plan", p.power_plan], ["Uses your fastest GPU", p.gpu_high],
+    ["Roblox gets extra CPU priority", p.high_priority], ["High performance power plan", p.power_plan], ["Uses your fastest GPU", p.gpu_high],
     ["Windows Game Mode", p.game_mode], ["Xbox background recording off", p.no_dvr]];
   box.append(h("div", { class: "boost-top" }, btn, h("div", { style: "flex:1;min-width:0" },
     h("h3", { style: "font-size:20px;margin-bottom:4px" }, p.boost ? "FPS Boost is on" : "FPS Boost"),
@@ -1786,10 +1786,11 @@ function renderFps() {
 }
 function renderFpsTune() {
   const p = cfg.performance, box = $("#fpsTune"); box.innerHTML = "";
-  const capSeg = segmented(FPS_CAPS, p.fps_cap == null ? "" : String(p.fps_cap), (v) => { p.fps_cap = v === "" ? null : Number(v); applySystem(v === "9999" ? "FPS unlocked. Above 240 can make some PCs run hotter, so drop it if things get unstable." : "FPS cap saved."); renderFps(); });
+  const capSeg = segmented(FPS_CAPS, p.fps_cap == null ? "" : String(p.fps_cap), (v) => { p.fps_cap = v === "" ? null : Number(v); applySystem(v === "9999" ? "FPS unlocked. Above 240 can make some PCs run hotter, so drop it if things get unstable." : "FPS cap saved."); renderFps(); renderFpsTune(); });
   const qSeg = segmented(QUALITIES, p.graphics_quality ? String(p.graphics_quality) : "", (v) => { p.graphics_quality = v === "" ? null : Number(v); applySystem("Graphics quality saved."); renderFps(); });
   box.append(h("h3", { style: "margin-bottom:4px" }, "Fine-tune"), h("p", { class: "sub" }, "Orbit writes these into Roblox's own settings before it starts, so they work in every game. Roblox has to be launched through Orbit (or restarted) to pick them up."),
     h("div", { class: "field" }, h("label", {}, "Frame rate cap"), capSeg),
+    ...(p.fps_cap >= 9999 ? [h("div", { class: "vstatus err", style: "margin:-6px 0 12px" }, "Unlimited makes Roblox use as much CPU and GPU as it can, which can make your PC and overlays (like the server badge) lag. 240, or your monitor's refresh rate, is smoother for most people.")] : []),
     h("div", { class: "field" }, h("label", {}, "Roblox graphics quality"), qSeg),
     toggleRow("Use my fastest graphics card", "On laptops with two GPUs, makes Windows run Roblox on the powerful one.", p.gpu_high, (v) => { p.gpu_high = v; applySystem(v ? "Roblox will use your high performance GPU." : "GPU choice is back to Windows' default."); renderFps(); }),
     toggleRow("Windows Game Mode", "Tells Windows to prioritize the game you're playing.", p.game_mode, (v) => { p.game_mode = v; applySystem(v ? "Game Mode is on." : "Game Mode is back to how it was."); renderFps(); }),
@@ -1801,7 +1802,7 @@ function renderBoost() {
   renderFps(); renderFpsTune();
   const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
-    toggleRow("High priority for Roblox", "Tells Windows to give Roblox the CPU first while you play.", p.high_priority, (v) => { p.high_priority = v; save(); }),
+    toggleRow("Priority for Roblox", "Gives Roblox above-normal CPU priority while you play, without starving the rest of your PC.", p.high_priority, (v) => { p.high_priority = v; save(); }),
     toggleRow("High performance power plan", "Switches Windows to its high performance power plan while Roblox runs, then switches back.", p.power_plan, (v) => { p.power_plan = v; save(); }));
   const list = $("#appList"); list.innerHTML = "";
   if (!cfg.launch_with.length) list.append(h("div", { class: "muted small", style: "padding:6px 0" }, "No apps yet. Add Discord, OBS, Spotify, or anything else you always open."));

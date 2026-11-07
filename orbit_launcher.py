@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -775,15 +775,129 @@ def apply_quick_preset(settings, name, place_id=None):
     save_settings(settings)
 
 
+_PE32 = None
+
+
+def process_table():
+    global _PE32
+    if not IS_WINDOWS:
+        return None
+    try:
+        if _PE32 is None:
+            class PE32(ctypes.Structure):
+                _fields_ = [("dwSize", ctypes.c_ulong), ("cntUsage", ctypes.c_ulong), ("th32ProcessID", ctypes.c_ulong),
+                            ("th32DefaultHeapID", ctypes.c_void_p), ("th32ModuleID", ctypes.c_ulong),
+                            ("cntThreads", ctypes.c_ulong), ("th32ParentProcessID", ctypes.c_ulong),
+                            ("pcPriClassBase", ctypes.c_long), ("dwFlags", ctypes.c_ulong),
+                            ("szExeFile", ctypes.c_wchar * 260)]
+            _PE32 = PE32
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+        k32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
+        k32.Process32FirstW.argtypes = [ctypes.c_void_p, ctypes.POINTER(_PE32)]
+        k32.Process32NextW.argtypes = [ctypes.c_void_p, ctypes.POINTER(_PE32)]
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
+        snap = k32.CreateToolhelp32Snapshot(0x2, 0)
+        if not snap or snap == ctypes.c_void_p(-1).value:
+            return None
+        entry = _PE32()
+        entry.dwSize = ctypes.sizeof(_PE32)
+        out = []
+        try:
+            ok = k32.Process32FirstW(snap, ctypes.byref(entry))
+            while ok:
+                out.append((int(entry.th32ProcessID), int(entry.th32ParentProcessID), entry.szExeFile))
+                ok = k32.Process32NextW(snap, ctypes.byref(entry))
+        finally:
+            k32.CloseHandle(snap)
+        return out
+    except Exception:
+        return None
+
+
+def pids_named(image):
+    table = process_table()
+    if table is not None:
+        return [pid for pid, _, name in table if name.lower() == image.lower()]
+    try:
+        out = subprocess.run([sys_tool("tasklist"), "/FO", "CSV", "/NH", "/FI", f"IMAGENAME eq {image}"],
+                             capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout
+    except Exception:
+        return []
+    pids = []
+    for row in out.splitlines():
+        parts = [x.strip('"') for x in row.split('","')]
+        if len(parts) > 1 and parts[1].isdigit():
+            pids.append(int(parts[1]))
+    return pids
+
+
+def _open_process(pid, access):
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenProcess.restype = ctypes.c_void_p
+    k32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_bool, ctypes.c_ulong]
+    return k32, k32.OpenProcess(access, False, int(pid))
+
+
+def kill_tree(pid):
+    if not pid or not IS_WINDOWS:
+        return
+    pid = int(pid)
+    table = process_table()
+    if table is None:
+        subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=20,
+                       creationflags=CREATE_NO_WINDOW)
+        return
+    victims, frontier = [pid], [pid]
+    while frontier:
+        kids = [c for c, parent, _ in table if parent in frontier and c not in victims]
+        victims += kids
+        frontier = kids
+    for victim in reversed(victims):
+        try:
+            k32, h = _open_process(victim, 0x0001)
+            if h:
+                k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+                k32.TerminateProcess(h, 1)
+                k32.CloseHandle.argtypes = [ctypes.c_void_p]
+                k32.CloseHandle(h)
+        except Exception:
+            pass
+
+
+def set_priority(pid=None, image=None, cls=0x00008000):
+    if not IS_WINDOWS:
+        return 0
+    done = 0
+    targets = [pid] if pid else pids_named(image)
+    for target in targets:
+        try:
+            k32, h = _open_process(target, 0x0200 | 0x1000)
+            if h:
+                k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+                done += bool(k32.SetPriorityClass(h, cls))
+                k32.CloseHandle.argtypes = [ctypes.c_void_p]
+                k32.CloseHandle(h)
+        except Exception:
+            pass
+    return done
+
+
+def raise_own_priority():
+    if IS_WINDOWS:
+        try:
+            k32 = ctypes.windll.kernel32
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+            k32.SetPriorityClass(k32.GetCurrentProcess(), 0x00008000)
+        except Exception:
+            pass
+
+
 def roblox_running():
     if not IS_WINDOWS:
         return False
-    try:
-        out = subprocess.run([sys_tool("tasklist"), "/FI", "IMAGENAME eq RobloxPlayerBeta.exe", "/NH"],
-                             capture_output=True, text=True, creationflags=CREATE_NO_WINDOW).stdout
-        return "RobloxPlayerBeta.exe" in out
-    except Exception:
-        return False
+    return bool(pids_named("RobloxPlayerBeta.exe"))
 
 
 def our_command(exe=None):
@@ -1048,12 +1162,7 @@ def record_session(game, seconds):
 def process_running(image):
     if not IS_WINDOWS:
         return False
-    try:
-        out = subprocess.run([sys_tool("tasklist"), "/FI", f"IMAGENAME eq {image}", "/NH"], capture_output=True,
-                             text=True, creationflags=CREATE_NO_WINDOW).stdout
-        return image.lower() in out.lower()
-    except Exception:
-        return False
+    return bool(pids_named(image))
 
 
 class PerfBoost:
@@ -1083,11 +1192,8 @@ class PerfBoost:
         if self.priority_set or not IS_WINDOWS or not self.perf.get("high_priority") or not roblox_running():
             return
         self.priority_set = True
-        subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command",
-                        "Get-Process RobloxPlayerBeta -ErrorAction SilentlyContinue | "
-                        "ForEach-Object { try { $_.PriorityClass = 'High' } catch {} }"],
-                       capture_output=True, creationflags=CREATE_NO_WINDOW)
-        log("Set Roblox to high priority")
+        n = set_priority(image="RobloxPlayerBeta.exe", cls=0x00008000)
+        log(f"Set Roblox to above-normal priority ({n} process{'es' if n != 1 else ''})")
 
     def end(self):
         if self.prev_scheme:
@@ -1132,8 +1238,7 @@ def close_badge():
     data = load_json(BADGE_FILE, {}) or {}
     pid = data.get("pid")
     if pid and IS_WINDOWS:
-        subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
-                       creationflags=CREATE_NO_WINDOW)
+        kill_tree(pid)
     BADGE_FILE.unlink(missing_ok=True)
 
 
@@ -1379,6 +1484,7 @@ class SessionMonitor:
         return fh
 
     def run(self):
+        raise_own_priority()
         self.positions = {}
         log_path = None
         deadline = time.time() + 90
@@ -1538,17 +1644,10 @@ def acquire_monitor_lock(wait=0.0):
 
 
 def orbit_pids():
-    try:
-        out = subprocess.run([sys_tool("tasklist"), "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq OrbitLauncher.exe"],
-                             capture_output=True, text=True, timeout=15, creationflags=CREATE_NO_WINDOW).stdout
-    except Exception as e:
-        log(f"Couldn't list Orbit processes: {e}")
-        return set()
+    names = {Path(sys.executable).name.lower(), "orbitlauncher.exe"} if is_frozen() else {"orbitlauncher.exe"}
     pids = set()
-    for row in out.splitlines():
-        parts = [x.strip('"') for x in row.split('","')]
-        if len(parts) > 1 and parts[1].isdigit():
-            pids.add(int(parts[1]))
+    for name in names:
+        pids |= set(pids_named(name))
     return pids
 
 
@@ -1589,8 +1688,7 @@ def stop_stale_copies():
         return
     targets = orbit_pids() - keep - gui
     for pid in sorted(targets):
-        subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
-                       creationflags=CREATE_NO_WINDOW)
+        kill_tree(pid)
     if targets:
         log("Stopped old Orbit trackers: " + ", ".join(str(p) for p in sorted(targets)))
 
@@ -1613,11 +1711,17 @@ def pid_alive(pid):
     if not pid or not IS_WINDOWS:
         return False
     try:
-        out = subprocess.run([sys_tool("tasklist"), "/FI", f"PID eq {int(pid)}", "/NH", "/FO", "CSV"],
-                             capture_output=True, text=True, timeout=10, creationflags=CREATE_NO_WINDOW).stdout
-        return f'"{int(pid)}"' in out
+        k32, h = _open_process(pid, 0x1000)
+        if not h:
+            return ctypes.get_last_error() == 5
+        code = ctypes.c_ulong()
+        k32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        k32.GetExitCodeProcess(h, ctypes.byref(code))
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
+        k32.CloseHandle(h)
+        return code.value == 259
     except Exception:
-        return False
+        return True
 
 
 class AutoAttach:
@@ -1649,7 +1753,7 @@ class AutoAttach:
             if self.replaced:
                 return
             self.replaced = True
-            log("Replacing an outdated session tracker")
+            log(f"Replacing an outdated session tracker (v{info.get('version', '?')}, pid {info.get('pid')})")
             stop_stale_copies()
             time.sleep(2)
         log(f"Roblox is running; attaching session tracking ({self.owner})")
@@ -1733,8 +1837,7 @@ def set_start_with_windows(on):
     elif not on:
         data = load_json(BACKGROUND_FILE, {}) or {}
         for pid in data.get("pids", []):
-            subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
-                           creationflags=CREATE_NO_WINDOW)
+            kill_tree(pid)
         BACKGROUND_FILE.unlink(missing_ok=True)
     return on
 
@@ -3170,6 +3273,7 @@ def ping_ms(ip):
 
 
 def show_badge_window(title, body, ip=None, joined=None):
+    raise_own_priority()
     import tkinter as tk
     import tkinter.font as tkfont
     settings = load_settings()
@@ -4096,6 +4200,14 @@ def _run_gui(mode, after_update, selftest):
             ready = api._ready.wait(90)
             time.sleep(2)
             if mode == "app":
+                table = process_table() or []
+                me = os.getpid()
+                checks = {"table": len(table) > 10 and any(pid == me for pid, _, _ in table),
+                          "alive_self": pid_alive(me), "alive_bogus": not pid_alive(4_000_000_001 % 4_000_000),
+                          "named": me in pids_named(Path(sys.executable).name) or not is_frozen(),
+                          "priority": set_priority(pid=me) == 1, "roblox": roblox_running() is False}
+                log(f"Process checks: {checks}")
+                api._ui_errors += [f"process check failed: {k}" for k, v in checks.items() if not v]
                 r = api.toggle_mini()
                 if r is not True:
                     api._ui_errors.append(f"mini player: {r}")
