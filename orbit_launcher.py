@@ -1,3 +1,4 @@
+import base64
 import calendar
 import ipaddress
 import json
@@ -18,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.7.3"
+APP_VERSION = "1.8.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -125,6 +126,8 @@ DEFAULT_SETTINGS = {
     "performance": {"high_priority": False, "power_plan": False},
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
+    "saved_servers": [],
+    "hotkeys": {"enabled": True},
     "mod_profile": "Default",
     "discord": {
         "enabled": False,
@@ -140,6 +143,9 @@ DEFAULT_SETTINGS = {
         "badge_pos": "Top right",
         "badge_size": "Small",
         "start_with_windows": False,
+        "badge_ping": True,
+        "badge_timer": True,
+        "break_minutes": 0,
     },
     "appearance": {
         "mode": "Dark",
@@ -150,6 +156,8 @@ DEFAULT_SETTINGS = {
         "bg_dim": 0.55,
         "tray": True,
         "close_to_tray": False,
+        "custom_colors": ["#9d6bff", "#d946ef"],
+        "splash": True,
     },
     "updates": {"auto": True},
     "registration": {"registered": False, "backups": {}},
@@ -943,9 +951,17 @@ def close_badge():
     BADGE_FILE.unlink(missing_ok=True)
 
 
-def show_badge(title, body):
+BADGE_HIDDEN = DATA_DIR / "badge_hidden.flag"
+
+
+def show_badge(title, body, ip=None, joined=None):
     close_badge()
-    proc = spawn_self(TOAST_FLAG, title, body, "--badge")
+    extra = []
+    if ip:
+        extra += ["--ip", str(ip)]
+    if joined:
+        extra += ["--joined", str(int(joined))]
+    proc = spawn_self(TOAST_FLAG, title, body, "--badge", *extra)
     if proc:
         save_json(BADGE_FILE, {"pid": proc.pid})
 
@@ -990,6 +1006,8 @@ class SessionMonitor:
         joined = at or time.time()
         game = {"place_id": place_id, "job_id": job_id, "ip": ip, "joined": joined,
                 "name": None, "located": False, "quiet": False}
+        if not getattr(self, "play_start", None):
+            self.play_start = joined
         self.game = game
         self._publish(game)
         log(f"Joined place {place_id}" + (" (already in progress)" if quiet else ""))
@@ -1040,7 +1058,7 @@ class SessionMonitor:
             spawn_toast(game["name"] or "Joined a game", location)
             time.sleep(7)
         if self.session.get("server_badge", True) and self.game is game:
-            show_badge(game["name"] or "Roblox", location)
+            show_badge(game["name"] or "Roblox", location, game.get("ip"), game.get("joined"))
 
     def on_leave(self, at=None, record=True):
         game, self.game = self.game, None
@@ -1053,6 +1071,17 @@ class SessionMonitor:
             record_playtime(game["place_id"], game["name"], seconds)
             record_session(game, seconds)
         self._discord(None)
+
+    def check_break(self):
+        minutes = int(self.session.get("break_minutes") or 0)
+        if not minutes or not getattr(self, "play_start", None):
+            return
+        played = time.time() - self.play_start
+        due = minutes * 60 * (getattr(self, "breaks", 0) + 1)
+        if played >= due:
+            self.breaks = getattr(self, "breaks", 0) + 1
+            spawn_toast("Time for a quick break?", f"You've been playing for {fmt_duration(played)}.")
+            log(f"Break reminder after {fmt_duration(played)}")
 
     def _candidate_logs(self):
         try:
@@ -1166,6 +1195,7 @@ class SessionMonitor:
                 if self.icon:
                     self.icon.apply()
                 self.boost.tick()
+                self.check_break()
                 newer = self._newest_log()
                 try:
                     current_mtime = log_path.stat().st_mtime
@@ -1456,6 +1486,7 @@ def background_main():
         return
     save_json(BACKGROUND_FILE, {"pids": [os.getpid(), os.getppid()], "version": APP_VERSION})
     log(f"Background tracking started (v{APP_VERSION})")
+    threading.Thread(target=hotkey_loop, args=("background",), daemon=True).start()
     AutoAttach("background").loop(interval=6)
 
 
@@ -1481,6 +1512,265 @@ def set_start_with_windows(on):
                            creationflags=CREATE_NO_WINDOW)
         BACKGROUND_FILE.unlink(missing_ok=True)
     return on
+
+
+HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server"),
+           2: (0x4E, "new", "Ctrl+Alt+N", "Hop to a new server in the same game"),
+           3: (0x42, "badge", "Ctrl+Alt+B", "Show or hide the server badge"),
+           4: (0x4F, "open", "Ctrl+Alt+O", "Open Orbit")}
+
+
+def current_game():
+    cur = load_json(CURRENT_FILE, None) or {}
+    if cur.get("place_id"):
+        return cur
+    return load_json(LAST_SERVER_FILE, None) or {}
+
+
+def run_hotkey(action):
+    if not (load_settings().get("hotkeys") or {}).get("enabled", True):
+        return
+    log(f"Hotkey: {action}")
+    game = current_game()
+    if action == "rejoin" and game.get("place_id"):
+        spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], game.get("job_id")))
+    elif action == "new" and game.get("place_id"):
+        servers, _ = list_servers(game["place_id"], pages=1)
+        choices = [x for x in servers if x["id"] != game.get("job_id") and x["playing"] < x["max"]]
+        if choices:
+            pick = sorted(choices, key=lambda x: (x["ping"] if x["ping"] is not None else 999, x["playing"]))[0]
+            spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], pick["id"]))
+        else:
+            spawn_toast("No other servers", "Couldn't find another open server right now.")
+    elif action == "badge":
+        if BADGE_HIDDEN.exists():
+            BADGE_HIDDEN.unlink(missing_ok=True)
+        else:
+            BADGE_HIDDEN.write_text("1")
+    elif action == "open":
+        if pid_alive((load_json(GUI_FILE, {}) or {}).get("pids", [0])[0]):
+            SHOW_FLAG.write_text(str(time.time()))
+        else:
+            spawn_self()
+
+
+def hotkey_loop(owner):
+    if not IS_WINDOWS or not (load_settings().get("hotkeys") or {}).get("enabled", True):
+        return
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    u.RegisterHotKey.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint, ctypes.c_uint]
+    mods = 0x0001 | 0x0002 | 0x4000
+    ok = [i for i, (vk, *_rest) in HOTKEYS.items() if u.RegisterHotKey(None, i, mods, vk)]
+    if not ok:
+        return
+    log(f"Hotkeys ready ({owner}): " + ", ".join(HOTKEYS[i][2] for i in ok))
+    msg = wintypes.MSG()
+    while u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+        if msg.message == 0x0312 and msg.wParam in HOTKEYS:
+            threading.Thread(target=run_hotkey, args=(HOTKEYS[msg.wParam][1],), daemon=True).start()
+
+
+def calendar_data():
+    days = {}
+    for x in _sessions():
+        d = time.strftime("%Y-%m-%d", time.localtime(x.get("start", 0)))
+        days[d] = days.get(d, 0) + int(x.get("seconds", 0))
+    return days
+
+
+def game_stats(pid):
+    pid = str(pid)
+    sess = [x for x in _sessions() if str(x.get("place_id")) == pid]
+    play = (load_json(PLAYTIME_FILE, {}) or {}).get(pid, {})
+    info = game_info(pid)
+    locs = {}
+    for x in sess:
+        if x.get("location"):
+            locs[x["location"]] = locs.get(x["location"], 0) + 1
+    total = max(play.get("seconds", 0), sum(x.get("seconds", 0) for x in sess))
+    count = max(play.get("sessions", 0), len(sess))
+    return {
+        "pid": pid, "name": info["name"], "creator": info.get("creator"), "icon": info.get("icon"),
+        "thumb": info.get("thumb"), "total": total, "sessions": count, "avg": int(total / count) if count else 0,
+        "longest": max([x.get("seconds", 0) for x in sess] or [0]),
+        "first": min([x["start"] for x in sess] or [0]), "last": max([x.get("end", 0) for x in sess] or [play.get("last_played", 0)]),
+        "locations": sorted(locs.items(), key=lambda kv: -kv[1])[:8], "recent": list(reversed(sess))[:15],
+    }
+
+
+PACKS = {
+    "cursor_void_ring": ("Void Ring", "cursor", "A glowing purple ring with a white center dot."),
+    "cursor_dot": ("Dot", "cursor", "A tiny clean dot. Minimal and precise."),
+    "cursor_crosshair": ("Crosshair", "cursor", "A thin crosshair for aiming games."),
+    "death_soft_pop": ("Soft Pop", "sound", "A short, soft pop when you reset or die."),
+    "death_warp": ("Warp Out", "sound", "A sci-fi warp swoosh."),
+    "death_retro": ("Retro Blip", "sound", "A quick three-note retro blip."),
+}
+PACK_TARGETS = {
+    "cursor": ["content/textures/Cursors/KeyboardMouse/ArrowFarCursor.png",
+               "content/textures/Cursors/KeyboardMouse/ArrowCursor.png"],
+    "sound": ["content/sounds/ouch.ogg"],
+}
+
+
+def pack_file(pack_id):
+    ext = ".png" if PACKS[pack_id][1] == "cursor" else ".ogg"
+    return resource_dir() / "ui" / "packs" / (pack_id + ext)
+
+
+def pack_states(settings):
+    folder = mods_dir(settings)
+    out = []
+    for pid, (name, kind, desc) in PACKS.items():
+        src = pack_file(pid)
+        installed = src.exists() and all((folder / t).exists() and (folder / t).stat().st_size == src.stat().st_size
+                                          for t in PACK_TARGETS[kind])
+        mime = "image/png" if kind == "cursor" else "audio/ogg"
+        data = f"data:{mime};base64," + base64.b64encode(src.read_bytes()).decode() if src.exists() else ""
+        out.append({"id": pid, "name": name, "kind": kind, "desc": desc, "installed": installed, "data": data})
+    return out
+
+
+def install_pack(settings, pack_id, on=True):
+    if pack_id not in PACKS:
+        raise ValueError("Unknown pack")
+    kind = PACKS[pack_id][1]
+    folder = mods_dir(settings)
+    for target in PACK_TARGETS[kind]:
+        dest = folder / target
+        if on:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(pack_file(pack_id), dest)
+        else:
+            dest.unlink(missing_ok=True)
+    log(f"{'Installed' if on else 'Removed'} pack {pack_id} in mod profile {settings.get('mod_profile')}")
+
+
+def health_checks(settings):
+    checks = []
+
+    def add(cid, title, ok, detail, fix=None, level="bad"):
+        checks.append({"id": cid, "title": title, "ok": bool(ok), "detail": detail, "fix": fix,
+                       "level": "ok" if ok else level})
+
+    players = player_dirs()
+    add("roblox", "Roblox is installed", bool(players),
+        f"Found {players[0].name}" if players else "Roblox isn't installed.", "Download Roblox")
+    frozen = is_frozen()
+    add("installed", "Orbit is installed properly", running_installed_copy() or not frozen,
+        "Running from the installed copy." if running_installed_copy() else
+        ("Running from source (fine for testing)." if not frozen else f"Running from {Path(sys.executable).parent}. Install with OrbitSetup.exe so updates work."),
+        None, "warn")
+    if frozen and IS_WINDOWS:
+        ours = read_protocol_command(PROTOCOLS[0]) == our_command()
+        add("links", "Roblox Play links open through Orbit", ours,
+            "Website Play buttons go through Orbit." if ours else "Play links currently open Roblox directly or another launcher.",
+            "Use Orbit for links", "warn")
+    excl = settings["presets"].get("exclusive_fullscreen")
+    add("fullscreen", "Overlays can show over Roblox", not excl,
+        "Exclusive fullscreen is off." if not excl else "Exclusive fullscreen (Alt+Enter) hides the server badge and banner.",
+        "Turn off exclusive fullscreen", "warn")
+    badge = settings["session"].get("server_badge", True)
+    add("badge", "Server badge is on", badge, "Shows the server location while you play." if badge else "The badge is turned off.",
+        "Turn on the badge", "warn")
+    running = roblox_running()
+    if running:
+        info = load_json(MONITOR_FILE, {}) or {}
+        tracking = monitor_active() and pid_alive(info.get("pid")) and \
+            parse_version(info.get("version", "0")) >= parse_version(APP_VERSION)
+        add("tracking", "Session tracking is running", tracking,
+            "Orbit is watching your current session." if tracking else "Roblox is open but Orbit isn't tracking it.",
+            "Start tracking")
+    else:
+        add("tracking", "Session tracking", True, "Starts automatically when you play.")
+    if settings["session"].get("start_with_windows"):
+        bg = (load_json(BACKGROUND_FILE, {}) or {}).get("pids", [0])[0]
+        alive = pid_alive(bg)
+        add("background", "Background helper is running", alive,
+            "Tracks Roblox even when this window is closed." if alive else "Start with Windows is on but the helper isn't running.",
+            "Start helper")
+    if settings["discord"].get("enabled"):
+        has_id = bool(settings["discord"].get("client_id", "").strip())
+        add("discord", "Discord status is set up", has_id,
+            "Ready." if has_id else "Discord status is on but there's no Application ID.", "Open Discord settings", "warn")
+    if IS_WINDOWS:
+        ps = Path(sys_tool("powershell"))
+        add("tools", "Windows tools are reachable", ps.exists(), f"PowerShell: {ps}" if ps.exists() else
+            "PowerShell wasn't found. Shortcuts and some fixes may not work.", None, "warn")
+    return checks
+
+
+def apply_health_fix(cid, settings):
+    if cid == "roblox":
+        webbrowser.open("https://www.roblox.com/download")
+    elif cid == "links":
+        register_protocols(settings)
+    elif cid == "fullscreen":
+        settings["presets"]["exclusive_fullscreen"] = False
+        save_settings(settings)
+    elif cid == "badge":
+        settings["session"]["server_badge"] = True
+        save_settings(settings)
+    elif cid == "tracking":
+        stop_stale_copies()
+        spawn_self(ATTACH_FLAG)
+    elif cid == "background":
+        spawn_self(BACKGROUND_FLAG)
+    return True
+
+
+def roblox_cache_paths():
+    temp = Path(os.environ.get("TEMP") or (LOCALAPPDATA / "Temp"))
+    base = LOCALAPPDATA / "Roblox"
+    paths = [temp / "Roblox", base / "Downloads", base / "rbx-storage", base / "http"]
+    paths += list(base.glob("rbx-storage.db*"))
+    cutoff = time.time() - 86400
+    if ROBLOX_LOGS.is_dir():
+        paths += [p for p in ROBLOX_LOGS.glob("*.log") if p.stat().st_mtime < cutoff]
+    return [p for p in paths if p.exists()]
+
+
+def path_size(p):
+    try:
+        if p.is_file():
+            return p.stat().st_size
+        return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    except OSError:
+        return 0
+
+
+def repair(kind, settings):
+    if kind in ("cache", "reinstall") and roblox_running():
+        raise OSError("Close Roblox first, then try again.")
+    if kind == "cache":
+        freed = 0
+        for p in roblox_cache_paths():
+            freed += path_size(p)
+            if p.is_dir():
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                p.unlink(missing_ok=True)
+        log(f"Cleared Roblox cache ({freed / 1048576:.1f} MB)")
+        return f"Cleared {freed / 1048576:.1f} MB of Roblox cache."
+    if kind == "reset_roblox":
+        for d in player_dirs():
+            (d / "ClientSettings" / "ClientAppSettings.json").unlink(missing_ok=True)
+            sync_mods(d, None)
+        log("Removed Orbit's flags and mods from Roblox")
+        return "Roblox is back to stock. Orbit puts your flags and mods back next time you launch through it."
+    if kind == "reset_flags":
+        settings["presets"] = dict(DEFAULT_PRESETS)
+        settings["custom_flags"] = {}
+        save_settings(settings)
+        return "Your default FastFlags are reset. Game profiles were kept."
+    if kind == "reinstall":
+        dest = Path(os.environ.get("TEMP") or LOCALAPPDATA) / "RobloxPlayerInstaller.exe"
+        download_file("https://www.roblox.com/download/client?os=win", dest)
+        subprocess.Popen([str(dest)], env=child_env())
+        log("Started the official Roblox installer")
+        return "The official Roblox installer is running."
+    raise ValueError("Unknown repair")
 
 
 def claim_monitor():
@@ -1673,7 +1963,7 @@ def _font(size, bold=False):
 
 def render_recap_png(recap, settings, dest):
     from PIL import Image, ImageDraw, ImageFilter
-    accents = ACCENTS.get(settings["appearance"].get("accent"), ACCENTS["Void"])
+    accents = accent_pair(settings["appearance"])
     c1, c2 = (tuple(int(h[i:i + 2], 16) for i in (1, 3, 5)) for h in accents)
     W, H = 1200, 675
     img = Image.new("RGB", (W, H), (8, 6, 14))
@@ -2128,12 +2418,20 @@ def run_uninstall():
     u.MessageBoxW(None, f"{APP_NAME} was uninstalled.", APP_NAME, 0x40)
 
 
+def accent_pair(appearance):
+    if appearance.get("accent") == "Custom":
+        colors = appearance.get("custom_colors") or []
+        if len(colors) == 2 and all(re.fullmatch(r"#[0-9a-fA-F]{6}", str(x)) for x in colors):
+            return list(colors)
+    return ACCENTS.get(appearance.get("accent"), ACCENTS["Void"])
+
+
 def theme_colors(appearance):
     if appearance.get("mode") == "Light":
         c = dict(bg="#f3f0fb", panel="#ffffff", fg="#17122a", muted="#6a6386")
     else:
         c = dict(bg="#06040b", panel="#120e1f", fg="#f1edff", muted="#9c95b8")
-    c["accent"] = ACCENTS.get(appearance.get("accent"), ACCENTS["Void"])[0]
+    c["accent"] = accent_pair(appearance)[0]
     return c
 
 
@@ -2161,7 +2459,7 @@ def show_toast(title, body, seconds=6.5):
     import tkinter as tk
     import tkinter.font as tkfont
     c = theme_colors(load_settings()["appearance"])
-    accent2 = ACCENTS.get(load_settings()["appearance"].get("accent"), ACCENTS["Void"])[1]
+    accent2 = accent_pair(load_settings()["appearance"])[1]
     key = "#010203"
     root = tk.Tk()
     root.withdraw()
@@ -2278,15 +2576,30 @@ def roblox_rect():
         return None
 
 
-def show_badge_window(title, body):
+def ping_ms(ip):
+    if not ip or not IS_WINDOWS:
+        return None
+    try:
+        out = subprocess.run([sys_tool("ping"), "-n", "1", "-w", "1500", str(ip)], capture_output=True, text=True,
+                             timeout=5, creationflags=CREATE_NO_WINDOW).stdout
+    except Exception:
+        return None
+    m = re.search(r"[=<]\s?(\d+)\s?ms", out, re.I)
+    return int(m.group(1)) if m else None
+
+
+def show_badge_window(title, body, ip=None, joined=None):
     import tkinter as tk
     import tkinter.font as tkfont
     settings = load_settings()
     appearance, sess = settings["appearance"], settings["session"]
     pos = sess.get("badge_pos") or "Top right"
     small = (sess.get("badge_size") or "Small") == "Small"
+    show_ping = sess.get("badge_ping", True) and bool(ip)
+    show_timer = sess.get("badge_timer", True) and bool(joined)
+    joined = float(joined) if joined else None
     c = theme_colors(appearance)
-    accent2 = ACCENTS.get(appearance.get("accent"), ACCENTS["Void"])[1]
+    accent2 = accent_pair(appearance)[1]
     key = "#010203"
     root = tk.Tk()
     root.withdraw()
@@ -2300,15 +2613,21 @@ def show_badge_window(title, body):
         pass
     f_name = tkfont.Font(family="Segoe UI Semibold", size=9 if small else 10)
     f_loc = tkfont.Font(family="Segoe UI", size=9 if small else 10)
+    f_num = tkfont.Font(family="Segoe UI Semibold", size=9 if small else 10)
     h = 24 if small else 30
     dot = 7 if small else 9
-    text_x = 12 + dot * 2 + 6
-    if small:
-        parts = [(body, f_loc, c["fg"])]
-    else:
+    sep = "  ·  "
+    x = 12 + dot * 2 + 6
+    layout = []
+    if not small:
         name = title if len(title) <= 28 else title[:27] + "…"
-        parts = [(name, f_name, c["fg"]), ("  ·  ", f_loc, c["muted"]), (body, f_loc, c["fg"])]
-    w = text_x + sum(f.measure(t) for t, f, _ in parts) + 12
+        layout += [("name", name, f_name, c["fg"]), ("sep", sep, f_loc, c["muted"])]
+    layout.append(("loc", body, f_loc, c["fg"]))
+    if show_ping:
+        layout += [("sep", sep, f_loc, c["muted"]), ("ping", "··· ms", f_num, c["muted"], "999 ms")]
+    if show_timer:
+        layout += [("sep", sep, f_loc, c["muted"]), ("timer", "0:00", f_num, c["muted"], "0:00:00")]
+    w = x + sum(f.measure(item[4] if len(item) > 4 else item[1]) for item in layout for f in [item[2]]) + 12
     cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
     cv.pack()
     r = h // 2
@@ -2320,11 +2639,12 @@ def show_badge_window(title, body):
     cv.create_oval(cx - dot, cy - dot, cx + dot, cy + dot, fill=c["accent"], outline="")
     cv.create_oval(cx - dot // 2, cy - dot // 2, cx + dot // 2, cy + dot // 2, fill="#05030a", outline="#f5f3ff")
     cv.create_line(cx - dot - 2, cy + 2, cx + dot + 2, cy - 2, fill=accent2, width=2)
-    x = text_x
-    for t, f, col in parts:
-        cv.create_text(x, cy, text=t, anchor="w", font=f, fill=col)
-        x += f.measure(t)
-    state = {"alpha": 0.0, "xy": None, "hwnd": None}
+    items = {}
+    for item in layout:
+        kind, text, font, color = item[:4]
+        items[kind] = cv.create_text(x, cy, text=text, anchor="w", font=font, fill=color)
+        x += font.measure(item[4] if len(item) > 4 else text)
+    state = {"alpha": 0.0, "xy": None, "hwnd": None, "ping": None}
     peak = 0.86
 
     def target_xy():
@@ -2379,13 +2699,32 @@ def show_badge_window(title, body):
         place()
     log(f"Badge placed at {first_xy} ({w}x{h}, {pos}, anchored to {'Roblox' if roblox_rect() else 'screen'} {first_rect})")
 
+    if show_ping:
+        def pinger():
+            while True:
+                state["ping"] = ping_ms(ip)
+                time.sleep(5)
+        threading.Thread(target=pinger, daemon=True).start()
+
+    def refresh_numbers():
+        if "ping" in items:
+            p = state["ping"]
+            color = c["muted"] if p is None else "#4ade80" if p < 80 else "#fbbf24" if p < 150 else "#fb7185"
+            cv.itemconfigure(items["ping"], text="··· ms" if p is None else f"{p} ms", fill=color)
+        if "timer" in items:
+            sec = max(0, int(time.time() - joined))
+            hh, mm, ss = sec // 3600, sec % 3600 // 60, sec % 60
+            cv.itemconfigure(items["timer"], text=f"{hh}:{mm:02d}:{ss:02d}" if hh else f"{mm}:{ss:02d}")
+
     def tick():
         try:
-            target = peak if roblox_in_front() else 0.0
+            visible = roblox_in_front() and not BADGE_HIDDEN.exists()
+            target = peak if visible else 0.0
             state["alpha"] += (target - state["alpha"]) * 0.35
             if abs(state["alpha"] - target) < 0.02:
                 state["alpha"] = target
             place()
+            refresh_numbers()
             root.attributes("-alpha", state["alpha"])
             root.attributes("-topmost", True)
         except tk.TclError:
@@ -2394,7 +2733,7 @@ def show_badge_window(title, body):
             if not state.get("logged"):
                 state["logged"] = True
                 log("Badge error:\n" + traceback.format_exc())
-        root.after(150 if state["alpha"] in (0.0, peak) else 30, tick)
+        root.after(250 if state["alpha"] in (0.0, peak) else 30, tick)
 
     tick()
     root.mainloop()
@@ -2474,6 +2813,7 @@ class Api:
             "icon_set": ICON_FILE.exists(),
             "allowlist": sorted(ALLOWLIST),
             "accents": ACCENTS,
+            "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
             "credits": [{"role": r, "handle": h} for r, h in CREDITS],
             "ext_path": str(EXTENSIONS_DIR / EXTENSION_NAME),
             "mode": self._mode,
@@ -2885,6 +3225,56 @@ class Api:
     def minimize(self):
         self._window.minimize()
 
+    def health(self):
+        try:
+            return health_checks(self._settings)
+        except Exception as e:
+            return self._err(e)
+
+    def health_fix(self, cid):
+        try:
+            apply_health_fix(cid, self._settings)
+            return True
+        except Exception as e:
+            return self._err(e)
+
+    def repair(self, kind):
+        try:
+            return {"message": repair(kind, self._settings)}
+        except Exception as e:
+            return self._err(e)
+
+    def calendar(self):
+        return calendar_data()
+
+    def game_stats(self, pid):
+        try:
+            return game_stats(pid)
+        except Exception as e:
+            return self._err(e)
+
+    def packs(self):
+        return pack_states(self._settings)
+
+    def install_pack(self, pack_id, on=True):
+        try:
+            install_pack(self._settings, pack_id, bool(on))
+            return pack_states(self._settings)
+        except Exception as e:
+            return self._err(e)
+
+    def toggle_saved(self, server):
+        saved = [x for x in self._settings.get("saved_servers", []) if x.get("job_id") != server.get("job_id")]
+        if len(saved) == len(self._settings.get("saved_servers", [])):
+            saved.insert(0, {k: server.get(k) for k in ("place_id", "job_id", "name", "location", "note")} |
+                         {"saved": int(time.time())})
+        self._settings["saved_servers"] = saved[:50]
+        save_settings(self._settings)
+        return saved
+
+    def hotkeys(self):
+        return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
+
     def set_startup(self, on):
         try:
             set_start_with_windows(bool(on))
@@ -3015,6 +3405,7 @@ def _run_gui(mode, after_update, selftest):
                     api.show_window()
         threading.Thread(target=watch_show_requests, daemon=True).start()
         threading.Thread(target=AutoAttach("window").loop, daemon=True).start()
+        threading.Thread(target=hotkey_loop, args=("window",), daemon=True).start()
     icon = app_icon_file()
     try:
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")), icon=str(icon) if icon.exists() else None)
@@ -3067,7 +3458,9 @@ def main():
         body = args[i + 2] if len(args) > i + 2 else ""
         try:
             if "--badge" in args:
-                show_badge_window(title, body)
+                def opt(flag):
+                    return args[args.index(flag) + 1] if flag in args and len(args) > args.index(flag) + 1 else None
+                show_badge_window(title, body, opt("--ip"), opt("--joined"))
             else:
                 show_toast(title, body)
         except Exception:

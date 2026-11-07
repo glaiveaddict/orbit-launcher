@@ -107,7 +107,7 @@ jobs:
           sleep 3
           python render_check.py banner
           wait
-          ORBIT_BADGE_ALWAYS=1 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge &
+          ORBIT_BADGE_ALWAYS=1 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge --ip 8.8.8.8 --joined $(( $(date +%s) - 754 )) &
           sleep 4
           python render_check.py badge
           taskkill //IM OrbitLauncher.exe //F > /dev/null 2>&1

@@ -407,6 +407,77 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .modal h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.01em; } .modal p { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
 .modal .input { width: 100%; margin-bottom: 16px; }
 .modal .row { justify-content: flex-end; }
+
+.health-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 14px; align-items: center; padding: 12px 4px; border-top: 1px solid var(--line); animation: rise .5s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.health-row:first-child { border-top: 0; }
+.health-row .hi { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; font-size: 15px; }
+.health-row .hi.ok { background: rgba(74, 222, 128, .14); color: #4ade80; }
+.health-row .hi.warn { background: rgba(251, 191, 36, .14); color: #fbbf24; }
+.health-row .hi.bad { background: rgba(251, 113, 133, .15); color: #fb7185; }
+.health-row b { display: block; font-weight: 650; }
+.health-row span { color: var(--muted); font-size: 12.5px; }
+.health-score { display: flex; align-items: center; gap: 18px; }
+.health-score .big-num { font-size: 34px; }
+.repair-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.repair { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; background: rgba(255, 255, 255, .02); transition: border-color .3s, transform .35s var(--spring); }
+.repair:hover { border-color: rgba(var(--accent-rgb), .45); transform: translateY(-2px); }
+.repair b { font-weight: 650; }
+.repair span { color: var(--muted); font-size: 12.5px; flex: 1; }
+.cal-wrap { overflow-x: auto; padding-bottom: 4px; }
+.cal { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 13px); gap: 3px; width: max-content; }
+.cal i { width: 13px; height: 13px; border-radius: 3.5px; background: rgba(var(--accent-rgb), .07); transition: transform .25s var(--spring); animation: calIn .5s var(--spring) both; animation-delay: calc(var(--d) * 4ms); }
+.cal i:hover { transform: scale(1.45); outline: 1px solid var(--text); }
+.cal i.l1 { background: rgba(var(--accent-rgb), .3); } .cal i.l2 { background: rgba(var(--accent-rgb), .55); }
+.cal i.l3 { background: rgba(var(--accent-rgb), .8); } .cal i.l4 { background: var(--accent2); box-shadow: 0 0 8px -1px var(--accent2); }
+.cal i.pad { visibility: hidden; }
+@keyframes calIn { from { opacity: 0; transform: scale(.3); } }
+.cal-legend { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+.cal-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.cal-months { display: flex; font-size: 11px; color: var(--muted); margin-bottom: 6px; height: 14px; position: relative; }
+.cal-months span { position: absolute; }
+.game-hero { position: relative; border-radius: 18px; overflow: hidden; min-height: 170px; display: flex; align-items: flex-end; padding: 20px; background: #0b0614 center/cover no-repeat; }
+.game-hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 3, 10, .1), rgba(5, 3, 10, .88)); }
+.game-hero > * { position: relative; }
+.game-hero h1 { font-size: 26px; margin: 0; color: #fff; }
+.game-hero .muted { color: rgba(255, 255, 255, .7); }
+.loc-bar { display: grid; grid-template-columns: 1fr 120px 34px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+.loc-bar .bar { margin: 0; }
+.clickable { cursor: pointer; }
+.clickable:hover { color: var(--accent); }
+.star { background: none; border: 0; color: var(--muted); font-size: 17px; padding: 4px 6px; cursor: pointer; transition: transform .3s var(--spring), color .2s; }
+.star:hover { transform: scale(1.25); color: var(--accent2); }
+.star.on { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, .6); }
+.packs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pack { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: rgba(255, 255, 255, .02); transition: border-color .3s, transform .35s var(--spring), box-shadow .3s; animation: rise .5s var(--spring) both; animation-delay: calc(var(--i, 0) * 50ms); }
+.pack:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), .5); }
+.pack.on { border-color: var(--accent); box-shadow: 0 0 22px -8px var(--accent); }
+.pack .pv { height: 70px; border-radius: 10px; display: grid; place-items: center; background: radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), .18), rgba(0, 0, 0, .35)); }
+.pack .pv img { width: 44px; height: 44px; image-rendering: auto; filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), .6)); }
+.pack .pv .wave { display: flex; gap: 3px; align-items: center; height: 36px; }
+.pack .pv .wave i { width: 4px; border-radius: 3px; background: linear-gradient(var(--accent), var(--accent2)); height: 30%; }
+.pack.playing .pv .wave i { animation: wave .55s ease-in-out infinite alternate; animation-delay: calc(var(--k) * 60ms); }
+@keyframes wave { to { height: 100%; } }
+.pack b { font-weight: 650; }
+.pack .small { flex: 1; }
+.custom-colors { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.custom-colors input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 9px; background: none; padding: 2px; cursor: pointer; }
+.custom-colors .prev { width: 120px; height: 32px; border-radius: 9px; }
+.swatch.custom { background: conic-gradient(#f43f5e, #fbbf24, #4ade80, #22d3ee, #9d6bff, #f43f5e); }
+.hk-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.hk-row:first-of-type { border-top: 0; }
+.hk-row kbd { font: 600 12px var(--mono, ui-monospace, monospace); padding: 4px 8px; border-radius: 7px; border: 1px solid var(--line); background: rgba(var(--accent-rgb), .1); min-width: 92px; text-align: center; }
+#splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #05030a; pointer-events: none; transition: opacity .6s ease .1s; }
+#splash.done { opacity: 0; }
+#splash .sp-core { position: relative; width: 120px; height: 120px; }
+#splash .sp-disk { position: absolute; inset: -60px; border-radius: 50%; background: conic-gradient(from 0deg, transparent, var(--accent), var(--accent2), #fff, var(--accent), transparent 70%); filter: blur(14px); transform: scaleY(.32) scale(.1); opacity: 0; animation: spDisk 1.5s cubic-bezier(.2, .8, .2, 1) forwards, spSpin 1.2s linear infinite; }
+#splash .sp-hole { position: absolute; inset: 22px; border-radius: 50%; background: #000; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 0 30px 6px var(--accent); transform: scale(0); animation: spHole .9s cubic-bezier(.3, 1.6, .5, 1) .15s forwards; }
+#splash .sp-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent2); opacity: 0; animation: spRing 1.1s ease-out .5s forwards; }
+#splash .sp-name { position: absolute; top: calc(50% + 92px); left: 50%; transform: translateX(-50%); font-weight: 800; letter-spacing: .5em; font-size: 13px; color: #f5f3ff; opacity: 0; animation: spName .8s ease .55s forwards; white-space: nowrap; padding-left: .5em; }
+@keyframes spDisk { 60% { opacity: 1; transform: scaleY(.32) scale(1.15); } to { opacity: .9; transform: scaleY(.32) scale(1); } }
+@keyframes spSpin { to { rotate: 360deg; } }
+@keyframes spHole { to { transform: scale(1); } }
+@keyframes spRing { from { opacity: .9; transform: scale(.6); } to { opacity: 0; transform: scale(3.2); } }
+@keyframes spName { from { opacity: 0; letter-spacing: 1.2em; } to { opacity: .9; letter-spacing: .5em; } }
 </style>
 </head>
 <body>
@@ -430,6 +501,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     <div class="side-foot"><span class="dot" id="sideDot"></span><span id="sideStatus">Checking Roblox...</span></div>
   </aside>
 
+  <div id="splash" hidden><div class="sp-core"><div class="sp-disk"></div><div class="sp-hole"></div><div class="sp-ring"></div></div><div class="sp-name">ORBIT</div></div>
   <main id="pages">
     <section class="page" id="page-home">
       <div class="card hero tilt rise" style="--i:0">
@@ -475,6 +547,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="page-head rise row" style="--i:0"><div><h1>Library</h1><p>Your favorite games. Each one can have its own FastFlags and mod pack.</p></div><span class="spacer"></span>
         <button class="btn primary" id="libAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add game</button></div>
       <div class="lib-grid rise" style="--i:1" id="libGrid"></div>
+      <div class="card rise" style="--i:2;margin-top:14px" id="savedCard"></div>
       <div class="card rise" style="--i:2;margin-top:14px" id="libSuggestCard"><h3>Recently played</h3><p class="sub">Add them to your library with one click.</p><div class="row" id="libSuggest"></div></div>
     </section>
 
@@ -511,6 +584,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row" style="margin-bottom:6px"><div><h3>Launch with Roblox</h3><p class="sub" style="margin:0">These open when Roblox starts through Orbit. Optionally close them when you stop playing.</p></div><span class="spacer"></span><button class="btn" id="appAdd">Add app</button></div>
         <div id="appList"></div>
       </div>
+      <div class="card rise" style="--i:3" id="hotkeyCard"></div>
     </section>
 
     <section class="page" id="page-flags">
@@ -535,6 +609,10 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row" id="modChips"></div>
       </div>
       <div class="card rise" style="--i:3">
+        <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original cursors and death sounds made for Orbit. Installs into the selected mod profile.</p></div></div>
+        <div class="packs" id="packGrid" style="margin-top:12px"></div>
+      </div>
+      <div class="card rise" style="--i:4">
         <h3>Files in this profile</h3>
         <p class="sub">Laid out like the Roblox version folder, e.g. <code>content\sounds\ouch.ogg</code> (death sound) or <code>content\textures\Cursors\KeyboardMouse\ArrowCursor.png</code> (cursor).</p>
         <div class="file-list" id="modFiles"></div>
@@ -549,6 +627,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="card tilt"><div class="stat-label">Games played</div><div class="big-num" id="statGames">0</div></div>
         <div class="card tilt"><div class="stat-label">Sessions</div><div class="big-num" id="statSessions">0</div></div>
       </div>
+      <div class="card rise" style="--i:3" id="calCard"></div>
       <div class="card recap rise" style="--i:3" id="recapCard"></div>
       <div class="card rise" style="--i:4">
         <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Most played</h3><span class="spacer"></span><button class="btn danger" id="resetStats">Reset</button></div>
@@ -590,6 +669,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div id="bgImageOpts"><div class="row" style="margin-bottom:12px"><button class="btn" id="bgChoose">Choose image</button><span class="muted small" id="bgName"></span></div>
           <div class="field" style="margin:0"><label>Dim</label><div class="range-wrap"><input type="range" id="bgDim" min="0" max="90"><div class="range-val" id="bgDimVal"></div></div></div></div>
       </div>
+      <div class="card rise" style="--i:3" id="splashCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Sounds</h3><p class="sub">Played when you launch Roblox and unlock achievements.</p>
         <div class="field"><div id="sndSeg"></div></div>
@@ -622,6 +702,26 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       </div>
     </section>
 
+    <section class="page" id="page-health">
+      <div class="page-head rise row" style="--i:0"><div><h1>Health</h1><p>Checks everything Orbit needs and fixes problems in one click.</p></div><span class="spacer"></span>
+        <button class="btn" id="healthRun">Run checks again</button></div>
+      <div class="card rise" style="--i:1"><div class="health-score"><div class="big-num" id="healthScore">–</div><div><b id="healthTitle">Checking...</b><div class="muted small" id="healthSub"></div></div></div></div>
+      <div class="card rise" style="--i:2" id="healthList"></div>
+      <div class="card rise" style="--i:3">
+        <h3>Repair Roblox</h3><p class="sub">Tools for when Roblox acts up. None of these touch your Orbit settings unless it says so.</p>
+        <div class="repair-grid">
+          <div class="repair"><b>Clear Roblox cache</b><span>Deletes downloaded game assets, temp files and logs older than a day. Fixes stuck loading and broken textures.</span><button class="btn" data-repair="cache">Clear cache</button></div>
+          <div class="repair"><b>Put Roblox back to stock</b><span>Removes Orbit's FastFlags and mods from Roblox's folder. They come back the next time you launch through Orbit.</span><button class="btn" data-repair="reset_roblox">Restore stock</button></div>
+          <div class="repair"><b>Reset my FastFlags</b><span>Sets your default FastFlags back to Orbit's defaults and clears custom flags. Game profiles stay.</span><button class="btn danger" data-repair="reset_flags">Reset flags</button></div>
+          <div class="repair"><b>Reinstall Roblox</b><span>Downloads and runs the official Roblox installer. Your account and games are not affected.</span><button class="btn" data-repair="reinstall">Reinstall</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-game">
+      <div class="rise" style="--i:0;margin-bottom:12px"><button class="btn ghost" id="gameBack">← Back</button></div>
+      <div id="gameBody"></div>
+    </section>
     <section class="page" id="page-credits">
       <div class="page-head rise" style="--i:0"><h1>Credits</h1><p>The people behind Orbit.</p></div>
       <div class="grid2" id="creditList"></div>
@@ -698,12 +798,13 @@ const ICONS = {
   boost: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
   file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
   box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["servers", "Servers"],
                ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
-               ["#Orbit"], ["credits", "Credits"]];
+               ["#Orbit"], ["health", "Health"], ["credits", "Credits"]];
 
 let api = null, S = null, cfg = null, page = "home";
 const iconCache = {};
@@ -789,8 +890,10 @@ function modal({ title, text = "", input = false, placeholder = "", ok = "OK", d
 let starRGB = "220,210,255";
 function applyTheme() {
   const a = cfg.appearance, names = Object.keys(S.accents);
-  if (!S.accents[a.accent]) a.accent = names[0];
-  const [c1, c2] = S.accents[a.accent], root = document.documentElement;
+  if (a.accent !== "Custom" && !S.accents[a.accent]) a.accent = names[0];
+  const valid = (c) => Array.isArray(c) && c.length === 2 && c.every((x) => /^#[0-9a-f]{6}$/i.test(x));
+  if (a.accent === "Custom" && !valid(a.custom_colors)) a.custom_colors = [...S.accents[names[0]]];
+  const [c1, c2] = a.accent === "Custom" ? a.custom_colors : S.accents[a.accent], root = document.documentElement;
   root.dataset.mode = a.mode === "Light" ? "light" : "dark";
   root.style.setProperty("--accent", c1);
   root.style.setProperty("--accent2", c2);
@@ -981,12 +1084,13 @@ function go(id) {
   }
   $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === id));
   const active = $(`.nav-item[data-page="${id}"]`);
-  $("#navInd").style.transform = `translateY(${active.offsetTop}px)`;
+  $("#navInd").style.opacity = active ? "" : "0";
+  if (active) $("#navInd").style.transform = `translateY(${active.offsetTop}px)`;
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: () => {}, credits: () => {}, library: renderLibrary, servers: renderServers,
-     achievements: renderAchievements, screens: renderScreens, boost: renderBoost })[id]?.();
+     achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -1141,6 +1245,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
+  renderPacks();
 }
 
 
@@ -1154,10 +1259,14 @@ function renderSession() {
       segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"], ["Top center", "Center"]], s.badge_pos || "Top right", (v) => { s.badge_pos = v; save(); })),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Badge size"), h("span", {}, "Small shows just the location. Normal adds the game name.")),
       segmented([["Small", "Small"], ["Normal", "Normal"]], s.badge_size || "Small", (v) => { s.badge_size = v; save(); })),
+    toggleRow("Live ping on the badge", "Shows your ping to the server, updated every few seconds. Green is great, yellow is okay, red is far.", s.badge_ping !== false, (v) => { s.badge_ping = v; save(); }),
+    toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); }),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Break reminders"), h("span", {}, "A small popup suggests a break after this much play time. Applies from your next session.")),
+      segmented([["0", "Off"], ["30", "30m"], ["60", "1h"], ["90", "1h 30m"], ["120", "2h"]], String(s.break_minutes || 0), (v) => { s.break_minutes = Number(v); save(); })),
     toggleRow("Start with Windows", "Runs a tiny background helper (no window) so the badge, banner and stats work even when Orbit's window is closed, no matter how you open Roblox.", !!s.start_with_windows, async (v) => { const r = await api.set_startup(v); if (r && r.error) toast(r.error, "err"); else { s.start_with_windows = v; toast(v ? "Orbit now tracks Roblox in the background." : "Background tracking is off.", "ok"); } }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
-  renderStats(); renderRecap(); renderTimeline();
+  renderStats(); renderCalendar(); renderRecap(); renderTimeline();
 }
 async function renderStats() {
   const data = S.playtime || {};
@@ -1174,7 +1283,7 @@ async function renderStats() {
   rows.forEach(([pid, e], i) => {
     const bar = h("i"); bars.push([bar, (e.seconds || 0) / max * 100]);
     const gi = h("div", { class: "gi", "data-pid": pid });
-    list.append(h("div", { class: "stat-row" }, gi,
+    list.append(h("div", { class: "stat-row clickable", title: "Open game stats", onclick: () => openGame(pid) }, gi,
       h("div", { style: "min-width:0" }, h("div", { class: "nm" }, h("span", { class: "rank" }, `#${i + 1}`), e.name || `Place ${pid}`), h("div", { class: "bar" }, bar)),
       h("div", { class: "num" }, fmtDur(e.seconds)), h("div", { class: "num muted" }, String(e.sessions || 0)),
       h("div", { class: "num muted small" }, fmtAgo(e.last_played || 0))));
@@ -1217,7 +1326,22 @@ function renderAppearance() {
     b.addEventListener("mouseleave", () => (nameEl.textContent = a.accent));
     sw.append(b);
   });
+  const cc = a.custom_colors || [...S.accents.Void];
+  const cb = h("button", { class: "swatch custom" + (a.accent === "Custom" ? " on" : ""), title: "Custom", style: `--sw:${cc[0]}` });
+  cb.addEventListener("click", () => { a.accent = "Custom"; a.custom_colors = a.custom_colors || [...cc]; applyTheme(); save(); renderAppearance(); });
+  cb.addEventListener("mouseenter", () => (nameEl.textContent = "Custom"));
+  cb.addEventListener("mouseleave", () => (nameEl.textContent = a.accent));
+  sw.append(cb);
   nameEl.textContent = a.accent;
+  $("#customColors")?.remove();
+  if (a.accent === "Custom") {
+    const pick = (i) => { const inp = h("input", { type: "color", value: a.custom_colors[i] });
+      inp.addEventListener("input", () => { a.custom_colors[i] = inp.value; applyTheme(); prev.style.background = `linear-gradient(90deg,${a.custom_colors[0]},${a.custom_colors[1]})`; save(); }); return inp; };
+    const prev = h("div", { class: "prev", style: `background:linear-gradient(90deg,${a.custom_colors[0]},${a.custom_colors[1]})` });
+    nameEl.after(h("div", { class: "custom-colors", id: "customColors" }, pick(0), pick(1), prev, h("span", { class: "muted small" }, "Main and glow color. Also used for the in-game badge.")));
+  }
+  const spc = $("#splashCard"); spc.innerHTML = "";
+  spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
   const bgSeg = $("#bgSeg"); bgSeg.innerHTML = "";
@@ -1332,6 +1456,7 @@ async function renderRecent() {
     const gi = h("div", { class: "gi", "data-pid": x.place_id });
     box.append(h("div", { class: "list-row", style: `--i:${i}` }, gi,
       h("div", { class: "tx" }, h("b", {}, x.name), h("span", {}, `${fmtAgo(x.end || x.start)} · ${fmtDur(x.seconds)}${x.location ? " · " + x.location : ""}`)),
+      starBtn(x),
       h("button", { class: "btn", onclick: async () => { await saveNow(); sfx("launch"); const r = await api.join_server(x.place_id, x.job_id); r && r.error ? toast(r.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin")));
   });
   await loadGames([...new Set(list.map((x) => x.place_id))]);
@@ -1367,13 +1492,14 @@ async function renderLibrary() {
       curProfile = String(g.pid); go("flags");
     };
     const card = h("div", { class: "card game tilt", style: `--i:${i}` }, art,
-      h("div", { class: "meta" }, h("div", { class: "gname", title: g.name }, info.name || g.name),
+      h("div", { class: "meta" }, h("div", { class: "gname clickable", title: "Open game stats", onclick: () => openGame(g.pid) }, info.name || g.name),
         h("div", { class: "small muted" }, info.creator ? "by " + info.creator : " "),
         h("div", { class: "row" }, h("button", { class: "btn primary", onclick: () => playGame(g) }, "Play"),
           h("button", { class: "btn", onclick: () => { go("servers"); findServers(g.pid); } }, "Servers"), flagsBtn),
         h("div", { class: "row" }, sel)));
     grid.append(card);
   });
+  renderSaved();
   const sug = $("#libSuggest"); sug.innerHTML = "";
   const have = new Set(cfg.library.map((g) => String(g.pid)));
   const recent = Object.entries(S.playtime || {}).filter(([pid]) => !have.has(pid)).sort((a, b) => (b[1].last_played || 0) - (a[1].last_played || 0)).slice(0, 8);
@@ -1459,7 +1585,7 @@ async function renderTimeline(more) {
     const t = (ts) => new Date(ts * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
     box.append(h("div", { class: "list-row", style: `--i:${i}` }, h("div", { class: "gi", "data-pid": x.place_id }),
       h("div", { class: "tx" }, h("b", {}, x.name), h("span", {}, `${t(x.start)} – ${t(x.end)}${x.location ? " · " + x.location : ""}`)),
-      h("div", { class: "num", style: "font-weight:650" }, fmtDur(x.seconds)),
+      h("div", { class: "num", style: "font-weight:650" }, fmtDur(x.seconds)), starBtn(x),
       h("button", { class: "btn ghost", title: "Join this server again", onclick: async () => { await saveNow(); sfx("launch"); const y = await api.join_server(x.place_id, x.job_id); y && y.error ? toast(y.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin")));
   });
   box.dataset.lastDay = lastDay;
@@ -1532,8 +1658,168 @@ function renderBoost() {
     h("div", { class: "tx" }, h("b", {}, app.name), h("span", { class: "mono" }, app.path)),
     h("span", { class: "muted small" }, "Close after"), switchEl(app.close_after, (v) => { app.close_after = v; save(); }),
     h("button", { class: "btn ghost danger", onclick: () => { cfg.launch_with.splice(i, 1); save(); renderBoost(); } }, "Remove"))));
+  renderHotkeys();
 }
 
+async function renderHotkeys() {
+  const box = $("#hotkeyCard"), keys = await api.hotkeys(); box.innerHTML = "";
+  cfg.hotkeys = cfg.hotkeys || { enabled: true };
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Hotkeys"), h("p", { class: "sub" }, "Work anywhere, even while you're in a game, as long as Orbit or its background helper is running."),
+    toggleRow("Global hotkeys", "Turning this on or off takes effect next time Orbit opens.", cfg.hotkeys.enabled !== false, (v) => { cfg.hotkeys.enabled = v; save(); }),
+    ...keys.map((k) => h("div", { class: "hk-row" }, h("kbd", {}, k.keys), h("span", { class: "muted" }, k.desc))));
+}
+
+function starBtn(x) {
+  const on = () => (cfg.saved_servers || []).some((y) => y.job_id === x.job_id);
+  const b = h("button", { class: "star" + (on() ? " on" : ""), title: on() ? "Remove from saved servers" : "Save this server" }, on() ? "★" : "☆");
+  b.onclick = async (e) => {
+    e.stopPropagation(); await saveNow();
+    cfg.saved_servers = await api.toggle_saved({ place_id: x.place_id, job_id: x.job_id, name: x.name, location: x.location });
+    const now = on(); b.classList.toggle("on", now); b.textContent = now ? "★" : "☆"; b.title = now ? "Remove from saved servers" : "Save this server";
+    toast(now ? `Saved this ${x.name} server.` : "Removed from saved servers.", now ? "ok" : "");
+    if (page === "library") renderSaved();
+  };
+  return b;
+}
+async function renderSaved() {
+  const box = $("#savedCard"), list = cfg.saved_servers || []; box.innerHTML = "";
+  box.style.display = list.length ? "" : "none"; if (!list.length) return;
+  box.append(h("h3", {}, "Saved servers"), h("p", { class: "sub" }, "Servers you starred. Roblox closes servers once everyone leaves, so older ones may put you somewhere new."));
+  list.forEach((x, i) => box.append(h("div", { class: "list-row", style: `--i:${i}` }, h("div", { class: "gi", "data-pid": x.place_id }),
+    h("div", { class: "tx" }, h("b", {}, x.name || "Server"), h("span", {}, `saved ${fmtAgo(x.saved)}${x.location ? " · " + x.location : ""}`)), starBtn(x),
+    h("button", { class: "btn", onclick: async () => { await saveNow(); sfx("launch"); const r = await api.join_server(x.place_id, x.job_id); r && r.error ? toast(r.error, "err") : toast(`Joining ${x.name}...`); } }, "Join"))));
+  await loadGames([...new Set(list.map((x) => x.place_id))]);
+  $$(".gi", box).forEach((g) => { const u = iconCache[g.dataset.pid]; if (u) g.style.backgroundImage = `url("${u}")`; });
+}
+
+async function renderCalendar() {
+  const box = $("#calCard"), data = await api.calendar(); box.innerHTML = "";
+  const weeks = 26, today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - (weeks - 1) * 7 - today.getDay());
+  const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const vals = Object.values(data), max = Math.max(3600, ...vals), level = (v) => !v ? 0 : v < max * .25 ? 1 : v < max * .5 ? 2 : v < max * .8 ? 3 : 4;
+  const grid = h("div", { class: "cal" }), months = h("div", { class: "cal-months" });
+  let streak = 0, best = 0, run = 0, active = 0, lastMonth = -1;
+  for (let i = 0, d = new Date(start); d <= today || d.getDay() !== 0; i++, d.setDate(d.getDate() + 1)) {
+    const v = data[key(d)] || 0, future = d > today;
+    if (d.getDay() === 0 && d.getMonth() !== lastMonth && !future) { lastMonth = d.getMonth(); months.append(h("span", { style: `left:${Math.floor(i / 7) * 16}px` }, d.toLocaleDateString(undefined, { month: "short" }))); }
+    if (!future) { if (v) { active++; run++; best = Math.max(best, run); } else run = 0; }
+    grid.append(h("i", { class: future ? "pad" : "l" + level(v), style: `--d:${i}`, title: `${d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · ${v ? fmtDur(v) : "no play"}` }));
+  }
+  for (let d = new Date(today); data[key(d)]; d.setDate(d.getDate() - 1)) streak++;
+  box.append(h("div", { class: "row", style: "margin-bottom:12px" }, h("h3", { style: "margin:0" }, "Play calendar"), h("span", { class: "spacer" }),
+    h("span", { class: "muted small" }, `${active} active day${active === 1 ? "" : "s"} · current streak ${streak} · best ${best}`)),
+    h("div", { class: "cal-wrap" }, months, grid),
+    h("div", { class: "cal-legend" }, "Less", ...[0, 1, 2, 3, 4].map((l) => h("i", { class: "cal-l l" + l, style: l ? "" : "background:rgba(var(--accent-rgb),.07)" })), "More"));
+  $$(".cal-legend i", box).forEach((el, l) => { if (l) el.style.background = ["", "rgba(var(--accent-rgb),.3)", "rgba(var(--accent-rgb),.55)", "rgba(var(--accent-rgb),.8)", "var(--accent2)"][l]; });
+}
+
+let gameBack = "session";
+async function openGame(pid) {
+  gameBack = page === "game" ? gameBack : page;
+  go("game");
+  const body = $("#gameBody"); body.innerHTML = "";
+  body.append(h("div", { class: "card" }, h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Loading game stats..."))));
+  const g = await api.game_stats(pid); body.innerHTML = "";
+  if (g.error) { toast(g.error, "err"); return; }
+  const inLib = cfg.library.some((x) => String(x.pid) === String(pid));
+  const libBtn = h("button", { class: "btn" }, inLib ? "In your library ✓" : "Add to library"); libBtn.disabled = inLib;
+  libBtn.onclick = () => addToLibrary(String(pid)).then(() => { libBtn.textContent = "In your library ✓"; libBtn.disabled = true; });
+  body.append(h("div", { class: "game-hero rise", style: `--i:0;background-image:url("${g.thumb || g.icon || ""}")` },
+    h("div", { style: "flex:1" }, h("h1", {}, g.name), h("div", { class: "muted small" }, g.creator ? "by " + g.creator : ""),
+      h("div", { class: "row", style: "margin-top:12px" }, h("button", { class: "btn primary", onclick: () => playGame({ pid, name: g.name }) }, "Play"),
+        h("button", { class: "btn", onclick: () => { go("servers"); findServers(pid); } }, "Find servers"), libBtn))));
+  const stat = (label, val) => h("div", { class: "card tilt" }, h("div", { class: "stat-label" }, label), h("div", { class: "big-num", style: "font-size:24px" }, val));
+  body.append(h("div", { class: "grid3 rise", style: "--i:1;margin-top:14px" }, stat("Total play time", fmtDur(g.total)), stat("Sessions", String(g.sessions)), stat("Average session", fmtDur(g.avg))),
+    h("div", { class: "grid3 rise", style: "--i:2" }, stat("Longest session", fmtDur(g.longest)), stat("First played", g.first ? new Date(g.first * 1000).toLocaleDateString() : "–"), stat("Last played", g.last ? fmtAgo(g.last) : "–")));
+  const locCard = h("div", { class: "card rise", style: "--i:3" }, h("h3", {}, "Server locations"));
+  if (!g.locations.length) locCard.append(h("p", { class: "sub", style: "margin:0" }, "Locations show up here after you play this game through Orbit."));
+  const top = g.locations.length ? g.locations[0][1] : 1;
+  g.locations.forEach(([loc, n]) => { const bar = h("i"); locCard.append(h("div", { class: "loc-bar" }, h("span", {}, loc), h("div", { class: "bar" }, bar), h("span", { class: "muted num" }, String(n)))); setTimeout(() => (bar.style.width = n / top * 100 + "%"), 200); });
+  const hist = h("div", { class: "card rise", style: "--i:4" }, h("h3", { style: "margin-bottom:8px" }, "Recent sessions"));
+  if (!g.recent.length) hist.append(h("p", { class: "sub", style: "margin:0" }, "No sessions recorded yet."));
+  g.recent.forEach((x, i) => hist.append(h("div", { class: "list-row", style: `--i:${i}` },
+    h("div", { class: "tx" }, h("b", {}, new Date(x.start * 1000).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })), h("span", {}, x.location || "Unknown location")),
+    h("div", { class: "num", style: "font-weight:650" }, fmtDur(x.seconds)), starBtn(x),
+    h("button", { class: "btn ghost", onclick: async () => { await saveNow(); sfx("launch"); const y = await api.join_server(x.place_id, x.job_id); y && y.error ? toast(y.error, "err") : toast(`Joining ${x.name}...`); } }, "Rejoin"))));
+  body.append(locCard, hist);
+}
+
+async function resync() {
+  const st = await api.get_state(); Object.assign(cfg, st.settings); S.registered = st.registered;
+}
+async function renderHealth() {
+  const list = $("#healthList"); list.innerHTML = "";
+  list.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Running checks...")));
+  const checks = await api.health(); list.innerHTML = "";
+  if (checks.error) { toast(checks.error, "err"); return; }
+  const ok = checks.filter((c) => c.ok).length, bad = checks.filter((c) => c.level === "bad").length;
+  $("#healthScore").textContent = `${ok}/${checks.length}`;
+  $("#healthTitle").textContent = ok === checks.length ? "Everything looks good" : bad ? `${checks.length - ok} thing${checks.length - ok === 1 ? "" : "s"} need attention` : "Mostly good, a few suggestions";
+  $("#healthSub").textContent = ok === checks.length ? "Orbit is set up properly." : "Click Fix next to anything marked below.";
+  $("#healthScore").style.color = ok === checks.length ? "#4ade80" : bad ? "#fb7185" : "#fbbf24";
+  checks.forEach((c, i) => {
+    const fix = c.fix && !c.ok ? h("button", { class: "btn" + (c.level === "bad" ? " primary" : "") }, c.fix) : h("span");
+    if (c.fix && !c.ok) fix.onclick = async () => {
+      if (c.id === "discord") return go("discord");
+      fix.disabled = true; await saveNow();
+      const r = await api.health_fix(c.id);
+      if (r && r.error) { toast(r.error, "err"); fix.disabled = false; return; }
+      await resync(); toast("Fixed.", "ok"); setTimeout(renderHealth, c.id === "tracking" || c.id === "background" ? 2500 : 300);
+    };
+    list.append(h("div", { class: "health-row", style: `--i:${i}` }, h("div", { class: "hi " + c.level }, c.ok ? "✓" : c.level === "bad" ? "!" : "–"),
+      h("div", {}, h("b", {}, c.title), h("span", {}, c.detail)), fix));
+  });
+}
+async function runRepair(kind, btn) {
+  const asks = {
+    cache: ["Clear Roblox cache?", "Roblox needs to be closed. Games may load a little slower the first time after this.", "Clear"],
+    reset_roblox: ["Put Roblox back to stock?", "Orbit's FastFlags and mods are removed from Roblox until your next launch through Orbit.", "Restore stock"],
+    reset_flags: ["Reset your FastFlags?", "Your default FastFlags go back to Orbit's defaults and custom flags are cleared. Game profiles stay.", "Reset"],
+    reinstall: ["Reinstall Roblox?", "Close Roblox first. Orbit downloads the official installer and runs it.", "Reinstall"],
+  }[kind];
+  if (!(await modal({ title: asks[0], text: asks[1], ok: asks[2], danger: kind === "reset_flags" }))) return;
+  const label = btn.textContent; btn.disabled = true; btn.textContent = "Working...";
+  await saveNow(); const r = await api.repair(kind);
+  btn.disabled = false; btn.textContent = label;
+  if (r.error) return toast(r.error, "err");
+  await resync(); toast(r.message, "ok");
+}
+
+let packAudio = null;
+async function renderPacks() {
+  const grid = $("#packGrid"), packs = await api.packs(); grid.innerHTML = "";
+  packs.forEach((p, i) => {
+    const pv = h("div", { class: "pv" });
+    if (p.kind === "cursor") pv.append(h("img", { src: p.data, alt: "" }));
+    else pv.append(h("div", { class: "wave" }, ...Array.from({ length: 9 }, (_, k) => h("i", { style: `--k:${k};height:${[30, 55, 80, 45, 95, 60, 40, 70, 35][k]}%` }))));
+    const card = h("div", { class: "pack" + (p.installed ? " on" : ""), style: `--i:${i}` }, pv,
+      h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, p.kind === "cursor" ? "Cursor" : "Death sound")),
+      h("div", { class: "small muted" }, p.desc));
+    const row = h("div", { class: "row" });
+    if (p.kind === "sound") {
+      const play = h("button", { class: "btn ghost" }, "▶ Play");
+      play.onclick = () => { if (packAudio) packAudio.pause(); packAudio = new Audio(p.data); packAudio.volume = cfg.sounds.volume ?? .6; card.classList.add("playing"); packAudio.onended = () => card.classList.remove("playing"); packAudio.play().catch(() => card.classList.remove("playing")); };
+      row.append(play);
+    }
+    const btn = h("button", { class: "btn" + (p.installed ? " danger" : " primary") }, p.installed ? "Remove" : "Install");
+    btn.onclick = async () => {
+      btn.disabled = true; const r = await api.install_pack(p.id, !p.installed);
+      if (r.error) { btn.disabled = false; return toast(r.error, "err"); }
+      toast(p.installed ? `Removed ${p.name}.` : `${p.name} installed in "${cfg.mod_profile}". It shows up next time Roblox starts through Orbit.`, "ok");
+      if (!p.installed && !cfg.apply_mods) { cfg.apply_mods = true; save(); }
+      renderMods();
+    };
+    row.append(btn); card.append(row); grid.append(card);
+  });
+}
+
+function playSplash() {
+  const sp = $("#splash"); sp.hidden = false; sp.classList.remove("done");
+  sp.replaceWith(sp.cloneNode(true)); const fresh = $("#splash"); fresh.hidden = false;
+  setTimeout(() => fresh.classList.add("done"), 1500);
+  setTimeout(() => (fresh.hidden = true), 2300);
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
@@ -1547,6 +1833,10 @@ function palActions() {
   ["Starfield", "Warp", "Nebula"].forEach((n) => A.push({ ico: "✦", t: `Background: ${n}`, k: "Appearance", run: () => { cfg.appearance.background = n; applyBackground(); save(); } }));
   A.push({ ico: "💬", t: cfg.discord.enabled ? "Turn off Discord status" : "Turn on Discord status", k: "Discord", run: () => { cfg.discord.enabled = !cfg.discord.enabled; save(); toast(`Discord status ${cfg.discord.enabled ? "on" : "off"}.`, "ok"); } });
   A.push({ ico: "⬇", t: "Check for updates", k: "Orbit", run: () => checkUpdates(true) });
+  A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
+  A.push({ ico: "🧹", t: "Clear Roblox cache", k: "Repair", run: () => { go("health"); setTimeout(() => $('[data-repair="cache"]').click(), 300); } });
+  Object.entries(S.playtime || {}).forEach(([pid, e]) => A.push({ ico: "📈", t: `Stats: ${e.name || pid}`, k: "Game", run: () => openGame(pid) }));
+  (cfg.saved_servers || []).forEach((x) => A.push({ ico: "★", t: `Join saved ${x.name}${x.location ? " (" + x.location + ")" : ""}`, k: "Saved", run: () => api.join_server(x.place_id, x.job_id) }));
   A.push({ ico: "📁", t: "Open Roblox folder", k: "Folders", run: () => api.open_roblox_folder() });
   A.push({ ico: "🖼", t: "Open screenshots folder", k: "Folders", run: () => api.open_screenshots_folder() });
   A.push({ ico: "💾", t: "Export backup", k: "Orbit", run: () => $("#bkExport").click() });
@@ -1704,6 +1994,9 @@ function wire() {
     r && r.error ? toast(r.error, "err") : toast(`Shortcut added to ${loc === "Desktop" ? "your desktop" : "the Start menu"}.`, "ok");
   });
 
+  $("#healthRun").onclick = () => renderHealth();
+  $$("[data-repair]").forEach((b) => (b.onclick = () => runRepair(b.dataset.repair, b)));
+  $("#gameBack").onclick = () => go(gameBack);
   $("#extPath").value = S.ext_path;
   $("#extInstall").onclick = async () => { const r = await api.install_extension(); r.error ? toast(r.error, "err") : (toast("Extension files ready. Now do steps 2-4.", "ok"), $("#extPath").value = r.path); };
   $("#extChrome").onclick = () => api.open_browser_extensions("chrome");
@@ -1790,6 +2083,7 @@ async function init() {
   S = await api.get_state();
   cfg = S.settings;
   applyTheme(); starfield();
+  if (S.mode !== "setup" && cfg.appearance.splash !== false && !location.search.includes("nosplash")) playSplash();
   $("#ver").textContent = "v" + S.version;
   if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();

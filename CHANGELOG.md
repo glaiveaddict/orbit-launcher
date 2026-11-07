@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.8.0
+- **Live ping and session timer on the server badge:** see your ping to the server (green, yellow or red) and how long you've been in it, right on the Roblox screen. Both can be turned off in Stats.
+- **Health page:** checks that Roblox, links, overlays, tracking and the background helper are all working, with a Fix button for anything that isn't.
+- **Repair tools:** clear Roblox's cache, put Roblox back to stock, reset your FastFlags, or reinstall Roblox with the official installer.
+- **Global hotkeys:** Ctrl+Alt+R rejoins, Ctrl+Alt+N hops to a new server, Ctrl+Alt+B shows or hides the badge, Ctrl+Alt+O opens Orbit. Works while you're in game.
+- **Saved servers:** star any server in your history and join it again from the Library.
+- **Play calendar:** a heatmap of the last six months with your current and best streak.
+- **Game pages:** click any game in Stats or the Library for its total time, longest session, favorite server locations and session history.
+- **Break reminders:** optional popup after 30 minutes to 2 hours of play.
+- **Custom accent color:** pick your own two colors. The in-game badge and banner use them too.
+- **Orbit packs:** original cursors and death sounds you can preview and install in one click from Mods.
+- **Startup animation:** a quick black hole intro when Orbit opens (can be turned off in Appearance).
+
 ## v1.7.3
 - **Fix:** the server badge now appears where you choose (top right by default) instead of getting stuck in the top-left corner behind Roblox's menu button.
 
