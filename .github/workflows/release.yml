@@ -59,6 +59,34 @@ jobs:
           (cd dist && sha256sum OrbitLauncher.exe | cut -d' ' -f1 > OrbitLauncher.exe.sha256)
           ls -la dist
 
+      - name: Smoke test the app window
+        if: steps.ver.outputs.exists == 'false'
+        timeout-minutes: 6
+        run: |
+          set +e
+          for mode in setup app; do
+            export ORBIT_SELFTEST_OUT="$PWD/selftest-$mode.json"
+            if [ "$mode" = "setup" ]; then exe=dist/OrbitSetup.exe; args="--setup --selftest"; else exe=dist/OrbitLauncher.exe; args="--selftest"; fi
+            timeout 150 "$exe" $args
+            echo "== $mode exit code: $? =="
+            cat "selftest-$mode.json" 2>/dev/null || echo "(no self-test result written)"
+            echo
+          done
+          echo "== launcher.log =="
+          cat "$LOCALAPPDATA/OrbitLauncher/launcher.log" 2>/dev/null
+          python - <<'PY'
+          import json, sys
+          ok = True
+          for mode in ("setup", "app"):
+              try:
+                  r = json.load(open(f"selftest-{mode}.json"))
+              except Exception:
+                  print(f"{mode}: no result"); ok = False; continue
+              print(mode, "ready:", r.get("ready"), "errors:", r.get("errors"))
+              ok = ok and bool(r.get("ready")) and not r.get("errors")
+          sys.exit(0 if ok else 1)
+          PY
+
       - name: Publish release
         if: steps.ver.outputs.exists == 'false'
         run: |

@@ -653,6 +653,9 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 
 <script>
 "use strict";
+const reportError = (msg) => { try { if (window.pywebview && window.pywebview.api && window.pywebview.api.ui_error) window.pywebview.api.ui_error(msg); } catch (e) {} };
+window.addEventListener("error", (e) => reportError(`${e.message} @ line ${e.lineno}:${e.colno}\n${e.error && e.error.stack || ""}`));
+window.addEventListener("unhandledrejection", (e) => reportError("Unhandled promise: " + (e.reason && (e.reason.stack || e.reason.message) || e.reason)));
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const h = (tag, attrs = {}, ...kids) => {
@@ -1733,10 +1736,11 @@ async function init() {
   cfg = S.settings;
   applyTheme(); starfield();
   $("#ver").textContent = "v" + S.version;
-  if (S.mode === "setup") { wireWindow(); renderSetup(); return; }
+  if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
   buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits();
   go("home");
+  api.ui_ready("app");
   setTimeout(showWhatsNew, 900);
   setTimeout(checkAchievements, 2600);
   setTimeout(() => checkUpdates(false), 1800);
@@ -1748,7 +1752,7 @@ async function init() {
 
 
 function boot() {
-  if (window.pywebview && window.pywebview.api) { api = window.pywebview.api; init(); }
+  if (window.pywebview && window.pywebview.api) { api = window.pywebview.api; init().catch((e) => reportError("init failed: " + (e && (e.stack || e.message) || e))); }
   else if (location.search.includes("mock")) { api = window.MockApi; init(); }
 }
 window.addEventListener("pywebviewready", boot);

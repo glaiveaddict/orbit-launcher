@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -983,6 +983,7 @@ class SessionMonitor:
             logs = [p for p in ROBLOX_LOGS.glob("*.log") if p.stat().st_mtime >= self.launch_time - 5]
         except OSError:
             return None
+        logs = [p for p in logs if "crashhandler" not in p.name.lower()] or logs
         players = [p for p in logs if "player" in p.name.lower()] or logs
         return max(players, key=lambda p: p.stat().st_ctime, default=None)
 
@@ -1844,6 +1845,19 @@ class Api:
         self._tray = None
         self._quitting = False
         self._tray_hint = False
+        self._ready = threading.Event()
+        self._ui_errors = []
+
+    def ui_ready(self, mode=""):
+        log(f"Window ready ({mode or self._mode}, v{APP_VERSION})")
+        self._ready.set()
+        return True
+
+    def ui_error(self, message):
+        text = str(message)[:3000]
+        self._ui_errors.append(text[:600])
+        log("Window error: " + text)
+        return True
 
     def _js(self, code):
         try:
@@ -2318,8 +2332,25 @@ def _ensure_webview():
     return False
 
 
-def run_gui(mode="app", after_update=False):
-    if mode == "app":
+def run_gui(mode="app", after_update=False, selftest=False):
+    log(f"Opening {mode} window (v{APP_VERSION}{', self-test' if selftest else ''})")
+    try:
+        _run_gui(mode, after_update, selftest)
+    except Exception:
+        log("Window failed to open:\n" + traceback.format_exc())
+        if selftest:
+            _write_selftest(mode, False, [traceback.format_exc()])
+        else:
+            message_box("Orbit couldn't open its window. Details were saved to:\n" + str(LOG_FILE), error=True)
+
+
+def _write_selftest(mode, ready, errors):
+    out = os.environ.get("ORBIT_SELFTEST_OUT") or str(DATA_DIR / "selftest.json")
+    save_json(out, {"mode": mode, "ready": ready, "errors": errors, "version": APP_VERSION})
+
+
+def _run_gui(mode, after_update, selftest):
+    if mode == "app" and not selftest:
         settings = load_settings()
         if settings["updates"].get("auto", True) and apply_pending_update(("--after-update",)):
             return
@@ -2340,7 +2371,15 @@ def run_gui(mode="app", after_update=False):
     window = webview.create_window(title, html=html, js_api=api, width=size[0], height=size[1],
                                    resizable=False, frameless=True, easy_drag=False, background_color=bg)
     api._window = window
-    if mode == "app":
+    if selftest:
+        def finish_selftest():
+            ready = api._ready.wait(90)
+            time.sleep(2)
+            _write_selftest(mode, ready, api._ui_errors)
+            log(f"Self-test {'passed' if ready and not api._ui_errors else 'FAILED'} ({mode})")
+            window.destroy()
+        threading.Thread(target=finish_selftest, daemon=True).start()
+    elif mode == "app":
         if api._settings["appearance"].get("tray", True):
             try:
                 api._tray = start_tray(api)
@@ -2361,13 +2400,19 @@ def run_gui(mode="app", after_update=False):
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")))
 
 
+def _log_unhandled(kind, exc_type, exc, tb):
+    log(f"Unhandled {kind} error:\n" + "".join(traceback.format_exception(exc_type, exc, tb)))
+
+
 def main():
+    sys.excepthook = lambda t, e, tb: _log_unhandled("main", t, e, tb)
+    threading.excepthook = lambda a: _log_unhandled("thread", a.exc_type, a.exc_value, a.exc_traceback)
     args = sys.argv[1:]
     setup_named = is_frozen() and "setup" in Path(sys.executable).stem.lower()
     if UNINSTALL_FLAG in args:
         run_uninstall()
     elif SETUP_FLAG in args or (setup_named and LAUNCH_FLAG not in args and TOAST_FLAG not in args):
-        run_gui("setup")
+        run_gui("setup", selftest="--selftest" in args)
     elif TOAST_FLAG in args:
         i = args.index(TOAST_FLAG)
         title = args[i + 1] if len(args) > i + 1 else APP_NAME
@@ -2385,7 +2430,7 @@ def main():
             log(traceback.format_exc())
             message_box("Something went wrong launching Roblox. Details are in:\n" + str(LOG_FILE), error=True)
     else:
-        run_gui(after_update="--after-update" in args)
+        run_gui(after_update="--after-update" in args, selftest="--selftest" in args)
 
 
 if __name__ == "__main__":
