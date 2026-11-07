@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.7.1
+- **Fix:** the server badge now recovers from drawing errors instead of silently staying invisible, and logs where it places itself.
+
 ## v1.7.0
 - **Works however you open Roblox:** while Orbit is open, it notices Roblox running and turns on tracking, the location banner and the server badge, even if you started Roblox from its own app or another launcher.
 - **Start with Windows (optional):** a tiny background helper with no window, so all of this works even when Orbit is closed. Turn it on in Stats.

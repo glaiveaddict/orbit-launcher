@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2353,20 +2353,26 @@ def show_badge_window(title, body):
         else:
             xy = (R - w - margin, T + top)
         if xy != state["xy"]:
+            if state["xy"] is None:
+                log(f"Badge placed at {xy} ({w}x{h}, {pos}, anchored to {'Roblox' if roblox_rect() else 'screen'} {rect})")
             state["xy"] = xy
             root.geometry(f"{w}x{h}+{xy[0]}+{xy[1]}")
 
     def tick():
-        target = peak if roblox_in_front() else 0.0
-        state["alpha"] += (target - state["alpha"]) * 0.35
-        if abs(state["alpha"] - target) < 0.02:
-            state["alpha"] = target
         try:
+            target = peak if roblox_in_front() else 0.0
+            state["alpha"] += (target - state["alpha"]) * 0.35
+            if abs(state["alpha"] - target) < 0.02:
+                state["alpha"] = target
             place()
             root.attributes("-alpha", state["alpha"])
             root.attributes("-topmost", True)
         except tk.TclError:
             return
+        except Exception:
+            if not state.get("logged"):
+                state["logged"] = True
+                log("Badge error:\n" + traceback.format_exc())
         root.after(150 if state["alpha"] in (0.0, peak) else 30, tick)
 
     tick()
