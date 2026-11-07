@@ -1,3 +1,4 @@
+import calendar
 import ipaddress
 import json
 import os
@@ -17,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.5"
+APP_VERSION = "1.6.6"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -808,6 +809,7 @@ def build_activity(discord, place_id, job_id, info, joined):
 
 JOIN_RE = re.compile(r"! Joining game '([0-9a-fA-F\-]{36})' place (\d+) at ([0-9.]+)")
 UDMUX_RE = re.compile(r"UDMUX Address = ([0-9.]+), Port = \d+ \| RCC Server Address = ([0-9.]+)")
+LOG_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z")
 LEAVE_MARKERS = ("leaveUGCGameInternal", "Time to disconnect replication data")
 
 
@@ -951,15 +953,15 @@ class SessionMonitor:
             with self.lock:
                 self.ipc.set_activity(activity)
 
-    def on_join(self, place_id, job_id, ip):
+    def on_join(self, place_id, job_id, ip, at=None, quiet=False):
         if self.game:
-            self.on_leave()
-        game = {"place_id": place_id, "job_id": job_id, "ip": ip, "joined": time.time(),
-                "name": None, "located": False}
+            self.on_leave(at)
+        joined = at or time.time()
+        game = {"place_id": place_id, "job_id": job_id, "ip": ip, "joined": joined,
+                "name": None, "located": False, "quiet": quiet}
         self.game = game
-        log(f"Joined place {place_id}")
-        save_json(LAST_SERVER_FILE, {"place_id": place_id, "job_id": job_id, "name": None,
-                                     "time": int(time.time())})
+        log(f"Joined place {place_id}" + (" (already in progress)" if quiet else ""))
+        save_json(LAST_SERVER_FILE, {"place_id": place_id, "job_id": job_id, "name": None, "time": int(joined)})
         threading.Thread(target=self._join_details, args=(game,), daemon=True).start()
 
     def _join_details(self, game):
@@ -971,65 +973,123 @@ class SessionMonitor:
             save_json(LAST_SERVER_FILE, last)
         if self.game is game:
             self._discord(build_activity(self.discord, game["place_id"], game["job_id"], info, game["joined"]))
-        time.sleep(max(0.0, 4 - (time.time() - game["joined"])))
+        time.sleep(1.5)
         self._locate(game)
 
     def on_udmux(self, ip):
         game = self.game
         if game and not game["located"]:
             game["ip"] = ip
-            threading.Thread(target=self._locate, args=(game,), daemon=True).start()
 
     def _locate(self, game):
-        if not self.session.get("server_popup"):
-            if not game.get("location"):
-                game["location"] = server_location(game["ip"])
-            return
         with self.lock:
             if game["located"]:
                 return
             game["located"] = True
         location = server_location(game["ip"])
         game["location"] = location
-        if not location or self.game is not game:
+        log(f"Server location: {location or 'unknown'} ({game['ip']})")
+        if not location or self.game is not game or game.get("quiet") or not self.session.get("server_popup"):
             return
         for _ in range(10):
             if game["name"]:
                 break
             time.sleep(0.5)
-        spawn_toast(f"Joined {game['name'] or 'a game'}", f"Server location: {location}")
+        spawn_toast(game["name"] or "Joined a game", location)
 
-    def on_leave(self):
+    def on_leave(self, at=None, record=True):
         game, self.game = self.game, None
         if not game:
             return
-        if self.session.get("track_playtime"):
-            record_playtime(game["place_id"], game["name"], time.time() - game["joined"])
-            record_session(game, time.time() - game["joined"])
+        seconds = max(0, (at or time.time()) - game["joined"])
+        if record and self.session.get("track_playtime"):
+            record_playtime(game["place_id"], game["name"], seconds)
+            record_session(game, seconds)
         self._discord(None)
 
-    def _newest_log(self):
+    def _candidate_logs(self):
         try:
             logs = [p for p in ROBLOX_LOGS.glob("*.log") if p.stat().st_mtime >= self.launch_time - 5]
         except OSError:
+            return []
+        logs = [p for p in logs if "crashhandler" not in p.name.lower() and "player" in p.name.lower()
+                and not self._is_handoff(p)]
+        return sorted(logs, key=lambda p: p.stat().st_mtime, reverse=True)
+
+    def _is_handoff(self, path):
+        cache = self.__dict__.setdefault("_handoff", {})
+        if path in cache:
+            return cache[path]
+        try:
+            if path.stat().st_size > 30000:
+                cache[path] = False
+                return False
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return False
+        done = "RobloxStarter destroyed" in text or "Deeplinking NoReload" in text
+        if done:
+            cache[path] = "NoReload" in text
+        return "NoReload" in text
+
+    def _newest_log(self):
+        logs = self._candidate_logs()
+        return logs[0] if logs else None
+
+    @staticmethod
+    def _line_time(line):
+        m = LOG_TS_RE.match(line)
+        if not m:
             return None
-        logs = [p for p in logs if "crashhandler" not in p.name.lower()] or logs
-        players = [p for p in logs if "player" in p.name.lower()] or logs
-        return max(players, key=lambda p: p.stat().st_ctime, default=None)
+        try:
+            return calendar.timegm(time.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")) + float("0." + (m.group(2) or "0"))
+        except ValueError:
+            return None
 
     def handle_line(self, line):
         m = JOIN_RE.search(line)
         if m:
-            self.on_join(m.group(2), m.group(1), m.group(3))
+            self.on_join(m.group(2), m.group(1), m.group(3), at=self._line_time(line))
             return
         m = UDMUX_RE.search(line)
         if m:
             self.on_udmux(m.group(1))
             return
         if any(marker in line for marker in LEAVE_MARKERS):
-            self.on_leave()
+            self.on_leave(self._line_time(line))
+
+    def _catch_up(self, fh):
+        state = None
+        for line in fh:
+            m = JOIN_RE.search(line)
+            if m:
+                state = {"place": m.group(2), "job": m.group(1), "ip": m.group(3), "at": self._line_time(line)}
+                continue
+            m = UDMUX_RE.search(line)
+            if m and state:
+                state["ip"] = m.group(1)
+                continue
+            if state and any(marker in line for marker in LEAVE_MARKERS):
+                state = None
+        if state:
+            at = state["at"] or time.time()
+            self.on_join(state["place"], state["job"], state["ip"], at=at, quiet=time.time() - at > 45)
+
+    def _open(self, path):
+        fh = open(path, encoding="utf-8", errors="ignore")
+        if path in self.positions:
+            fh.seek(self.positions[path])
+        else:
+            try:
+                created = path.stat().st_ctime
+            except OSError:
+                created = time.time()
+            if created < self.launch_time - 5:
+                self._catch_up(fh)
+        return fh
 
     def run(self):
+        self.positions = {}
         log_path = None
         deadline = time.time() + 90
         while not log_path and time.time() < deadline:
@@ -1043,7 +1103,7 @@ class SessionMonitor:
             log("No Roblox log appeared; session features disabled for this launch")
             return
         log(f"Watching {log_path.name}")
-        fh = open(log_path, encoding="utf-8", errors="ignore")
+        fh = self._open(log_path)
         last_check, not_running = 0, 0
         try:
             while True:
@@ -1051,34 +1111,39 @@ class SessionMonitor:
                 if line:
                     self.handle_line(line)
                     continue
-                time.sleep(1)
-                if time.time() - last_check < 5:
+                time.sleep(0.5)
+                if time.time() - last_check < 3:
                     continue
                 last_check = time.time()
                 if self.icon:
                     self.icon.apply()
                 self.boost.tick()
                 newer = self._newest_log()
-                if newer and newer != log_path:
-                    self.on_leave()
+                try:
+                    current_mtime = log_path.stat().st_mtime
+                except OSError:
+                    current_mtime = 0
+                if newer and newer != log_path and newer.stat().st_mtime > current_mtime + 4:
+                    self.positions[log_path] = fh.tell()
                     fh.close()
                     log_path = newer
-                    fh = open(log_path, encoding="utf-8", errors="ignore")
-                    log(f"Switched to {log_path.name}")
+                    fh = self._open(log_path)
+                    log(f"Following {log_path.name}")
                 if getattr(self, "token", None) and monitor_claimed_by_other(self.token):
                     log("A newer Orbit launch took over session tracking")
                     self.handed_over = True
                     break
                 not_running = 0 if roblox_running() else not_running + 1
-                if not_running >= 2:
+                if not_running >= 3:
                     break
         finally:
             fh.close()
-            if self.game and self.session.get("crash_rejoin") and not getattr(self, "handed_over", False):
+            handed = getattr(self, "handed_over", False)
+            if self.game and self.session.get("crash_rejoin") and not handed:
                 g = self.game
                 self.crashed = {"place_id": g["place_id"], "job_id": g["job_id"],
                                 "name": g["name"] or f"Place {g['place_id']}"}
-            self.on_leave()
+            self.on_leave(record=not handed)
             if self.ipc:
                 self.ipc.close()
 
@@ -1177,16 +1242,20 @@ def stop_stale_copies():
     if not IS_WINDOWS or not is_frozen():
         return
     me = str(Path(sys.executable).resolve()).replace("'", "''")
-    script = ("Get-Process -Name OrbitLauncher,OrbitSetup -ErrorAction SilentlyContinue | "
-              f"Where-Object {{ $_.Path -and $_.Path -ne '{me}' }} | "
-              "ForEach-Object { try { Stop-Process -Id $_.Id -Force -ErrorAction Stop; $_.Path } catch {} }")
+    keep = ",".join(str(x) for x in {os.getpid(), os.getppid()})
+    script = (f"$keep=@({keep}); $me='{me}'; "
+              "Get-CimInstance Win32_Process -Filter \"Name='OrbitLauncher.exe'\" | "
+              "Where-Object { $keep -notcontains $_.ProcessId -and $keep -notcontains $_.ParentProcessId -and "
+              "($_.ExecutablePath -ne $me -or $_.CommandLine -like '*--orbit-launch*') } | "
+              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; "
+              "\"$($_.ProcessId) $($_.ExecutablePath)\" }")
     try:
         out = subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", script], capture_output=True,
-                             text=True, timeout=20, creationflags=CREATE_NO_WINDOW).stdout.strip()
+                             text=True, timeout=25, creationflags=CREATE_NO_WINDOW).stdout.strip()
         if out:
-            log("Stopped old Orbit copies: " + ", ".join(sorted(set(out.splitlines()))))
+            log("Stopped old Orbit trackers: " + "; ".join(sorted(set(out.splitlines()))))
     except Exception as e:
-        log(f"Couldn't check for old Orbit copies: {e}")
+        log(f"Couldn't check for old Orbit trackers: {e}")
 
 
 def claim_monitor():
@@ -1221,18 +1290,19 @@ def headless_main(uri):
     if not IS_WINDOWS:
         message_box("Launching Roblox only works on Windows.", error=True)
         return
-    stop_stale_copies()
-    token = claim_monitor()
-    owns_monitor = acquire_monitor_lock(wait=15)
-    if not owns_monitor:
-        log("Another Orbit is still tracking the previous session; it will hand over shortly")
-    updater = None
+    updater, token, owns_monitor = None, None, None
     while True:
         settings = load_settings()
         started = start_roblox(settings, uri)
         if not started:
             return
         launch_time, updater = started
+        if owns_monitor is None:
+            token = claim_monitor()
+            stop_stale_copies()
+            owns_monitor = acquire_monitor_lock(wait=12)
+            if not owns_monitor:
+                log("Another Orbit is still tracking this session")
         if not owns_monitor or not SessionMonitor.wanted(settings):
             break
         monitor = SessionMonitor(settings, launch_time)
@@ -1840,58 +1910,107 @@ def theme_colors(appearance):
     return c
 
 
-def show_toast(title, body, seconds=7):
+def _no_activate(root):
+    if not IS_WINDOWS:
+        return
+    try:
+        u = ctypes.windll.user32
+        u.GetParent.restype = ctypes.c_void_p
+        u.GetParent.argtypes = [ctypes.c_void_p]
+        u.GetWindowLongW.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        u.SetWindowLongW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_long]
+        u.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                   ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        hwnd = u.GetParent(root.winfo_id()) or root.winfo_id()
+        style = u.GetWindowLongW(hwnd, -20)
+        u.SetWindowLongW(hwnd, -20, style | 0x08000000 | 0x00000080 | 0x00000008)
+        u.SetWindowPos(hwnd, ctypes.c_void_p(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+        return hwnd
+    except Exception:
+        return None
+
+
+def show_toast(title, body, seconds=6.5):
     import tkinter as tk
+    import tkinter.font as tkfont
     c = theme_colors(load_settings()["appearance"])
+    accent2 = ACCENTS.get(load_settings()["appearance"].get("accent"), ACCENTS["Void"])[1]
+    key = "#010203"
     root = tk.Tk()
+    root.withdraw()
     root.overrideredirect(True)
+    root.configure(bg=key)
     try:
         root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
         root.attributes("-alpha", 0.0)
     except tk.TclError:
         pass
-    root.configure(bg=c["accent"])
-    inner = tk.Frame(root, bg=c["panel"])
-    inner.pack(fill="both", expand=True, padx=(4, 0))
-    tk.Label(inner, text=APP_NAME.upper(), bg=c["panel"], fg=c["accent"],
-             font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=14, pady=(12, 0))
-    tk.Label(inner, text=title, bg=c["panel"], fg=c["fg"], font=("Segoe UI Semibold", 11),
-             wraplength=290, justify="left").pack(anchor="w", padx=14)
-    tk.Label(inner, text=body, bg=c["panel"], fg=c["muted"], font=("Segoe UI", 10),
-             wraplength=290, justify="left").pack(anchor="w", padx=14, pady=(2, 14))
+    f_title = tkfont.Font(family="Segoe UI Semibold", size=12)
+    f_body = tkfont.Font(family="Segoe UI", size=10)
+    f_tag = tkfont.Font(family="Segoe UI", size=8, weight="bold")
+    title = title if len(title) <= 46 else title[:45] + "…"
+    text_w = max(f_title.measure(title), f_body.measure("Server  " + body), f_tag.measure("ORBIT · SERVER LOCATION"))
+    w, h, r = min(560, text_w + 104), 70, 22
+    cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+
+    def rounded(x1, y1, x2, y2, rad, **kw):
+        pts = [x1 + rad, y1, x2 - rad, y1, x2, y1, x2, y1 + rad, x2, y2 - rad, x2, y2, x2 - rad, y2,
+               x1 + rad, y2, x1, y2, x1, y2 - rad, x1, y1 + rad, x1, y1]
+        return cv.create_polygon(pts, smooth=True, splinesteps=24, **kw)
+
+    rounded(1, 1, w - 1, h - 1, r, fill=c["accent"], outline="")
+    rounded(2, 2, w - 2, h - 2, r - 1, fill=c["panel"], outline="")
+    cx, cy = 37, h // 2
+    cv.create_oval(cx - 20, cy - 20, cx + 20, cy + 20, fill=c["accent"], outline="")
+    cv.create_oval(cx - 17, cy - 7, cx + 17, cy + 7, outline=accent2, width=3)
+    cv.create_oval(cx - 9, cy - 9, cx + 9, cy + 9, fill="#05030a", outline="#f5f3ff", width=2)
+    cv.create_arc(cx - 17, cy - 7, cx + 17, cy + 7, start=180, extent=180, style="arc", outline=accent2, width=3)
+    tx = 72
+    cv.create_text(tx, 17, text="ORBIT · SERVER LOCATION", anchor="w", font=f_tag, fill=c["accent"])
+    cv.create_text(tx, 35, text=title, anchor="w", font=f_title, fill=c["fg"])
+    cv.create_text(tx, 54, text="Server  ", anchor="w", font=f_body, fill=c["muted"])
+    cv.create_text(tx + f_body.measure("Server  "), 54, text=body, anchor="w", font=f_body, fill=c["fg"])
+
+    sw = root.winfo_screenwidth()
+    x, y_end = (sw - w) // 2, 26
+    state = {"y": -h - 10.0, "alpha": 0.0, "closing": False}
+    root.geometry(f"{w}x{h}+{x}+{int(state['y'])}")
+    root.deiconify()
     root.update_idletasks()
-    w, h = 330, root.winfo_reqheight()
-    x, y = root.winfo_screenwidth() - w - 18, root.winfo_screenheight() - h - 58
-    state = {"y": y + 30, "alpha": 0.0}
+    _no_activate(root)
 
     def slide_in():
-        state["y"] += (y - state["y"]) * 0.25
-        state["alpha"] = min(0.97, state["alpha"] + 0.12)
+        if state["closing"]:
+            return
+        state["y"] += (y_end - state["y"]) * 0.22
+        state["alpha"] = min(0.98, state["alpha"] + 0.1)
         root.geometry(f"{w}x{h}+{x}+{int(state['y'])}")
         try:
             root.attributes("-alpha", state["alpha"])
         except tk.TclError:
             pass
-        if abs(state["y"] - y) > 0.5 or state["alpha"] < 0.97:
-            root.after(16, slide_in)
+        if abs(state["y"] - y_end) > 0.5 or state["alpha"] < 0.98:
+            root.after(15, slide_in)
 
-    def fade_out():
-        state["alpha"] -= 0.08
-        if state["alpha"] <= 0:
-            root.destroy()
-            return
+    def slide_out(*_):
+        state["closing"] = True
+        state["y"] -= 6 + (state["y"] + h) * 0.12
+        state["alpha"] = max(0.0, state["alpha"] - 0.08)
         try:
+            root.geometry(f"{w}x{h}+{x}+{int(state['y'])}")
             root.attributes("-alpha", state["alpha"])
         except tk.TclError:
+            pass
+        if state["y"] <= -h or state["alpha"] <= 0:
             root.destroy()
             return
-        root.after(16, fade_out)
+        root.after(15, slide_out)
 
-    root.geometry(f"{w}x{h}+{x}+{state['y']}")
-    for widget in (root, inner, *inner.winfo_children()):
-        widget.bind("<Button-1>", lambda e: fade_out())
+    cv.bind("<Button-1>", slide_out)
     slide_in()
-    root.after(int(seconds * 1000), fade_out)
+    root.after(int(seconds * 1000), slide_out)
     root.mainloop()
 
 

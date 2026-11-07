@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6.6
+- **Fix:** Orbit now stays connected after you press **Launch Roblox**. Games you pick inside Roblox afterwards are tracked, including teleports between places.
+- **Fix:** Orbit follows the real game log instead of the short helper log Roblox creates when you join from the website while Roblox is already open.
+- **Fix:** old background trackers are replaced right away, so Launch no longer waits about 15 seconds.
+- **Fix:** if Orbit starts while you're already in a game, it picks up that game and its play time from when you actually joined.
+- **New location popup:** a banner slides down at the top of the screen when you join a server. It never takes focus away from Roblox.
+
 ## v1.6.5
 - **Fix:** restarting after an update no longer shows "Orbit couldn't open its window" or "Failed to remove temporary directory". Each copy of Orbit now starts with its own clean files.
 - **Fix:** closing Orbit while you're in a game no longer breaks session tracking.
