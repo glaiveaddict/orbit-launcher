@@ -1,0 +1,78 @@
+name: Build & release Orbit
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "orbit_launcher.py"
+      - "ui/**"
+      - "orbit_preview/**"
+      - "CHANGELOG.md"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read version
+        id: ver
+        run: |
+          v=$(python -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"', open('orbit_launcher.py', encoding='utf-8').read()).group(1))")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release v$v already exists - bump APP_VERSION in orbit_launcher.py to publish a new one."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller pywebview
+          python -m py_compile orbit_launcher.py
+          printf '{"repo": "%s", "version": "%s"}\n' "${{ github.repository }}" "${{ steps.ver.outputs.version }}" > ui/build.json
+          python -m PyInstaller --noconfirm --onefile --noconsole --name OrbitLauncher --icon ui/orbit.ico \
+            --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" orbit_launcher.py
+          cp dist/OrbitLauncher.exe dist/OrbitSetup.exe
+          (cd dist && sha256sum OrbitLauncher.exe | cut -d' ' -f1 > OrbitLauncher.exe.sha256)
+          ls -la dist
+
+      - name: Publish release
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          v="${{ steps.ver.outputs.version }}"
+          python - "$v" > notes.md <<'PY'
+          import re, sys
+          v = sys.argv[1]
+          try:
+              text = open("CHANGELOG.md", encoding="utf-8").read()
+              m = re.search(rf"^## v?{re.escape(v)}\b.*?$(.*?)(?=^## |\Z)", text, re.S | re.M)
+              body = m.group(1).strip() if m else ""
+          except OSError:
+              body = ""
+          print(body or f"Orbit Launcher v{v}")
+          print("\n---\n**New here?** Download **OrbitSetup.exe** below and run it. Already installed? Orbit updates itself.")
+          PY
+          gh release create "v$v" dist/OrbitSetup.exe dist/OrbitLauncher.exe dist/OrbitLauncher.exe.sha256 \
+            --title "Orbit Launcher v$v" --notes-file notes.md

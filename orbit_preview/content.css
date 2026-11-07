@@ -1,0 +1,95 @@
+.orbit-pv-section {
+  margin: 12px 0 20px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 2px dashed #f5a524;
+  background: rgba(245, 165, 36, 0.06);
+  font-family: "Builder Sans", "Segoe UI", Arial, sans-serif;
+}
+.orbit-pv-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.orbit-pv-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: inherit;
+}
+.orbit-pv-pill {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f5a524;
+  color: #1b1b1b;
+}
+.orbit-pv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.orbit-pv-card {
+  display: block;
+  text-decoration: none !important;
+  color: inherit !important;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.12);
+  outline: 2px solid #f5a524;
+}
+.orbit-pv-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: repeating-linear-gradient(45deg, rgba(245, 165, 36, 0.12) 0 10px, transparent 10px 20px);
+}
+.orbit-pv-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
+}
+
+.orbit-pv-band {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 50%;
+  transform: translateY(-50%) rotate(-18deg);
+  background: rgba(245, 165, 36, 0.92);
+  color: #1b1b1b;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 5px 0;
+  pointer-events: none;
+}
+.orbit-pv-name {
+  padding: 8px 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.orbit-pv-price {
+  padding: 2px 8px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.orbit-pv-foot {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: #f5a524;
+  color: #1b1b1b;
+}

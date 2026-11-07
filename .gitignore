@@ -1,0 +1,6 @@
+__pycache__/
+build/
+dist/
+*.spec
+ui/build.json
+.ruff_cache/

@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbit Launcher</title>
+<style>
+:root {
+  --bg: #06040b; --panel: rgba(17,13,30,.62); --panel-solid: #120e1f; --panel2: rgba(255,255,255,.045); --panel3: rgba(255,255,255,.09);
+  --line: rgba(167,139,250,.12); --line2: rgba(167,139,250,.24);
+  --text: #f1edff; --muted: #9c95b8; --faint: #615a7c;
+  --accent: #9d6bff; --accent2: #d946ef; --accent-rgb: 157,107,255; --on-accent: #ffffff;
+  --grad: linear-gradient(135deg, var(--accent), var(--accent2));
+  --head-grad: linear-gradient(180deg, #ffffff 20%, #cbb8ff);
+  --star: 220,210,255; --good: #4ade80; --warn: #fbbf24; --bad: #fb7185;
+  --radius: 16px; --ease: cubic-bezier(.16,1,.3,1); --spring: cubic-bezier(.34,1.56,.64,1);
+}
+[data-mode="light"] {
+  --bg: #f3f0fb; --panel: rgba(255,255,255,.72); --panel-solid: #ffffff; --panel2: rgba(90,60,170,.06); --panel3: rgba(90,60,170,.12);
+  --line: rgba(90,60,170,.12); --line2: rgba(90,60,170,.24);
+  --text: #17122a; --muted: #6a6386; --faint: #a59fbd;
+  --head-grad: linear-gradient(180deg, #17122a 30%, #5b3fb0); --star: 120,90,200;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; font-size: 14px; letter-spacing: -.003em;
+  background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; user-select: none;
+  transition: background-color .5s var(--ease), color .5s var(--ease);
+}
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+::selection { background: rgba(var(--accent-rgb),.4); }
+::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-thumb { background: var(--panel3); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+
+#stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.nebula { position: fixed; inset: -20%; z-index: 0; pointer-events: none; opacity: .9; transition: opacity .6s;
+  background:
+    radial-gradient(38% 32% at 78% 12%, rgba(var(--accent-rgb),.22), transparent 70%),
+    radial-gradient(30% 28% at 18% 92%, color-mix(in srgb, var(--accent2) 22%, transparent), transparent 70%),
+    radial-gradient(26% 22% at 96% 86%, rgba(var(--accent-rgb),.10), transparent 70%);
+  animation: nebula 38s ease-in-out infinite alternate; }
+[data-mode="light"] .nebula { opacity: .55; }
+@keyframes nebula { to { transform: translate3d(-3%, 2%, 0) scale(1.06) rotate(2deg); } }
+
+#app { position: relative; z-index: 1; display: grid; grid-template-columns: 228px 1fr; grid-template-rows: 46px 1fr; height: 100vh; }
+.titlebar { grid-column: 1 / -1; display: flex; align-items: stretch; border-bottom: 1px solid var(--line); background: rgba(8,6,14,.35); backdrop-filter: blur(16px); z-index: 5; }
+[data-mode="light"] .titlebar, [data-mode="light"] .sidebar { background: rgba(255,255,255,.45); }
+.drag { flex: 1; display: flex; align-items: center; gap: 10px; padding-left: 16px; }
+.drag svg { transition: transform 1.4s var(--ease), filter .4s; } .drag:hover svg { transform: rotate(360deg) scale(1.1); filter: drop-shadow(0 0 6px rgba(var(--accent-rgb),.9)); }
+.drag * { pointer-events: none; }
+.brand-name { font-weight: 700; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ver { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: var(--muted); padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.saved { align-self: center; margin-right: 14px; font-size: 12px; color: var(--muted); opacity: 0; transform: translateY(4px); transition: .4s var(--ease); }
+.saved.show { opacity: 1; transform: none; }
+.saved::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); margin-right: 7px; vertical-align: 1px; }
+.win-btn { width: 50px; display: grid; place-items: center; color: var(--muted); transition: background .2s, color .2s; }
+.win-btn:hover { background: var(--panel2); color: var(--text); }
+.win-btn.close:hover { background: #e11d48; color: #fff; }
+.sidebar { border-right: 1px solid var(--line); background: rgba(8,6,14,.35); backdrop-filter: blur(16px); padding: 16px 12px; display: flex; flex-direction: column; z-index: 4; }
+.nav-label { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; color: var(--faint); padding: 0 12px 8px; }
+#nav { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.nav-indicator { position: absolute; left: 0; right: 0; height: 40px; top: 0; border-radius: 11px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb),.22), rgba(var(--accent-rgb),.04));
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.28), 0 8px 24px -12px rgba(var(--accent-rgb),.9);
+  transition: transform .55s var(--spring); }
+.nav-indicator::before { content: ""; position: absolute; left: -12px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--grad); box-shadow: 0 0 12px 1px rgba(var(--accent-rgb),.9); }
+.nav-item { position: relative; display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 11px; color: var(--muted); font-weight: 550; text-align: left; transition: color .25s; }
+.nav-item:hover { color: var(--text); }
+.nav-item.active { color: var(--text); }
+.nav-item svg { width: 18px; height: 18px; flex: none; transition: color .3s, transform .35s var(--spring), filter .3s; }
+.nav-item.active svg { color: var(--accent); filter: drop-shadow(0 0 6px rgba(var(--accent-rgb),.8)); }
+.nav-item:hover svg { transform: scale(1.14) rotate(-4deg); }
+.side-foot { margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 11px 12px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; animation: pulse 2.4s infinite; }
+.dot.off { background: var(--bad); animation: none; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74,222,128,.55); } 70% { box-shadow: 0 0 0 9px rgba(74,222,128,0); } 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); } }
+
+#pages { position: relative; overflow: hidden; }
+.page { position: absolute; inset: 0; overflow-y: auto; padding: 28px 32px 40px; opacity: 0; visibility: hidden; transform: translateY(12px) scale(.995); filter: blur(6px);
+  transition: opacity .3s var(--ease), transform .4s var(--ease), filter .3s var(--ease), visibility 0s .3s; }
+.page.active { opacity: 1; visibility: visible; transform: none; filter: none; transition: opacity .45s var(--ease), transform .6s var(--ease), filter .45s var(--ease), visibility 0s; }
+.page.active .rise { animation: rise .7s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 60ms + 80ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+.page-head { margin-bottom: 20px; }
+.page-head h1 { margin: 0; font-size: 28px; font-weight: 750; letter-spacing: -.025em; font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.page-head p { margin: 5px 0 0; color: var(--muted); }
+.card { position: relative; background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 40%), var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px;
+  backdrop-filter: blur(18px) saturate(140%); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 24px 48px -28px rgba(0,0,0,.85);
+  transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--ty, 0px));
+  transition: border-color .35s var(--ease), background-color .5s, box-shadow .35s var(--ease), transform .5s var(--ease); }
+.card.tilt:hover { --ty: -2px; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 30px 50px -26px rgba(0,0,0,.9), 0 0 40px -24px rgba(var(--accent-rgb),.9); }
+[data-mode="light"] .card { box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 18px 40px -28px rgba(60,30,140,.35); }
+.card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .35s;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--accent-rgb),.11), transparent 45%); }
+.card:hover { border-color: var(--line2); }
+.card:hover::before { opacity: 1; }
+.card > * { position: relative; }
+.card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.card .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+code, .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 12.5px; }
+code { color: color-mix(in srgb, var(--accent) 70%, var(--text)); }
+
+.btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 15px; border-radius: 11px;
+  background: var(--panel2); border: 1px solid var(--line); font-weight: 550; white-space: nowrap;
+  transition: background-color .25s, border-color .25s, transform .25s var(--ease), box-shadow .3s; }
+.btn:hover { background: var(--panel3); border-color: var(--line2); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.97); }
+.btn svg { width: 16px; height: 16px; }
+.btn.primary { background: var(--grad); color: var(--on-accent); border-color: transparent; font-weight: 650; box-shadow: 0 8px 22px -10px rgba(var(--accent-rgb),.95), inset 0 1px 0 rgba(255,255,255,.25); }
+.btn.primary:hover { box-shadow: 0 12px 28px -10px rgba(var(--accent-rgb),1), inset 0 1px 0 rgba(255,255,255,.3); }
+.btn.ghost { background: transparent; }
+.btn.danger:hover { background: rgba(251,113,133,.12); color: var(--bad); border-color: rgba(251,113,133,.35); }
+.btn:disabled { opacity: .4; pointer-events: none; }
+.ripple { position: absolute; border-radius: 50%; transform: scale(0); background: currentColor; opacity: .22; animation: ripple .65s var(--ease) forwards; pointer-events: none; }
+@keyframes ripple { to { transform: scale(2.6); opacity: 0; } }
+
+.hero { display: flex; align-items: center; gap: 30px; padding: 26px 30px; overflow: hidden;
+  background: radial-gradient(60% 120% at 12% 50%, rgba(var(--accent-rgb),.16), transparent 70%), var(--panel); }
+.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.04) 50%, transparent 60%); background-size: 250% 100%; animation: sheen 9s ease-in-out infinite; }
+@keyframes sheen { 0%, 60% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+.bh { position: relative; width: 240px; height: 190px; flex: none; margin: -14px -10px -14px -16px; }
+.bh canvas { width: 100%; height: 100%; display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hero h2 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.035em; line-height: 1.05; font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .kicker { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; text-shadow: 0 0 14px rgba(var(--accent-rgb),.7); }
+.hero .status { margin: 8px 0 20px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.btn-launch { height: 52px; padding: 0 30px; font-size: 16px; border-radius: 15px; color: #fff; font-weight: 700; letter-spacing: .01em; border: 0;
+  background: linear-gradient(110deg, var(--accent), var(--accent2), var(--accent)); background-size: 220% 100%; animation: flow 6s ease infinite, glowPulse 3s ease-in-out infinite;
+  box-shadow: 0 12px 34px -12px rgba(var(--accent-rgb),1), inset 0 1px 0 rgba(255,255,255,.3); }
+@keyframes flow { 50% { background-position: 100% 0; } }
+@keyframes glowPulse { 50% { box-shadow: 0 14px 44px -10px rgba(var(--accent-rgb),1), 0 0 0 4px rgba(var(--accent-rgb),.12), inset 0 1px 0 rgba(255,255,255,.3); } }
+.btn-launch::before { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%; transform: skewX(-20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); transition: left .8s var(--ease); }
+.btn-launch { transform: translate(var(--mgx, 0px), var(--mgy, 0px)); transition: transform .45s var(--spring), box-shadow .3s; }
+.btn-launch:hover { transform: translate(var(--mgx, 0px), calc(var(--mgy, 0px) - 2px)) scale(1.03); }
+.btn.btn-launch, .btn.btn-launch:hover { background: linear-gradient(110deg, var(--accent), var(--accent2), var(--accent)); background-size: 220% 100%; border-color: transparent; color: #fff; }
+.btn-launch:hover svg { transform: translateX(2px) scale(1.12); } .btn-launch svg { transition: transform .4s var(--spring); }
+.btn-launch:hover::before { left: 130%; }
+.btn-launch svg { width: 20px; height: 20px; }
+.btn-launch.loading { pointer-events: none; }
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; }
+.server-thumb { transition: transform .4s var(--spring); } .card:hover .server-thumb { transform: scale(1.06) rotate(-3deg); }
+.server-thumb { width: 56px; height: 56px; border-radius: 13px; background: var(--panel2) center/cover; flex: none; border: 1px solid var(--line); box-shadow: 0 8px 20px -10px rgba(0,0,0,.8); }
+.big-num { font-size: 32px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stat-label { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+.toggle-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-top: 1px solid var(--line); }
+.toggle-row:first-of-type { border-top: 0; padding-top: 2px; }
+.toggle-row .t { flex: 1; } .toggle-row .t b { font-weight: 600; display: block; margin-bottom: 1px; } .toggle-row .t span { color: var(--muted); font-size: 12.5px; }
+.switch { position: relative; width: 46px; height: 26px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 2; }
+.switch .track { position: absolute; inset: 0; border-radius: 99px; background: var(--panel3); border: 1px solid var(--line2); transition: border-color .3s; overflow: hidden; }
+.switch .track::after { content: ""; position: absolute; inset: 0; background: var(--grad); opacity: 0; transition: opacity .35s var(--ease); }
+.switch .knob { position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%; background: #fff; z-index: 1; box-shadow: 0 2px 6px rgba(0,0,0,.4); transition: transform .45s var(--spring), width .2s, box-shadow .3s; }
+.switch input:checked ~ .track { border-color: transparent; box-shadow: 0 0 16px -2px rgba(var(--accent-rgb),.85); }
+.switch input:checked ~ .track::after { opacity: 1; }
+.switch input:checked ~ .knob { transform: translateX(20px); }
+.switch input:active ~ .knob { width: 22px; }
+.switch input:checked:active ~ .knob { transform: translateX(16px); }
+.field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.field > label, .lbl { font-size: 10.5px; color: var(--muted); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.seg { position: relative; display: inline-flex; padding: 3px; border-radius: 12px; background: rgba(0,0,0,.22); border: 1px solid var(--line); }
+[data-mode="light"] .seg { background: var(--panel2); }
+.seg button { position: relative; z-index: 1; height: 30px; padding: 0 14px; border-radius: 9px; color: var(--muted); font-weight: 600; font-size: 13px; transition: color .3s; }
+.seg button:hover { color: var(--text); }
+.seg button.on { color: #fff; }
+.seg .hl { position: absolute; top: 3px; bottom: 3px; left: 0; border-radius: 9px; background: var(--grad); box-shadow: 0 6px 16px -6px rgba(var(--accent-rgb),.95), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .5s var(--spring), width .5s var(--spring); }
+.input { height: 38px; padding: 0 12px; border-radius: 11px; background: rgba(0,0,0,.22); border: 1px solid var(--line); outline: none; min-width: 0; transition: border-color .25s, box-shadow .25s; }
+[data-mode="light"] .input { background: var(--panel2); }
+.input:focus { border-color: rgba(var(--accent-rgb),.75); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.2), 0 0 20px -6px rgba(var(--accent-rgb),.8); }
+textarea.input { height: 120px; padding: 10px 12px; resize: vertical; width: 100%; line-height: 1.55; user-select: text; }
+select.input { padding-right: 34px; appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239c95b8' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+select.input option { background: var(--panel-solid); color: var(--text); }
+.range-wrap { display: flex; align-items: center; gap: 14px; }
+input[type=range] { -webkit-appearance: none; flex: 1; height: 6px; border-radius: 99px; outline: none; cursor: pointer;
+  background: linear-gradient(90deg, var(--accent), var(--accent2) var(--fill, 0%), var(--panel3) var(--fill, 0%)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.45), 0 0 0 5px rgba(var(--accent-rgb),.25), 0 0 18px rgba(var(--accent-rgb),.8); transition: transform .3s var(--spring); }
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.range-val { min-width: 78px; text-align: center; padding: 6px 10px; border-radius: 10px; background: rgba(var(--accent-rgb),.12); border: 1px solid rgba(var(--accent-rgb),.3); font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums; }
+.chip { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; height: 33px; padding: 0 15px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); font-weight: 600; font-size: 13px; transition: all .3s var(--ease); }
+.chip:hover { color: var(--text); border-color: var(--line2); transform: translateY(-1px); }
+.chip.on { background: linear-gradient(135deg, rgba(var(--accent-rgb),.28), color-mix(in srgb, var(--accent2) 18%, transparent)); border-color: rgba(var(--accent-rgb),.6); color: var(--text); box-shadow: 0 0 18px -6px rgba(var(--accent-rgb),.9); }
+.chip.add { border-style: dashed; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-family: Consolas, monospace; background: rgba(251,191,36,.12); color: var(--warn); margin: 4px 4px 0 0; }
+.vstatus { font-size: 12.5px; margin-top: 8px; min-height: 18px; }
+.vstatus.ok { color: var(--good); } .vstatus.err { color: var(--bad); }
+
+.file-list { max-height: 260px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.15); }
+[data-mode="light"] .file-list { background: var(--panel2); }
+.file { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-top: 1px solid var(--line); font-family: Consolas, monospace; font-size: 12.5px; animation: rise .5s var(--ease) both; animation-delay: calc(var(--i,0) * 35ms); }
+.file:first-child { border-top: 0; }
+.file svg { width: 15px; height: 15px; color: var(--accent); flex: none; filter: drop-shadow(0 0 4px rgba(var(--accent-rgb),.7)); }
+.empty { text-align: center; color: var(--muted); padding: 32px 10px; }
+.empty svg { width: 44px; height: 44px; color: var(--accent); opacity: .6; display: block; margin: 0 auto 12px; animation: float 3.2s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(var(--accent-rgb),.6)); }
+@keyframes float { 50% { transform: translateY(-7px); } }
+.stat-row, .stat-head { display: grid; grid-template-columns: 46px 1fr 90px 70px 96px; align-items: center; gap: 14px; }
+.stat-row { padding: 10px 8px; border-top: 1px solid var(--line); border-radius: 12px; transition: background .25s; }
+.stat-row:hover { background: rgba(var(--accent-rgb),.06); }
+.stat-row .gi { transition: transform .4s var(--spring), box-shadow .3s; } .stat-row:hover .gi { transform: scale(1.1) rotate(-4deg); box-shadow: 0 0 18px -4px rgba(var(--accent-rgb),.9); }
+.stat-row .gi { width: 46px; height: 46px; border-radius: 11px; background: var(--panel2) center/cover; border: 1px solid var(--line); }
+.stat-row .nm { font-weight: 650; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rank { font-size: 11px; font-weight: 800; color: var(--accent); margin-right: 6px; }
+.bar { height: 5px; border-radius: 99px; background: var(--panel3); margin-top: 8px; overflow: hidden; }
+.bar i { position: relative; display: block; height: 100%; width: 0; border-radius: 99px; background: var(--grad); box-shadow: 0 0 10px rgba(var(--accent-rgb),.8); transition: width 1.2s var(--ease); overflow: hidden; }
+.bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); transform: translateX(-100%); animation: shimmer 2.6s ease-in-out infinite 1.2s; }
+@keyframes shimmer { 60%, 100% { transform: translateX(100%); } }
+.stat-head { padding: 0 8px 8px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.swatches { display: flex; gap: 14px; }
+.swatch { position: relative; width: 36px; height: 36px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18); transition: transform .35s var(--spring), box-shadow .3s; }
+.swatch:hover { transform: scale(1.14); }
+.swatch.on { box-shadow: inset 0 0 0 2px rgba(255,255,255,.3), 0 0 18px -2px var(--sw); }
+.swatch.on::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--text); animation: pop .45s var(--spring); }
+.swatch-name { font-size: 12px; color: var(--muted); margin-top: 10px; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+
+.dc-preview { display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 12px; background: #111214; color: #dbdee1; border: 1px solid rgba(255,255,255,.06); transition: opacity .4s, filter .4s; }
+.dc-preview.off { opacity: .4; filter: grayscale(1); }
+.dc-preview .art { transition: transform 1.2s var(--ease); } .dc-preview:hover .art { transform: rotate(240deg) scale(1.05); }
+.dc-preview .art { width: 64px; height: 64px; border-radius: 10px; flex: none; background: radial-gradient(circle, #000 28%, transparent 30%), conic-gradient(from 30deg, var(--accent), var(--accent2), #1a1030, var(--accent)); }
+.dc-preview .k { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #b5bac1; text-transform: uppercase; }
+.dc-preview .n { font-weight: 650; color: #f2f3f5; margin-top: 2px; } .dc-preview .l { font-size: 13px; color: #b5bac1; }
+.dc-preview .el { font-size: 13px; color: #23a55a; font-variant-numeric: tabular-nums; }
+
+.steps { counter-reset: step; }
+.step { display: flex; gap: 16px; padding: 15px 0; border-top: 1px solid var(--line); }
+.step:first-child { border-top: 0; padding-top: 0; }
+.step .n { counter-increment: step; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: 13px; color: #fff; background: var(--grad); box-shadow: 0 0 16px -2px rgba(var(--accent-rgb),.9); }
+.step .n::before { content: counter(step); }
+.step .n { transition: transform .5s var(--spring); } .step:hover .n { transform: scale(1.15) rotate(-8deg); }
+.step .b { flex: 1; } .step .b b { display: block; margin-bottom: 6px; font-weight: 650; }
+.credit { display: flex; align-items: center; gap: 16px; padding: 20px; overflow: hidden; }
+.credit:hover { --ty: -4px; box-shadow: 0 20px 40px -22px rgba(var(--accent-rgb),.9); }
+.avatar { transition: transform .7s var(--spring), box-shadow .4s; }
+.credit:hover .avatar { transform: rotate(200deg) scale(1.08); box-shadow: 0 0 30px -2px rgba(var(--accent-rgb),1); }
+.avatar > span { display: inline-block; transition: transform .7s var(--spring); } .credit:hover .avatar > span { transform: rotate(-200deg); }
+.avatar { position: relative; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 21px; color: #fff; flex: none;
+  background: radial-gradient(circle, #05030a 55%, transparent 57%), conic-gradient(from 0deg, var(--accent), var(--accent2), #fff, var(--accent)); box-shadow: 0 0 22px -4px rgba(var(--accent-rgb),.95); }
+.avatar::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, transparent, rgba(255,255,255,.7) 10%, transparent 20%); -webkit-mask: radial-gradient(circle, transparent 56%, #000 58%); mask: radial-gradient(circle, transparent 56%, #000 58%); animation: spin 4s linear infinite; }
+.credit .role { font-size: 10.5px; color: var(--muted); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.credit .handle { font-size: 19px; font-weight: 750; letter-spacing: -.01em; margin-top: 3px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.credit .ring { position: absolute !important; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),.22); box-shadow: 0 0 0 18px rgba(var(--accent-rgb),.04); }
+
+.upd-pill { position: relative; overflow: hidden; align-self: center; margin-right: 10px; height: 28px; padding: 0 13px 0 11px; border-radius: 99px; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 650; color: #fff; background: linear-gradient(110deg, var(--accent), var(--accent2), var(--accent)); background-size: 220% 100%;
+  animation: flow 4s ease infinite, pillIn .6s var(--spring) both; box-shadow: 0 0 20px -4px rgba(var(--accent-rgb),.95); transition: transform .3s var(--spring); }
+.upd-pill[hidden] { display: none; }
+.upd-pill:hover { transform: scale(1.06); }
+.upd-pill.busy { pointer-events: none; }
+.upd-pill .fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); background: rgba(255,255,255,.25); transition: width .35s var(--ease); }
+.upd-pill > span { position: relative; }
+.upd-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: blink 1.4s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; transform: scale(.7); } }
+@keyframes pillIn { from { opacity: 0; transform: translateY(-8px) scale(.9); } }
+
+#setupView { display: none; }
+body.setup-mode .sidebar, body.setup-mode #pages, body.setup-mode #saved { display: none; }
+body.setup-mode #app { grid-template-columns: 1fr; }
+body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: center; justify-content: center; overflow-y: auto; padding: 10px 0 24px; }
+.setup-inner { width: 460px; display: flex; flex-direction: column; align-items: center; text-align: center; animation: rise .8s var(--ease) both; }
+.setup-inner .bh { margin: -6px 0 2px; }
+.setup-inner .kicker { font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); text-shadow: 0 0 14px rgba(var(--accent-rgb),.7); }
+.setup-inner h1 { margin: 4px 0 6px; font-size: 32px; font-weight: 800; letter-spacing: -.03em; font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.setup-inner > p { margin: 0; color: var(--muted); line-height: 1.5; }
+.setup-card { width: 100%; text-align: left; margin: 18px 0 14px; padding: 8px 18px; transition: opacity .4s; }
+.setup-card.locked { opacity: .45; pointer-events: none; }
+.setup-progress { width: 100%; margin: 0 0 16px; opacity: 0; transform: translateY(6px); transition: .4s var(--ease); }
+.setup-progress.show { opacity: 1; transform: none; }
+.bar.big { height: 8px; margin: 0 0 8px; }
+.bar.big i { width: 0; transition: width .5s var(--ease); }
+.setup-path { margin-top: 14px !important; font-size: 12px; font-family: Consolas, monospace; color: var(--faint) !important; }
+
+#toasts { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+.toast { display: flex; align-items: center; gap: 11px; min-width: 260px; max-width: 380px; padding: 13px 15px; border-radius: 13px; background: var(--panel-solid); border: 1px solid var(--line2); box-shadow: 0 18px 44px -14px rgba(0,0,0,.7), 0 0 30px -18px rgba(var(--accent-rgb),1); animation: toastIn .55s var(--spring) both; }
+.toast.out { animation: toastOut .35s var(--ease) forwards; }
+.toast i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex: none; }
+.toast.err i { background: var(--bad); box-shadow: 0 0 10px var(--bad); } .toast.ok i { background: var(--good); box-shadow: 0 0 10px var(--good); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(34px) scale(.95); filter: blur(4px); } }
+@keyframes toastOut { to { opacity: 0; transform: translateX(34px); filter: blur(4px); } }
+.modal-wrap { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(4,2,10,.6); backdrop-filter: blur(8px); opacity: 0; visibility: hidden; transition: opacity .3s, visibility 0s .3s; z-index: 40; }
+.modal-wrap.show { opacity: 1; visibility: visible; transition: opacity .3s; }
+.modal { width: 430px; padding: 24px; border-radius: 18px; background: var(--panel-solid); border: 1px solid var(--line2); box-shadow: 0 40px 90px -24px rgba(0,0,0,.8), 0 0 60px -30px rgba(var(--accent-rgb),1); transform: translateY(16px) scale(.95); transition: transform .5s var(--spring); }
+.modal-wrap.show .modal { transform: none; }
+.modal h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.01em; } .modal p { margin: 0 0 16px; color: var(--muted); line-height: 1.5; }
+.modal .input { width: 100%; margin-bottom: 16px; }
+.modal .row { justify-content: flex-end; }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas><div class="nebula"></div>
+<div id="app">
+  <header class="titlebar">
+    <div class="drag pywebview-drag-region">
+      <svg width="24" height="24" viewBox="-50 -50 100 100"><defs><linearGradient id="tg" x1="0" x2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent2)"/></linearGradient></defs><ellipse rx="46" ry="14" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/><circle r="20" fill="#000" stroke="#f5f3ff" stroke-width="3"/><path d="M -46 0 A 46 14 0 0 0 46 0" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/></svg>
+      <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span>
+    </div>
+    <button class="upd-pill" id="updPill" hidden><span class="fill"></span><span class="upd-dot"></span><span id="updText">Update ready</span></button>
+    <div class="saved" id="saved">Saved</div>
+    <button class="win-btn" id="minBtn" title="Minimize"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.3"/></svg></button>
+    <button class="win-btn close" id="closeBtn" title="Close"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.3"/></svg></button>
+  </header>
+
+  <aside class="sidebar">
+    <div class="nav-label">MENU</div>
+    <nav id="nav"><div class="nav-indicator" id="navInd"></div></nav>
+    <div class="side-foot"><span class="dot" id="sideDot"></span><span id="sideStatus">Checking Roblox...</span></div>
+  </aside>
+
+  <main id="pages">
+    <section class="page" id="page-home">
+      <div class="card hero tilt rise" style="--i:0">
+        <div class="bh" aria-hidden="true"><canvas id="bhCanvas"></canvas></div>
+        <div style="position:relative;z-index:1">
+          <div class="kicker">Orbit Launcher</div><h2 id="heroTitle">Ready to play</h2>
+          <div class="status"><span id="installText">Looking for Roblox...</span><span id="versionText" class="small"></span></div>
+          <div class="row">
+            <button class="btn btn-launch" id="launchBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg><span>Launch Roblox</span></button>
+            <button class="btn" id="applyBtn">Apply settings now</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card tilt rise" style="--i:1">
+          <h3>Last server</h3>
+          <div class="row" style="margin-top:12px">
+            <div class="server-thumb" id="lastThumb"></div>
+            <div style="flex:1;min-width:0"><div id="lastName" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">No server yet</div><div class="muted small" id="lastAgo">Play a game through Orbit first</div></div>
+            <button class="btn" id="rejoinBtn" disabled>Rejoin</button>
+          </div>
+        </div>
+        <div class="card rise" style="--i:2">
+          <div class="toggle-row" style="padding:0">
+            <div class="t"><b>Use Orbit for Roblox links</b><span>Play buttons on roblox.com open through Orbit, so your flags, mods and session features apply.</span></div>
+            <label class="switch"><input type="checkbox" id="regToggle"><span class="track"></span><span class="knob"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <div class="row"><h3 style="margin:0">Quick actions</h3><span class="spacer"></span>
+          <button class="btn" id="openRoblox">Open Roblox folder</button><button class="btn" id="openLog">Open launcher log</button></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-flags">
+      <div class="page-head rise" style="--i:0"><h1>FastFlags</h1><p>Graphics tweaks Roblox still allows. Give a game its own profile to use different settings there.</p></div>
+      <div class="card rise" style="--i:1">
+        <div class="row">
+          <select class="input" id="profileSel" style="min-width:300px"></select>
+          <button class="btn" id="addGameBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add game</button>
+          <button class="btn danger" id="removeGameBtn">Remove</button>
+        </div>
+        <p class="sub" style="margin:10px 0 0">Game profiles apply when you join that game from the website or with Rejoin. Teleporting to another game inside Roblox keeps the flags you launched with.</p>
+      </div>
+      <div id="flagsBody"></div>
+    </section>
+
+    <section class="page" id="page-mods">
+      <div class="page-head rise" style="--i:0"><h1>Mods</h1><p>Swap Roblox's sounds, cursors, fonts and textures. Originals come back when you remove a mod.</p></div>
+      <div class="card rise" style="--i:1" id="modsToggleCard"></div>
+      <div class="card rise" style="--i:2">
+        <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Mod profiles</h3><span class="spacer"></span>
+          <button class="btn" id="openModsBtn">Open folder</button><button class="btn danger" id="delModBtn">Delete profile</button></div>
+        <div class="row" id="modChips"></div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <h3>Files in this profile</h3>
+        <p class="sub">Laid out like the Roblox version folder, e.g. <code>content\sounds\ouch.ogg</code> (death sound) or <code>content\textures\Cursors\KeyboardMouse\ArrowCursor.png</code> (cursor).</p>
+        <div class="file-list" id="modFiles"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-session">
+      <div class="page-head rise" style="--i:0"><h1>Session</h1><p>Server location, play time and crash recovery while you play.</p></div>
+      <div class="card rise" style="--i:1" id="sessionToggles"></div>
+      <div class="grid3 rise" style="--i:2">
+        <div class="card tilt"><div class="stat-label">Total play time</div><div class="big-num" id="statTotal">0m</div></div>
+        <div class="card tilt"><div class="stat-label">Games played</div><div class="big-num" id="statGames">0</div></div>
+        <div class="card tilt"><div class="stat-label">Sessions</div><div class="big-num" id="statSessions">0</div></div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Most played</h3><span class="spacer"></span><button class="btn danger" id="resetStats">Reset</button></div>
+        <div id="statsList"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-discord">
+      <div class="page-head rise" style="--i:0"><h1>Discord</h1><p>Show the game you're playing on your Discord profile.</p></div>
+      <div class="grid2">
+        <div class="card rise" style="--i:1" id="discordToggles"></div>
+        <div class="card rise" style="--i:2">
+          <h3>Preview</h3><p class="sub">Roughly how your status will look.</p>
+          <div class="dc-preview" id="dcPreview"><div class="art" id="dcArt"></div>
+            <div><div class="k">Playing Roblox</div><div class="n">Your game</div><div class="l">by Game Creator</div><div class="el" id="dcEl">00:00 elapsed</div></div></div>
+        </div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <div class="field"><label>Discord application ID</label><input class="input mono" id="dcId" placeholder="e.g. 123456789012345678" style="max-width:340px"></div>
+        <p class="sub">Create a free application in the Discord Developer Portal, name it "Roblox" so your status reads "Playing Roblox", and paste its Application ID here.</p>
+        <button class="btn" id="dcPortal">Open Developer Portal</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-appearance">
+      <div class="page-head rise" style="--i:0"><h1>Appearance</h1><p>Make Orbit (and Roblox's icon) yours.</p></div>
+      <div class="card rise" style="--i:1">
+        <div class="field"><label>Theme</label><div id="modeSeg"></div></div>
+        <div class="field" style="margin:0"><label>Accent</label><div class="swatches" id="swatches"></div><div class="swatch-name" id="swatchName"></div></div>
+      </div>
+      <div class="card rise" style="--i:2">
+        <h3>Roblox icon</h3>
+        <p class="sub" id="iconStatus">No custom icon chosen.</p>
+        <div class="row" style="margin-bottom:6px"><button class="btn" id="chooseIcon">Choose .ico file</button><button class="btn danger" id="removeIcon">Remove</button></div>
+        <div id="iconToggle"></div>
+      </div>
+      <div class="card rise" style="--i:3">
+        <h3>Shortcuts</h3>
+        <p class="sub">To keep Orbit on your taskbar: open it, right-click its taskbar icon and choose <b>Pin to taskbar</b>. Or add shortcuts here.</p>
+        <div class="toggle-row" style="padding-top:4px"><div class="t"><b>Orbit Launcher</b><span>Opens this window.</span></div>
+          <button class="btn" data-sc="orbit:Desktop">Desktop</button><button class="btn" data-sc="orbit:Programs">Start menu</button></div>
+        <div class="toggle-row"><div class="t"><b>Roblox (Orbit)</b><span>Opens Roblox through Orbit, with your custom icon.</span></div>
+          <button class="btn" data-sc="roblox:Desktop">Desktop</button><button class="btn" data-sc="roblox:Programs">Start menu</button></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-extensions">
+      <div class="page-head rise" style="--i:0"><h1>Extensions</h1><p>Orbit Item Preview: see catalog items on your own profile and inventory, always labeled PREVIEW · NOT OWNED.</p></div>
+      <div class="card steps rise" style="--i:1">
+        <div class="step"><div class="n"></div><div class="b"><b>Get the extension files</b><span class="muted small">Run this again any time to update.</span><div style="margin-top:10px"><button class="btn primary" id="extInstall">Install / update files</button></div></div></div>
+        <div class="step"><div class="n"></div><div class="b"><b>Open your browser's extensions page and turn on Developer mode</b><div class="row" style="margin-top:6px"><button class="btn" id="extChrome">Open in Chrome</button><button class="btn" id="extEdge">Open in Edge</button></div></div></div>
+        <div class="step"><div class="n"></div><div class="b"><b>Click "Load unpacked" and pick this folder</b><div class="row" style="margin-top:6px"><input class="input mono" id="extPath" readonly style="flex:1"><button class="btn" id="extCopy">Copy</button></div></div></div>
+        <div class="step"><div class="n"></div><div class="b"><b>Pin it and add items</b><span class="muted small">Click the extension, paste item IDs or catalog links, then open your profile or inventory on roblox.com.</span></div></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-credits">
+      <div class="page-head rise" style="--i:0"><h1>Credits</h1><p>The people behind Orbit.</p></div>
+      <div class="grid2" id="creditList"></div>
+      <div class="card rise" style="--i:6">
+        <div class="row"><div><h3>About &amp; updates</h3><p class="sub" style="margin:0" id="creditFoot"></p></div><span class="spacer"></span>
+          <button class="btn" id="checkUpd">Check for updates</button></div>
+        <div id="autoUpdRow" style="margin-top:10px"></div>
+        <div class="vstatus" id="updStatus"></div>
+      </div>
+    </section>
+  </main>
+
+  <section id="setupView">
+    <div class="setup-inner">
+      <div class="bh"><canvas id="setupCanvas"></canvas></div>
+      <div class="kicker">Orbit Launcher</div>
+      <h1 id="setupTitle">Install Orbit</h1>
+      <p id="setupSub"></p>
+      <div class="card setup-card" id="setupOptions"></div>
+      <div class="setup-progress" id="setupProg"><div class="bar big"><i id="setupBar"></i></div><div class="muted small" id="setupText">Starting...</div></div>
+      <button class="btn btn-launch" id="setupBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Install</span></button>
+      <p class="setup-path" id="setupPath"></p>
+    </div>
+  </section>
+</div>
+
+<div id="toasts"></div>
+<div class="modal-wrap" id="modal"><div class="modal">
+  <h3 id="mTitle"></h3><p id="mText"></p><input class="input" id="mInput">
+  <div class="row"><button class="btn ghost" id="mCancel">Cancel</button><button class="btn primary" id="mOk">OK</button></div>
+</div></div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+};
+
+const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  flags: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  mods: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  session: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  discord: '<path d="M7 17c-2 0-4-1-4-1V8c2-2 5-3 5-3l1 2h6l1-2s3 1 5 3v8s-2 1-4 1l-1-2H8z"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/>',
+  appearance: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.6 0-1.4-1.2-1.6-1.2-2.8 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>',
+  extensions: '<path d="M10 4a2 2 0 1 1 4 0v2h4a1 1 0 0 1 1 1v4h-2a2 2 0 1 0 0 4h2v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-4h2a2 2 0 1 0 0-4H5V7a1 1 0 0 1 1-1h4z"/>',
+  credits: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+  file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+};
+const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+const PAGES = [["home", "Home"], ["flags", "FastFlags"], ["mods", "Mods"], ["session", "Session"],
+               ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"], ["credits", "Credits"]];
+
+let api = null, S = null, cfg = null, page = "home";
+const iconCache = {};
+
+
+function toast(msg, kind = "") {
+  const t = h("div", { class: "toast " + kind }, h("i"), h("span", {}, msg));
+  $("#toasts").append(t);
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 400); }, 3200);
+}
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 350);
+}
+async function saveNow() {
+  clearTimeout(saveTimer);
+  await api.save_settings(cfg);
+  const s = $("#saved"); s.classList.add("show");
+  clearTimeout(s._t); s._t = setTimeout(() => s.classList.remove("show"), 1400);
+}
+function fmtDur(sec) {
+  sec = Math.floor(sec || 0); const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60);
+  return hh ? `${hh}h ${mm}m` : mm ? `${mm}m` : `${sec}s`;
+}
+function fmtAgo(ts) {
+  const d = Date.now() / 1000 - ts;
+  if (d < 90) return "just now"; if (d < 3600) return `${Math.floor(d / 60)} min ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  return new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+function hexRgb(hex) { const n = parseInt(hex.slice(1), 16); return `${n >> 16 & 255},${n >> 8 & 255},${n & 255}`; }
+
+function attachRipple(root = document) {
+  root.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".btn, .chip, .seg button"); if (!b) return;
+    const r = b.getBoundingClientRect(), size = Math.max(r.width, r.height);
+    const span = h("span", { class: "ripple", style: `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px` });
+    b.append(span); setTimeout(() => span.remove(), 650);
+  });
+}
+
+function switchEl(checked, onChange) {
+  const input = h("input", { type: "checkbox" }); input.checked = !!checked;
+  input.addEventListener("change", () => onChange(input.checked));
+  return h("label", { class: "switch" }, input, h("span", { class: "track" }), h("span", { class: "knob" }));
+}
+function toggleRow(title, desc, checked, onChange) {
+  return h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, title), h("span", {}, desc)), switchEl(checked, onChange));
+}
+function segmented(options, value, onChange) {
+  const hl = h("span", { class: "hl" });
+  const wrap = h("div", { class: "seg" }, hl);
+  const move = (btn) => { hl.style.width = btn.offsetWidth + "px"; hl.style.transform = `translateX(${btn.offsetLeft - 3}px)`; hl.style.left = "3px"; };
+  options.forEach(([val, label]) => {
+    const b = h("button", { class: val === value ? "on" : "" }, label);
+    b.addEventListener("click", () => {
+      $$("button", wrap).forEach((x) => x.classList.remove("on")); b.classList.add("on"); move(b); onChange(val);
+    });
+    wrap.append(b);
+  });
+  requestAnimationFrame(() => { const on = $("button.on", wrap) || $("button", wrap); on.classList.add("on"); hl.style.transition = "none"; move(on); requestAnimationFrame(() => (hl.style.transition = "")); });
+  wrap._remeasure = () => { const on = $("button.on", wrap); if (on) move(on); };
+  return wrap;
+}
+
+
+function modal({ title, text = "", input = false, placeholder = "", ok = "OK", danger = false }) {
+  return new Promise((resolve) => {
+    const m = $("#modal"), inp = $("#mInput");
+    $("#mTitle").textContent = title; $("#mText").textContent = text; $("#mText").style.display = text ? "" : "none";
+    inp.style.display = input ? "" : "none"; inp.value = ""; inp.placeholder = placeholder;
+    const okBtn = $("#mOk"); okBtn.textContent = ok; okBtn.style.background = danger ? "var(--bad)" : "";
+    m.classList.add("show"); if (input) setTimeout(() => inp.focus(), 120);
+    const done = (val) => { m.classList.remove("show"); okBtn.onclick = $("#mCancel").onclick = inp.onkeydown = null; resolve(val); };
+    okBtn.onclick = () => done(input ? inp.value.trim() : true);
+    $("#mCancel").onclick = () => done(input ? null : false);
+    inp.onkeydown = (e) => { if (e.key === "Enter") okBtn.click(); if (e.key === "Escape") $("#mCancel").click(); };
+  });
+}
+
+
+let starRGB = "220,210,255";
+function applyTheme() {
+  const a = cfg.appearance, names = Object.keys(S.accents);
+  if (!S.accents[a.accent]) a.accent = names[0];
+  const [c1, c2] = S.accents[a.accent], root = document.documentElement;
+  root.dataset.mode = a.mode === "Light" ? "light" : "dark";
+  root.style.setProperty("--accent", c1);
+  root.style.setProperty("--accent2", c2);
+  root.style.setProperty("--accent-rgb", hexRgb(c1));
+  const [r, g, b] = hexRgb(c1).split(",").map(Number);
+  root.style.setProperty("--on-accent", (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.72 ? "#120a1f" : "#ffffff");
+  starRGB = a.mode === "Light" ? hexRgb(c1) : "225,215,255";
+  bhColors = [hexRgb(c1).split(",").map(Number), hexRgb(c2).split(",").map(Number)];
+}
+
+
+function starfield() {
+  const c = $("#stars"), x = c.getContext("2d");
+  let W, H, dpr, stars = [], shooting = null, last = 0, px = 0, py = 0, tx = 0, ty = 0;
+  addEventListener("pointermove", (e) => { tx = (e.clientX / innerWidth - .5); ty = (e.clientY / innerHeight - .5); });
+  const resize = () => {
+    dpr = window.devicePixelRatio || 1; W = c.width = innerWidth * dpr; H = c.height = innerHeight * dpr;
+    c.style.width = innerWidth + "px"; c.style.height = innerHeight + "px";
+    stars = Array.from({ length: 170 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: Math.random() ** 2 * .9 + .1, t: Math.random() * 6.3, s: Math.random() * .02 + .008 }));
+  };
+  resize(); addEventListener("resize", resize);
+  const frame = (ts) => {
+    requestAnimationFrame(frame);
+    if (document.hidden || ts - last < 33) return;
+    last = ts; x.clearRect(0, 0, W, H);
+    px += (tx - px) * .06; py += (ty - py) * .06;
+    for (const st of stars) {
+      st.t += st.s * 3; st.x -= st.z * .12 * dpr; if (st.x < -2) { st.x = W + 2; st.y = Math.random() * H; }
+      const al = (.2 + .8 * Math.abs(Math.sin(st.t))) * st.z, r = (st.z * 1.1 + .25) * dpr;
+      x.fillStyle = `rgba(${starRGB},${al})`; x.beginPath(); x.arc(st.x - px * st.z * 34 * dpr, st.y - py * st.z * 24 * dpr, r, 0, 6.283); x.fill();
+    }
+    if (!shooting && Math.random() < .004) shooting = { x: Math.random() * W * .7 + W * .3, y: Math.random() * H * .4, l: 0 };
+    if (shooting) {
+      const sh = shooting; sh.l += 1; const len = 120 * dpr, px = sh.x - sh.l * 14 * dpr, py = sh.y + sh.l * 6 * dpr;
+      const g = x.createLinearGradient(px, py, px + len, py - len * .43);
+      g.addColorStop(0, `rgba(${starRGB},${Math.max(0, .9 - sh.l / 40)})`); g.addColorStop(1, `rgba(${starRGB},0)`);
+      x.strokeStyle = g; x.lineWidth = 1.6 * dpr; x.beginPath(); x.moveTo(px, py); x.lineTo(px + len, py - len * .43); x.stroke();
+      if (sh.l > 40) shooting = null;
+    }
+  };
+  requestAnimationFrame(frame);
+}
+
+let bhColors = [[157, 107, 255], [217, 70, 239]];
+function blackHole(c, hero, pageName = "home") {
+  const x = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  const W = 240, H = 190; c.width = W * dpr; c.height = H * dpr; x.scale(dpr, dpr);
+  const off = document.createElement("canvas"); off.width = W * dpr; off.height = H * dpr;
+  const o = off.getContext("2d"); o.scale(dpr, dpr);
+  const cx = W / 2, cy = H / 2 + 2, core = 25;
+  let tilt = .24, rot = -0.22, cosR = Math.cos(rot), sinR = Math.sin(rot);
+
+  const st = { speed: 1, tSpeed: 1, pull: 1, tPull: 1, tilt: .24, tTilt: .24, rot: -0.22, tRot: -0.22, flare: 0 };
+  const ease = (cur, to, k) => cur + (to - cur) * k;
+  hero.addEventListener("pointermove", (e) => {
+    const r = c.getBoundingClientRect(), mx = (e.clientX - r.left) / r.width - .5, my = (e.clientY - r.top) / r.height - .5;
+    const over = Math.abs(mx) < .5 && Math.abs(my) < .5;
+    st.tSpeed = over ? 4.2 : 1.7; st.tPull = over ? .9 : 1;
+    st.tTilt = Math.max(.1, Math.min(.42, .24 + my * .3)); st.tRot = -0.22 + Math.max(-.6, Math.min(.6, mx * .5));
+    c.style.cursor = over ? "pointer" : "";
+  });
+  hero.addEventListener("pointerleave", () => { st.tSpeed = 1; st.tPull = 1; st.tTilt = .24; st.tRot = -0.22; });
+  c.addEventListener("click", () => { st.flare = 1; st.speed = 9; });
+  const parts = Array.from({ length: 2200 }, () => {
+    const t = Math.random() ** 2.1, r = core * 1.42 + t * 84;
+    return { r, a: Math.random() * 6.283, w: Math.pow(core / r, 1.5), s: Math.random() * .9 + .4, t, j: (Math.random() - .5) * 2.4 };
+  });
+  const mix = (k) => { const [a, b] = bhColors; return [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * k)); };
+  const proj = (r, a, lift) => { r *= st.pull * (1 + st.flare * .18); const px = Math.cos(a) * r, py = Math.sin(a) * r * tilt + lift; return [cx + px * cosR - py * sinR, cy + px * sinR + py * cosR]; };
+  const layer = (front) => {
+    o.setTransform(dpr, 0, 0, dpr, 0, 0); o.clearRect(0, 0, W, H); o.globalCompositeOperation = "lighter";
+    for (const p of parts) {
+      if ((Math.sin(p.a) > 0) !== front) continue;
+      const [X, Y] = proj(p.r, p.a, p.j * (1 - p.t));
+      const beam = .55 + .9 * Math.max(0, Math.cos(p.a + .5)) ** 1.5;
+      const hot = 1 - p.t, col = hot > .8 ? [255, 248, 255] : mix(Math.min(1, 1.15 - hot));
+      o.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${Math.min(1, (.2 + hot * .8) * beam * (1 + st.flare * 1.4 + (st.speed - 1) * .06))})`;
+      o.fillRect(X - p.s / 2, Y - p.s / 2, p.s, p.s * .9);
+    }
+    if (!front) {
+      sweepT += .006 * st.speed; const sweep = sweepT;
+      for (const [rx, lw, al] of [[1.62, 7, .55], [1.46, 2.2, .95], [1.9, 12, .18]]) {
+        const g = o.createConicGradient(sweep + rot, cx, cy);
+        const [a1, a2] = bhColors;
+        g.addColorStop(0, `rgba(${a2},${al * .3})`); g.addColorStop(.25, `rgba(255,245,255,${al})`);
+        g.addColorStop(.5, `rgba(${a1},${al * .7})`); g.addColorStop(.75, `rgba(${a2},${al * .4})`); g.addColorStop(1, `rgba(${a2},${al * .3})`);
+        o.strokeStyle = g; o.lineWidth = lw; o.lineCap = "round";
+        o.beginPath(); o.ellipse(cx, cy, core * rx, core * rx * .9, rot, Math.PI * 1.04, Math.PI * 1.96); o.stroke();
+        o.globalAlpha = .35; o.beginPath(); o.ellipse(cx, cy, core * rx * .92, core * rx * .55, rot, Math.PI * .08, Math.PI * .92); o.stroke(); o.globalAlpha = 1;
+      }
+    }
+    x.globalCompositeOperation = "lighter";
+    x.filter = "blur(6px)"; x.globalAlpha = .9; x.drawImage(off, 0, 0, W, H);
+    x.filter = "blur(2px)"; x.globalAlpha = .7; x.drawImage(off, 0, 0, W, H);
+    x.filter = "none"; x.globalAlpha = 1; x.drawImage(off, 0, 0, W, H);
+  };
+  let last = 0, sweepT = 0;
+  const frame = (ts) => {
+    requestAnimationFrame(frame);
+    if (document.hidden || page !== pageName || ts - last < 16) return;
+    const dt = Math.min(50, ts - last || 16) / 16; last = ts;
+    st.speed = ease(st.speed, st.tSpeed, .045 * dt); st.pull = ease(st.pull, st.tPull, .06 * dt);
+    tilt = st.tilt = ease(st.tilt, st.tTilt, .07 * dt); rot = st.rot = ease(st.rot, st.tRot, .07 * dt);
+    cosR = Math.cos(rot); sinR = Math.sin(rot); st.flare = Math.max(0, st.flare - .022 * dt);
+    for (const p of parts) p.a += p.w * .05 * dt * st.speed;
+    x.globalCompositeOperation = "source-over"; x.clearRect(0, 0, W, H);
+    const [a1, a2] = bhColors;
+    let g = x.createRadialGradient(cx, cy, core, cx, cy, 110);
+    g.addColorStop(0, `rgba(${a1},${.38 + st.flare * .4 + (st.speed - 1) * .03})`); g.addColorStop(.4, `rgba(${a2},${.1 + st.flare * .2})`); g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    layer(false);
+    x.globalCompositeOperation = "source-over";
+    g = x.createRadialGradient(cx, cy, core * .7, cx, cy, core * 1.12);
+    g.addColorStop(0, "#000"); g.addColorStop(.86, "#000"); g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.beginPath(); x.arc(cx, cy, core * 1.12, 0, 6.283); x.fill();
+    x.globalCompositeOperation = "lighter"; x.lineWidth = 1.4; x.strokeStyle = "rgba(250,245,255,.9)";
+    x.shadowColor = `rgb(${a1})`; x.shadowBlur = 10;
+    x.beginPath(); x.arc(cx, cy, core * 1.06, 0, 6.283); x.stroke(); x.shadowBlur = 0;
+    layer(true);
+    if (st.flare > 0) {
+      const k = 1 - st.flare, rr = core * (1.2 + k * 3.4);
+      x.strokeStyle = `rgba(${a1},${st.flare * .8})`; x.lineWidth = 2 + st.flare * 4;
+      x.beginPath(); x.ellipse(cx, cy, rr, rr * (tilt * 1.6 + .25), rot, 0, 6.283); x.stroke();
+    }
+    x.globalCompositeOperation = "source-over";
+  };
+  requestAnimationFrame(frame);
+  return st;
+}
+function spotlight() {
+  let tilted = null;
+  const reset = (el) => { if (el) { el.style.setProperty("--rx", "0deg"); el.style.setProperty("--ry", "0deg"); } };
+  document.addEventListener("pointermove", (e) => {
+    const card = e.target.closest && e.target.closest(".card"); if (!card) { reset(tilted); tilted = null; return; }
+    const r = card.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    card.style.setProperty("--mx", mx + "px"); card.style.setProperty("--my", my + "px");
+    if (card !== tilted) { reset(tilted); tilted = null; }
+    if (card.classList.contains("tilt")) {
+      const max = card.classList.contains("hero") ? 2.2 : 5;
+      card.style.setProperty("--ry", ((mx / r.width - .5) * max * 2).toFixed(2) + "deg");
+      card.style.setProperty("--rx", ((.5 - my / r.height) * max * 1.6).toFixed(2) + "deg");
+      tilted = card;
+    }
+  });
+  document.addEventListener("pointerleave", () => { reset(tilted); tilted = null; });
+
+  const hero = $(".hero"), btn = $("#launchBtn");
+  hero.addEventListener("pointermove", (e) => {
+    const r = btn.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy), pull = Math.max(0, 1 - d / 190);
+    btn.style.setProperty("--mgx", (dx * .16 * pull).toFixed(1) + "px"); btn.style.setProperty("--mgy", (dy * .22 * pull).toFixed(1) + "px");
+  });
+  hero.addEventListener("pointerleave", () => { btn.style.setProperty("--mgx", "0px"); btn.style.setProperty("--mgy", "0px"); });
+}
+
+
+function buildNav() {
+  const nav = $("#nav");
+  PAGES.forEach(([id, label]) => {
+    const b = h("button", { class: "nav-item", "data-page": id });
+    b.innerHTML = svg(id) + `<span>${label}</span>`;
+    b.addEventListener("click", () => go(id));
+    nav.append(b);
+  });
+}
+function go(id) {
+  page = id;
+  $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === id));
+  const active = $(`.nav-item[data-page="${id}"]`);
+  $("#navInd").style.transform = `translateY(${active.offsetTop}px)`;
+  $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
+  const pg = $("#page-" + id); pg.scrollTop = 0;
+  ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
+     appearance: renderAppearance, extensions: () => {}, credits: () => {} })[id]?.();
+  requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
+}
+
+
+async function loadIcons(pids) {
+  const need = pids.filter((p) => !(p in iconCache));
+  if (need.length) Object.assign(iconCache, await api.game_icons(need));
+}
+function renderHome() {
+  $("#installText").textContent = S.install ? `Roblox found · ${S.install}` : "Roblox isn't installed yet. Get it from roblox.com/download.";
+  $("#sideStatus").textContent = S.install ? "Roblox ready" : "Roblox not found";
+  $("#sideDot").classList.toggle("off", !S.install);
+  $("#regToggle").checked = !!S.registered;
+  const last = S.last_server;
+  if (last && last.place_id) {
+    $("#lastName").textContent = last.name || `Place ${last.place_id}`;
+    $("#lastAgo").textContent = fmtAgo(last.time || 0);
+    $("#rejoinBtn").disabled = false;
+    loadIcons([String(last.place_id)]).then(() => {
+      const url = iconCache[String(last.place_id)]; if (url) $("#lastThumb").style.backgroundImage = `url("${url}")`;
+    });
+  }
+}
+
+
+let curProfile = null;
+const FLAG_COMBOS = {
+  graphics_api: ["Graphics API", [["Automatic", "Auto"], ["Direct3D 11", "D3D11"], ["Vulkan", "Vulkan"], ["OpenGL", "OpenGL"]]],
+  msaa: ["Anti-aliasing (MSAA)", [["Automatic", "Auto"], ["1x", "1x"], ["2x", "2x"], ["4x", "4x"], ["8x", "8x"]]],
+  texture_quality: ["Texture quality", [["Automatic", "Auto"], ["0 (lowest)", "Lowest"], ["1", "Low"], ["2", "Medium"], ["3 (highest)", "Highest"]]],
+};
+const FLAG_CHECKS = [
+  ["exclusive_fullscreen", "Exclusive fullscreen", "Alt+Enter switches to real fullscreen instead of borderless."],
+  ["disable_dpi_scale", "Ignore display scaling", "Renders at full resolution on high-DPI screens."],
+  ["remove_grass", "Remove grass", "Hides terrain grass for a cleaner look and a bit more FPS."],
+  ["gray_sky", "Plain gray sky", "Replaces the skybox with flat gray."],
+  ["low_poly_meshes", "Low-detail meshes", "Lower mesh detail for more FPS on weaker PCs."],
+];
+function target() {
+  if (curProfile && cfg.game_profiles[curProfile]) {
+    const p = cfg.game_profiles[curProfile];
+    p.presets = Object.assign({}, S.default_presets, p.presets || {});
+    p.custom_flags = p.custom_flags || {};
+    return p;
+  }
+  return { get presets() { return cfg.presets; }, get custom_flags() { return cfg.custom_flags; }, set custom_flags(v) { cfg.custom_flags = v; } };
+}
+function renderProfileSel() {
+  const sel = $("#profileSel"); sel.innerHTML = "";
+  sel.append(h("option", { value: "" }, "Default · all games"));
+  Object.entries(cfg.game_profiles).sort((a, b) => (a[1].name || "").localeCompare(b[1].name || ""))
+    .forEach(([pid, p]) => sel.append(h("option", { value: pid }, `${p.name || "Place " + pid}  (${pid})`)));
+  sel.value = curProfile || "";
+  $("#removeGameBtn").disabled = !curProfile;
+}
+function normalize(val, options) {
+  val = String(val ?? "Automatic");
+  if (options.some(([v]) => v === val)) return val;
+  const hit = options.find(([v]) => v.split(" ")[0].replace(/x$/, "") === val.split(" ")[0].replace(/x$/, ""));
+  return hit ? hit[0] : "Automatic";
+}
+function renderFlags() {
+  renderProfileSel();
+  const t = target(), p = t.presets, body = $("#flagsBody");
+  body.innerHTML = "";
+  const gfx = h("div", { class: "card rise", style: "--i:2" }, h("h3", { style: "margin-bottom:14px" }, "Graphics"));
+  for (const [key, [label, opts]] of Object.entries(FLAG_COMBOS)) {
+    gfx.append(h("div", { class: "field" }, h("label", {}, label),
+      h("div", {}, segmented(opts, normalize(p[key], opts), (v) => { p[key] = v; save(); }))));
+  }
+  const lq = p.lighting_quality === "Automatic" ? 0 : parseInt(p.lighting_quality) || 0;
+  const range = h("input", { type: "range", min: 0, max: 21, value: lq });
+  const valEl = h("div", { class: "range-val" });
+  const upd = () => { const v = +range.value; valEl.textContent = v ? `Level ${v}` : "Auto"; range.style.setProperty("--fill", (v / 21 * 100) + "%"); };
+  range.addEventListener("input", () => { upd(); p.lighting_quality = +range.value ? String(range.value) : "Automatic"; save(); });
+  upd();
+  gfx.append(h("div", { class: "field", style: "margin:0" }, h("label", {}, "Lighting quality"), h("div", { class: "range-wrap" }, range, valEl)));
+
+  const tweaks = h("div", { class: "card rise", style: "--i:3" }, h("h3", { style: "margin-bottom:8px" }, "Tweaks"));
+  FLAG_CHECKS.forEach(([key, title, desc]) => tweaks.append(toggleRow(title, desc, p[key], (v) => { p[key] = v; save(); })));
+
+  const ta = h("textarea", { class: "input mono", spellcheck: "false", placeholder: '{ "FIntDebugForceMSAASamples": 4 }' });
+  ta.value = JSON.stringify(t.custom_flags || {}, null, 2);
+  const status = h("div", { class: "vstatus" });
+  const validate = (initial) => {
+    let obj;
+    try { obj = JSON.parse(ta.value.trim() || "{}"); if (typeof obj !== "object" || Array.isArray(obj) || obj === null) throw 0; }
+    catch { status.className = "vstatus err"; status.textContent = "Not valid JSON yet. Your last valid flags are kept."; return; }
+    t.custom_flags = obj; if (initial !== true) save();
+    const keys = Object.keys(obj), ignored = keys.filter((k) => !S.allowlist.includes(k));
+    status.className = "vstatus " + (ignored.length ? "" : "ok"); status.innerHTML = "";
+    status.append(keys.length ? `${keys.length} extra flag${keys.length > 1 ? "s" : ""}` + (ignored.length ? ". Roblox will ignore:" : ", all on Roblox's allowlist ✓") : "No extra flags.");
+    if (ignored.length) status.append(h("div", {}, ignored.map((k) => h("span", { class: "tag" }, k))));
+  };
+  ta.addEventListener("input", () => validate()); validate(true);
+  const extra = h("div", { class: "card rise", style: "--i:4" }, h("h3", {}, "Extra flags"),
+    h("p", { class: "sub" }, "Raw JSON for anything not covered above. Since September 2025 Roblox ignores flags that aren't on its allowlist."), ta, status);
+
+  body.append(h("div", { class: "grid2", style: "align-items:start" }, gfx, tweaks), extra);
+  requestAnimationFrame(() => $$(".seg", body).forEach((s) => s._remeasure()));
+}
+
+
+async function renderMods() {
+  $("#modsToggleCard").innerHTML = "";
+  $("#modsToggleCard").append(toggleRow("Apply mods on launch", "Copy the selected profile's files over Roblox every time it starts.", cfg.apply_mods, (v) => { cfg.apply_mods = v; save(); }));
+  const chips = $("#modChips"); chips.innerHTML = "";
+  S.mod_profiles.forEach((name) => {
+    const c = h("button", { class: "chip" + (name === cfg.mod_profile ? " on" : "") }, name);
+    c.addEventListener("click", () => { cfg.mod_profile = name; save(); renderMods(); });
+    chips.append(c);
+  });
+  const add = h("button", { class: "chip add" }, "+ New profile");
+  add.addEventListener("click", async () => {
+    const name = await modal({ title: "New mod profile", text: "Give it a name, like \"Classic 2016\" or \"Minimal\".", input: true, placeholder: "Profile name", ok: "Create" });
+    if (!name) return;
+    const r = await api.mod_profile_create(name);
+    if (r.error) return toast(r.error, "err");
+    S.mod_profiles = r.profiles; cfg.mod_profile = r.name; save(); renderMods(); api.open_mods(r.name);
+    toast(`Created "${r.name}". Drop files into the folder that just opened.`, "ok");
+  });
+  chips.append(add);
+  $("#delModBtn").disabled = cfg.mod_profile === "Default";
+  const list = $("#modFiles");
+  const files = await api.mods_list(cfg.mod_profile);
+  list.innerHTML = "";
+  if (!files.length) {
+    list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
+      h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
+  } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
+}
+
+
+function renderSession() {
+  const s = cfg.session, box = $("#sessionToggles"); box.innerHTML = "";
+  box.append(
+    toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
+    toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
+    toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
+  renderStats();
+}
+async function renderStats() {
+  const data = S.playtime || {};
+  const rows = Object.entries(data).sort((a, b) => (b[1].seconds || 0) - (a[1].seconds || 0));
+  const total = rows.reduce((n, [, e]) => n + (e.seconds || 0), 0), sessions = rows.reduce((n, [, e]) => n + (e.sessions || 0), 0);
+  countUp($("#statTotal"), total, fmtDur); countUp($("#statGames"), rows.length, (v) => String(Math.round(v))); countUp($("#statSessions"), sessions, (v) => String(Math.round(v)));
+  const list = $("#statsList"); list.innerHTML = "";
+  if (!rows.length) {
+    list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("session"); return d.firstChild; })(), h("div", {}, "Nothing tracked yet."), h("div", { class: "small" }, "Play something through Orbit and it'll show up here.")));
+    return;
+  }
+  list.append(h("div", { class: "stat-head" }, h("span"), h("span", {}, "Game"), h("span", { class: "num" }, "Time"), h("span", { class: "num" }, "Sessions"), h("span", { class: "num" }, "Last played")));
+  const max = rows[0][1].seconds || 1, bars = [];
+  rows.forEach(([pid, e], i) => {
+    const bar = h("i"); bars.push([bar, (e.seconds || 0) / max * 100]);
+    const gi = h("div", { class: "gi", "data-pid": pid });
+    list.append(h("div", { class: "stat-row" }, gi,
+      h("div", { style: "min-width:0" }, h("div", { class: "nm" }, h("span", { class: "rank" }, `#${i + 1}`), e.name || `Place ${pid}`), h("div", { class: "bar" }, bar)),
+      h("div", { class: "num" }, fmtDur(e.seconds)), h("div", { class: "num muted" }, String(e.sessions || 0)),
+      h("div", { class: "num muted small" }, fmtAgo(e.last_played || 0))));
+  });
+  setTimeout(() => bars.forEach(([b, w]) => (b.style.width = w + "%")), 250);
+  await loadIcons(rows.map(([pid]) => pid));
+  $$(".gi", list).forEach((g) => { const u = iconCache[g.dataset.pid]; if (u) g.style.backgroundImage = `url("${u}")`; });
+}
+function countUp(el, to, fmt) {
+  const start = performance.now(), dur = 900;
+  const step = (now) => { const k = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(to * e); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+
+let dcTimer = null;
+function renderDiscord() {
+  const d = cfg.discord, box = $("#discordToggles"); box.innerHTML = "";
+  const prev = () => $("#dcPreview").classList.toggle("off", !d.enabled);
+  box.append(
+    toggleRow("Show my game on Discord", "Needs the Discord desktop app open.", d.enabled, (v) => { d.enabled = v; save(); prev(); }),
+    toggleRow("Show the game's icon", "Uses the game's Roblox thumbnail as the picture.", d.show_game_icon, (v) => { d.show_game_icon = v; save(); }),
+    toggleRow("\"Join server\" button", "Anyone who can see your profile can join you.", d.show_join_button, (v) => { d.show_join_button = v; save(); }));
+  $("#dcId").value = d.client_id || ""; prev();
+  let sec = 0; clearInterval(dcTimer);
+  dcTimer = setInterval(() => { if (page !== "discord") return clearInterval(dcTimer); sec++; $("#dcEl").textContent = `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")} elapsed`; }, 1000);
+}
+
+
+function renderAppearance() {
+  const a = cfg.appearance;
+  const mode = $("#modeSeg"); mode.innerHTML = "";
+  mode.append(segmented([["Dark", "Dark"], ["Light", "Light"]], a.mode, (v) => { a.mode = v; applyTheme(); save(); }));
+  const sw = $("#swatches"); sw.innerHTML = "";
+  const nameEl = $("#swatchName");
+  Object.entries(S.accents).forEach(([name, [c1, c2]]) => {
+    const b = h("button", { class: "swatch" + (a.accent === name ? " on" : ""), title: name, style: `background:linear-gradient(135deg,${c1},${c2});--sw:${c1}` });
+    b.addEventListener("click", () => { a.accent = name; applyTheme(); save(); $$(".swatch").forEach((x) => x.classList.remove("on")); b.classList.add("on"); nameEl.textContent = name; });
+    b.addEventListener("mouseenter", () => (nameEl.textContent = name));
+    b.addEventListener("mouseleave", () => (nameEl.textContent = a.accent));
+    sw.append(b);
+  });
+  nameEl.textContent = a.accent;
+  $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
+  $("#removeIcon").disabled = !S.icon_set;
+  const it = $("#iconToggle"); it.innerHTML = "";
+  it.append(toggleRow("Use it on the Roblox window", "Shows your icon on Roblox's title bar and taskbar while it runs. No Roblox files are changed.", a.custom_window_icon, (v) => { a.custom_window_icon = v; save(); }));
+}
+
+
+function renderCredits() {
+  const list = $("#creditList"); list.innerHTML = "";
+  S.credits.forEach((c, i) => list.append(h("div", { class: "card credit tilt rise", style: `--i:${i + 1}` },
+    h("div", { class: "ring" }),
+    h("div", { class: "avatar" }, h("span", {}, c.handle.replace("@", "")[0].toUpperCase())),
+    h("div", {}, h("div", { class: "role" }, c.role), h("div", { class: "handle" }, c.handle)))));
+  $("#creditFoot").textContent = `Orbit Launcher v${S.version}` + (S.update_source ? ` · updates from github.com/${S.update_source}` : "");
+}
+
+
+function wireWindow() {
+  attachRipple();
+  $("#minBtn").onclick = () => api.minimize();
+  $("#closeBtn").onclick = async () => { if (S.mode !== "setup") await saveNow(); api.close(); };
+}
+function wire() {
+  wireWindow();
+
+  $("#launchBtn").onclick = async () => {
+    const b = $("#launchBtn"), label = $("span", b), icon = $("svg", b);
+    b.classList.add("loading"); icon.style.display = "none"; const sp = h("span", { class: "spinner" }); b.prepend(sp); label.textContent = "Launching...";
+    await saveNow();
+    const r = await api.launch("");
+    if (r && r.error) toast(r.error, "err"); else $("#heroTitle").textContent = "Entering orbit...";
+    setTimeout(() => { sp.remove(); icon.style.display = ""; label.textContent = "Launch Roblox"; b.classList.remove("loading"); $("#heroTitle").textContent = "Ready to play"; }, 4500);
+  };
+  $("#applyBtn").onclick = async () => { await saveNow(); const r = await api.apply_now(); r ? toast(`Settings applied to ${r}`, "ok") : toast("Roblox isn't installed.", "err"); };
+  $("#rejoinBtn").onclick = async () => { await saveNow(); const r = await api.rejoin(); if (r && r.error) toast(r.error, "err"); else toast(`Rejoining ${S.last_server.name || "your last server"}...`); };
+  $("#regToggle").onchange = async (e) => {
+    const r = await api.toggle_registration();
+    if (r && r.error) { toast(r.error, "err"); e.target.checked = S.registered; return; }
+    S.registered = r.registered; e.target.checked = r.registered;
+    toast(r.registered ? "Roblox links now open through Orbit." : "Roblox links use the normal launcher again.", "ok");
+  };
+  $("#openRoblox").onclick = () => api.open_roblox_folder();
+  $("#openLog").onclick = () => api.open_log();
+
+  $("#profileSel").onchange = (e) => { curProfile = e.target.value || null; renderFlags(); };
+  $("#addGameBtn").onclick = async () => {
+    const text = await modal({ title: "Add a game profile", text: "Paste the game's link (roblox.com/games/...) or its place ID. The profile starts as a copy of Default.", input: true, placeholder: "https://www.roblox.com/games/...", ok: "Add" });
+    if (!text) return;
+    toast("Looking up game...");
+    const r = await api.lookup_game(text);
+    if (r.error) return toast(r.error, "err");
+    if (!cfg.game_profiles[r.pid]) cfg.game_profiles[r.pid] = { name: r.name, presets: JSON.parse(JSON.stringify(cfg.presets)), custom_flags: JSON.parse(JSON.stringify(cfg.custom_flags)) };
+    curProfile = r.pid; save(); renderFlags(); toast(`Added a profile for ${r.name}.`, "ok");
+  };
+  $("#removeGameBtn").onclick = async () => {
+    if (!curProfile) return;
+    const name = cfg.game_profiles[curProfile]?.name || curProfile;
+    if (!(await modal({ title: "Remove profile?", text: `${name} will go back to using the Default flags.`, ok: "Remove", danger: true }))) return;
+    delete cfg.game_profiles[curProfile]; curProfile = null; save(); renderFlags();
+  };
+
+  $("#openModsBtn").onclick = () => api.open_mods(cfg.mod_profile);
+  $("#delModBtn").onclick = async () => {
+    if (!(await modal({ title: `Delete "${cfg.mod_profile}"?`, text: "This deletes the profile folder and its files. Roblox's originals come back next launch.", ok: "Delete", danger: true }))) return;
+    const r = await api.mod_profile_delete(cfg.mod_profile);
+    S.mod_profiles = r.profiles; cfg.mod_profile = "Default"; save(); renderMods();
+  };
+
+  $("#resetStats").onclick = async () => {
+    if (!(await modal({ title: "Reset play time?", text: "All tracked play time will be deleted.", ok: "Reset", danger: true }))) return;
+    await api.reset_playtime(); S.playtime = {}; renderStats();
+  };
+
+  $("#dcId").oninput = (e) => { cfg.discord.client_id = e.target.value.trim(); save(); };
+  $("#dcPortal").onclick = () => api.open_url("https://discord.com/developers/applications");
+
+  $("#chooseIcon").onclick = async () => { const r = await api.choose_icon(); if (r && r.error) toast(r.error, "err"); else if (r) { S.icon_set = true; renderAppearance(); toast("Icon saved. Recreate shortcuts to update them.", "ok"); } };
+  $("#removeIcon").onclick = async () => { await api.remove_icon(); S.icon_set = false; renderAppearance(); };
+  $$("[data-sc]").forEach((b) => b.onclick = async () => {
+    const [kind, loc] = b.dataset.sc.split(":");
+    const r = await api.make_shortcut(kind, loc);
+    r && r.error ? toast(r.error, "err") : toast(`Shortcut added to ${loc === "Desktop" ? "your desktop" : "the Start menu"}.`, "ok");
+  });
+
+  $("#extPath").value = S.ext_path;
+  $("#extInstall").onclick = async () => { const r = await api.install_extension(); r.error ? toast(r.error, "err") : (toast("Extension files ready. Now do steps 2-4.", "ok"), $("#extPath").value = r.path); };
+  $("#extChrome").onclick = () => api.open_browser_extensions("chrome");
+  $("#extEdge").onclick = () => api.open_browser_extensions("msedge");
+  $("#extCopy").onclick = async () => { await api.copy_text($("#extPath").value); toast("Folder path copied.", "ok"); };
+}
+
+
+function setPill(text, busy) {
+  const p = $("#updPill"); p.hidden = false; $("#updText").textContent = text; p.classList.toggle("busy", !!busy);
+}
+function updStatus(text, kind = "") { const el = $("#updStatus"); el.className = "vstatus " + kind; el.textContent = text; }
+window.updateProgress = (pct) => {
+  setPill(`Updating ${pct}%`, true); $("#updPill").style.setProperty("--p", pct + "%");
+  updStatus(`Downloading update... ${pct}%`);
+};
+function readyPill(v) {
+  setPill(`v${v} ready · Restart`); $("#updPill").style.setProperty("--p", "0%");
+  updStatus(`v${v} is downloaded. It installs when you restart Orbit (or next time you open it).`, "ok");
+  $("#updPill").onclick = async () => {
+    await saveNow(); setPill("Restarting...", true);
+    const r = await api.restart_to_update(); if (r && r.error) { toast(r.error, "err"); readyPill(v); }
+  };
+}
+async function downloadUpdate() {
+  window.updateProgress(0);
+  const r = await api.download_update();
+  if (r.error) { $("#updPill").hidden = true; updStatus(r.error, "err"); toast(r.error, "err"); return; }
+  S.pending_update = r.version; readyPill(r.version); toast(`Orbit v${r.version} is ready. Click the button up top to restart.`, "ok");
+}
+async function checkUpdates(manual) {
+  if (!S.update_source) { updStatus("Auto-updates turn on once Orbit is installed from your GitHub release (see the README)."); if (manual) toast("Updates aren't set up yet.", "err"); return; }
+  if (S.pending_update) return readyPill(S.pending_update);
+  updStatus("Checking for updates...");
+  const r = await api.check_update();
+  if (r.error) { updStatus(r.error, "err"); if (manual) toast(r.error, "err"); return; }
+  if (!r.available) { updStatus(`You're on the newest version (v${S.version}).`, "ok"); if (manual) toast("Orbit is up to date.", "ok"); return; }
+  updStatus(`v${r.version} is available.`);
+  if (r.manual) { setPill(`v${r.version} available`); $("#updPill").onclick = () => api.open_url(r.page); return; }
+  if (cfg.updates.auto || manual) return downloadUpdate();
+  setPill(`Update to v${r.version}`); $("#updPill").onclick = downloadUpdate;
+}
+function wireUpdates() {
+  $("#checkUpd").onclick = () => checkUpdates(true);
+  const row = $("#autoUpdRow"); row.innerHTML = "";
+  row.append(toggleRow("Update automatically", "Download new versions in the background and install them when Orbit restarts.", cfg.updates.auto, (v) => { cfg.updates.auto = v; save(); }));
+}
+
+
+function renderSetup() {
+  document.body.classList.add("setup-mode"); page = "setup";
+  const su = S.setup, isUpdate = !!su.installed_version, opts = { desktop: true, launch: true };
+  $("#setupTitle").textContent = isUpdate ? "Update Orbit" : "Install Orbit";
+  $("#setupSub").textContent = isUpdate
+    ? `You have v${su.installed_version}. Setup grabs the newest version and keeps your settings, mods and play time.`
+    : "Installs just for you, with no admin needed. Setup grabs the newest version automatically.";
+  $("#setupPath").textContent = su.path;
+  $("#setupBtn span").textContent = isUpdate ? "Update" : "Install";
+  const box = $("#setupOptions"); box.innerHTML = "";
+  box.append(toggleRow("Desktop shortcut", "A Start menu shortcut is always added.", true, (v) => (opts.desktop = v)),
+             toggleRow("Open Orbit when done", "Pin it from the taskbar once it opens.", true, (v) => (opts.launch = v)));
+  const bh = blackHole($("#setupCanvas"), $("#setupView"), "setup");
+  let finished = false;
+  $("#setupBtn").onclick = async () => {
+    const btn = $("#setupBtn"), label = $("span", btn), icon = $("svg", btn);
+    if (finished) return api.finish_setup(opts.launch);
+    btn.classList.add("loading"); icon.style.display = "none"; const sp = h("span", { class: "spinner" }); btn.prepend(sp);
+    label.textContent = isUpdate ? "Updating..." : "Installing..."; box.classList.add("locked"); $("#setupProg").classList.add("show");
+    bh.tSpeed = 3;
+    const r = await api.run_setup(opts);
+    sp.remove(); icon.style.display = ""; btn.classList.remove("loading"); bh.tSpeed = 1;
+    if (r.error) { label.textContent = "Try again"; box.classList.remove("locked"); toast(r.error, "err"); return; }
+    finished = true; bh.flare = 1; bh.speed = 9;
+    $("#setupTitle").textContent = "You're all set";
+    $("#setupSub").textContent = `Orbit v${r.version} is installed. From now on it updates itself.`;
+    icon.outerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+    label.textContent = opts.launch ? "Open Orbit" : "Close";
+  };
+}
+window.setupProgress = (f, text) => { $("#setupBar").style.width = (f * 100).toFixed(1) + "%"; $("#setupText").textContent = text; };
+
+async function init() {
+  S = await api.get_state();
+  cfg = S.settings;
+  applyTheme(); starfield();
+  $("#ver").textContent = "v" + S.version;
+  if (S.mode === "setup") { wireWindow(); renderSetup(); return; }
+  spotlight(); blackHole($("#bhCanvas"), $(".hero"));
+  buildNav(); wire(); wireUpdates(); renderCredits();
+  go("home");
+  setTimeout(() => checkUpdates(false), 1800);
+  api.check_version().then((r) => {
+    if (!r) return;
+    $("#versionText").textContent = !r.latest ? "Couldn't check for Roblox updates." : r.up_to_date ? "Roblox is up to date." : `Roblox will update to ${r.latest} on next launch.`;
+  });
+}
+
+
+function boot() {
+  if (window.pywebview && window.pywebview.api) { api = window.pywebview.api; init(); }
+  else if (location.search.includes("mock")) { api = window.MockApi; init(); }
+}
+window.addEventListener("pywebviewready", boot);
+document.addEventListener("DOMContentLoaded", () => setTimeout(() => { if (!api) boot(); }, 50));
+</script>
+</body>
+</html>

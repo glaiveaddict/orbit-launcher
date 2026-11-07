@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Orbit Item Preview",
+  "version": "1.0.0",
+  "description": "Preview Roblox items you don't own on your own profile and inventory. Every preview is labeled PREVIEW / NOT OWNED.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.roblox.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Orbit Item Preview"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.roblox.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
