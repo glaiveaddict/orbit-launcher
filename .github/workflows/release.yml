@@ -85,11 +85,12 @@ jobs:
           name = sys.argv[1]
           img = ImageGrab.grab()
           W = img.width
-          crop = img.crop((W // 2 - 360, 0, W // 2 + 360, 130)).convert("RGB")
+          box = (W - 460, 40, W, 120) if name == "badge" else (W // 2 - 360, 0, W // 2 + 360, 130)
+          crop = img.crop(box).convert("RGB")
           px = crop.load()
           purple = sum(1 for x in range(crop.width) for y in range(crop.height)
                        if px[x, y][2] > 150 and px[x, y][0] > 90 and px[x, y][1] < 140)
-          print(f"RENDER {name}: purple pixels at top center = {purple}")
+          print(f"RENDER {name}: purple pixels in its area = {purple}")
           small = crop.resize((crop.width // 2, crop.height // 2))
           buf = io.BytesIO(); small.save(buf, "PNG")
           print(f"IMG {name} " + base64.b64encode(buf.getvalue()).decode())

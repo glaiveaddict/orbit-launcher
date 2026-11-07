@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.9"
+APP_VERSION = "1.7.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -46,6 +46,10 @@ SHOW_FLAG = DATA_DIR / "show.flag"
 MONITOR_FILE = DATA_DIR / "monitor.json"
 GUI_FILE = DATA_DIR / "window.json"
 CURRENT_FILE = DATA_DIR / "current.json"
+BACKGROUND_FILE = DATA_DIR / "background.json"
+ATTACH_FLAG = "--orbit-attach"
+BACKGROUND_FLAG = "--background"
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 ICON_FILE = DATA_DIR / "roblox_icon.ico"
 EXTENSIONS_DIR = DATA_DIR / "Extensions"
 EXTENSION_NAME = "orbit_preview"
@@ -133,6 +137,9 @@ DEFAULT_SETTINGS = {
         "track_playtime": True,
         "crash_rejoin": True,
         "server_badge": True,
+        "badge_pos": "Top right",
+        "badge_size": "Small",
+        "start_with_windows": False,
     },
     "appearance": {
         "mode": "Dark",
@@ -1295,8 +1302,11 @@ def orbit_pids():
 
 
 def window_pids():
-    data = load_json(GUI_FILE, {}) or {}
-    return {int(x) for x in data.get("pids", []) if str(x).isdigit()}
+    pids = set()
+    for f in (GUI_FILE, BACKGROUND_FILE):
+        data = load_json(f, {}) or {}
+        pids |= {int(x) for x in data.get("pids", []) if str(x).isdigit()}
+    return pids
 
 
 def stop_legacy_trackers(keep):
@@ -1332,6 +1342,145 @@ def stop_stale_copies():
                        creationflags=CREATE_NO_WINDOW)
     if targets:
         log("Stopped old Orbit trackers: " + ", ".join(str(p) for p in sorted(targets)))
+
+
+def monitor_active():
+    if not IS_WINDOWS:
+        return False
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenMutexW.restype = ctypes.c_void_p
+    k32.OpenMutexW.argtypes = [ctypes.c_uint, ctypes.c_bool, ctypes.c_wchar_p]
+    k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = k32.OpenMutexW(0x00100000, False, "Local\\OrbitLauncherSessionMonitor")
+    if handle:
+        k32.CloseHandle(handle)
+        return True
+    return False
+
+
+def pid_alive(pid):
+    if not pid or not IS_WINDOWS:
+        return False
+    try:
+        out = subprocess.run([sys_tool("tasklist"), "/FI", f"PID eq {int(pid)}", "/NH", "/FO", "CSV"],
+                             capture_output=True, text=True, timeout=10, creationflags=CREATE_NO_WINDOW).stdout
+        return f'"{int(pid)}"' in out
+    except Exception:
+        return False
+
+
+class AutoAttach:
+    def __init__(self, owner):
+        self.owner = owner
+        self.replaced = False
+        self.spawned_at = 0
+        self.last_guard = 0
+
+    def tick(self):
+        if time.time() - self.last_guard > 30:
+            self.last_guard = time.time()
+            self.guard_links()
+        if not roblox_running():
+            self.replaced = False
+            self.seen = 0
+            return
+        self.seen = getattr(self, "seen", 0) + 1
+        if self.seen < 2 or time.time() - self.spawned_at < 20:
+            return
+        if monitor_active():
+            info = load_json(MONITOR_FILE, {}) or {}
+            if parse_version(info.get("version", "0")) >= parse_version(APP_VERSION) and pid_alive(info.get("pid")):
+                return
+            if self.replaced:
+                return
+            self.replaced = True
+            log("Replacing an outdated session tracker")
+            stop_stale_copies()
+            time.sleep(2)
+        log(f"Roblox is running; attaching session tracking ({self.owner})")
+        spawn_self(ATTACH_FLAG)
+        self.spawned_at = time.time()
+
+    def guard_links(self):
+        try:
+            settings = load_settings()
+            if is_frozen() and settings["registration"].get("registered") and \
+                    read_protocol_command(PROTOCOLS[0]) != our_command():
+                register_protocols(settings)
+                log("Another app had taken over Roblox links; switched them back to Orbit")
+        except Exception as e:
+            log(f"Link check failed: {e}")
+
+    def loop(self, interval=5):
+        while True:
+            try:
+                self.tick()
+            except Exception as e:
+                log(f"Auto-attach error: {e}")
+            time.sleep(interval)
+
+
+def attach_main():
+    ensure_dirs()
+    if not IS_WINDOWS or not acquire_monitor_lock(wait=3):
+        return
+    token = claim_monitor()
+    settings = load_settings()
+    if not SessionMonitor.wanted(settings):
+        return
+    log("Attached to running Roblox")
+    monitor = SessionMonitor(settings, time.time() - 60)
+    monitor.token = token
+    monitor.boost.begin()
+    try:
+        monitor.run()
+    except Exception:
+        log("Session monitor crashed:\n" + traceback.format_exc())
+    finally:
+        monitor.boost.end()
+
+
+_BG_MUTEX = None
+
+
+def background_main():
+    global _BG_MUTEX
+    ensure_dirs()
+    if not IS_WINDOWS:
+        return
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    _BG_MUTEX = k32.CreateMutexW(None, False, "Local\\OrbitLauncherBackground")
+    if ctypes.get_last_error() == 183:
+        return
+    save_json(BACKGROUND_FILE, {"pids": [os.getpid(), os.getppid()], "version": APP_VERSION})
+    log(f"Background tracking started (v{APP_VERSION})")
+    AutoAttach("background").loop(interval=6)
+
+
+def set_start_with_windows(on):
+    if not IS_WINDOWS:
+        return False
+    if not is_frozen():
+        raise OSError("Start with Windows only works in the installed app.")
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+        if on:
+            winreg.SetValueEx(k, APP_NAME, 0, winreg.REG_SZ, f'"{sys.executable}" {BACKGROUND_FLAG}')
+        else:
+            try:
+                winreg.DeleteValue(k, APP_NAME)
+            except OSError:
+                pass
+    if on and not pid_alive((load_json(BACKGROUND_FILE, {}) or {}).get("pids", [0])[0]):
+        spawn_self(BACKGROUND_FLAG)
+    elif not on:
+        data = load_json(BACKGROUND_FILE, {}) or {}
+        for pid in data.get("pids", []):
+            subprocess.run([sys_tool("taskkill"), "/PID", str(pid), "/T", "/F"], capture_output=True,
+                           creationflags=CREATE_NO_WINDOW)
+        BACKGROUND_FILE.unlink(missing_ok=True)
+    return on
 
 
 def claim_monitor():
@@ -2107,10 +2256,35 @@ def roblox_in_front():
         return True
 
 
+def roblox_rect():
+    if not IS_WINDOWS:
+        return None
+    try:
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = ctypes.c_void_p
+        u.FindWindowW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+        hwnd = u.FindWindowW(None, "Roblox")
+        if not hwnd or u.IsIconic(ctypes.c_void_p(hwnd)):
+            return None
+
+        class RECT(ctypes.Structure):
+            _fields_ = [("l", ctypes.c_long), ("t", ctypes.c_long), ("r", ctypes.c_long), ("b", ctypes.c_long)]
+        rc = RECT()
+        u.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rc))
+        if rc.r - rc.l < 200:
+            return None
+        return rc.l, rc.t, rc.r, rc.b
+    except Exception:
+        return None
+
+
 def show_badge_window(title, body):
     import tkinter as tk
     import tkinter.font as tkfont
-    appearance = load_settings()["appearance"]
+    settings = load_settings()
+    appearance, sess = settings["appearance"], settings["session"]
+    pos = sess.get("badge_pos") or "Top right"
+    small = (sess.get("badge_size") or "Small") == "Small"
     c = theme_colors(appearance)
     accent2 = ACCENTS.get(appearance.get("accent"), ACCENTS["Void"])[1]
     key = "#010203"
@@ -2124,30 +2298,33 @@ def show_badge_window(title, body):
         root.attributes("-alpha", 0.0)
     except tk.TclError:
         pass
-    f_name = tkfont.Font(family="Segoe UI Semibold", size=10)
-    f_loc = tkfont.Font(family="Segoe UI", size=10)
-    name = title if len(title) <= 30 else title[:29] + "…"
-    sep = "   ·   "
-    w = 44 + f_name.measure(name) + f_loc.measure(sep + body) + 16
-    h = 30
+    f_name = tkfont.Font(family="Segoe UI Semibold", size=9 if small else 10)
+    f_loc = tkfont.Font(family="Segoe UI", size=9 if small else 10)
+    h = 24 if small else 30
+    dot = 7 if small else 9
+    text_x = 12 + dot * 2 + 6
+    if small:
+        parts = [(body, f_loc, c["fg"])]
+    else:
+        name = title if len(title) <= 28 else title[:27] + "…"
+        parts = [(name, f_name, c["fg"]), ("  ·  ", f_loc, c["muted"]), (body, f_loc, c["fg"])]
+    w = text_x + sum(f.measure(t) for t, f, _ in parts) + 12
     cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
     cv.pack()
-    pts = lambda x1, y1, x2, y2, r: [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2,
-                                     x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
-    cv.create_polygon(pts(0, 0, w - 1, h - 1, 15), smooth=True, splinesteps=20, fill=c["accent"], outline="")
-    cv.create_polygon(pts(1, 1, w - 2, h - 2, 14), smooth=True, splinesteps=20, fill=c["panel"], outline="")
-    cx, cy = 20, h // 2
-    cv.create_oval(cx - 8, cy - 8, cx + 8, cy + 8, fill=c["accent"], outline="")
-    cv.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill="#05030a", outline="#f5f3ff", width=1)
-    cv.create_line(cx - 10, cy + 2, cx + 10, cy - 2, fill=accent2, width=2)
-    x = 36
-    cv.create_text(x, cy, text=name, anchor="w", font=f_name, fill=c["fg"])
-    x += f_name.measure(name)
-    cv.create_text(x, cy, text=sep, anchor="w", font=f_loc, fill=c["muted"])
-    x += f_loc.measure(sep)
-    cv.create_text(x, cy, text=body, anchor="w", font=f_loc, fill=c["fg"])
-    sw = root.winfo_screenwidth()
-    root.geometry(f"{w}x{h}+{(sw - w) // 2}+6")
+    r = h // 2
+    pts = lambda x1, y1, x2, y2, rr: [x1 + rr, y1, x2 - rr, y1, x2, y1, x2, y1 + rr, x2, y2 - rr, x2, y2, x2 - rr, y2,
+                                      x1 + rr, y2, x1, y2, x1, y2 - rr, x1, y1 + rr, x1, y1]
+    cv.create_polygon(pts(0, 0, w - 1, h - 1, r), smooth=True, splinesteps=20, fill=c["accent"], outline="")
+    cv.create_polygon(pts(1, 1, w - 2, h - 2, r - 1), smooth=True, splinesteps=20, fill=c["panel"], outline="")
+    cx, cy = 12 + dot, h // 2
+    cv.create_oval(cx - dot, cy - dot, cx + dot, cy + dot, fill=c["accent"], outline="")
+    cv.create_oval(cx - dot // 2, cy - dot // 2, cx + dot // 2, cy + dot // 2, fill="#05030a", outline="#f5f3ff")
+    cv.create_line(cx - dot - 2, cy + 2, cx + dot + 2, cy - 2, fill=accent2, width=2)
+    x = text_x
+    for t, f, col in parts:
+        cv.create_text(x, cy, text=t, anchor="w", font=f, fill=col)
+        x += f.measure(t)
+    root.geometry(f"{w}x{h}+0+0")
     root.deiconify()
     root.update_idletasks()
     hwnd = _no_activate(root)
@@ -2158,19 +2335,39 @@ def show_badge_window(title, body):
             u.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
         except Exception:
             pass
-    state = {"alpha": 0.0}
+    state = {"alpha": 0.0, "xy": None}
+    peak = 0.86
+
+    def place():
+        rect = roblox_rect() or (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
+        L, T, R, B = rect
+        margin, top = 12, 66
+        if pos == "Top left":
+            xy = (L + margin, T + top)
+        elif pos == "Bottom left":
+            xy = (L + margin, B - h - margin - 8)
+        elif pos == "Bottom right":
+            xy = (R - w - margin, B - h - margin - 8)
+        elif pos == "Top center":
+            xy = (L + (R - L - w) // 2, T + 8)
+        else:
+            xy = (R - w - margin, T + top)
+        if xy != state["xy"]:
+            state["xy"] = xy
+            root.geometry(f"{w}x{h}+{xy[0]}+{xy[1]}")
 
     def tick():
-        target = 0.9 if roblox_in_front() else 0.0
+        target = peak if roblox_in_front() else 0.0
         state["alpha"] += (target - state["alpha"]) * 0.35
         if abs(state["alpha"] - target) < 0.02:
             state["alpha"] = target
         try:
+            place()
             root.attributes("-alpha", state["alpha"])
             root.attributes("-topmost", True)
         except tk.TclError:
             return
-        root.after(120 if state["alpha"] in (0.0, 0.9) else 30, tick)
+        root.after(150 if state["alpha"] in (0.0, peak) else 30, tick)
 
     tick()
     root.mainloop()
@@ -2661,6 +2858,15 @@ class Api:
     def minimize(self):
         self._window.minimize()
 
+    def set_startup(self, on):
+        try:
+            set_start_with_windows(bool(on))
+            self._settings["session"]["start_with_windows"] = bool(on)
+            save_settings(self._settings)
+            return {"on": bool(on)}
+        except Exception as e:
+            return self._err(e)
+
     def toggle_maximize(self):
         self._maximized = not getattr(self, "_maximized", False)
         try:
@@ -2781,6 +2987,7 @@ def _run_gui(mode, after_update, selftest):
                     SHOW_FLAG.unlink(missing_ok=True)
                     api.show_window()
         threading.Thread(target=watch_show_requests, daemon=True).start()
+        threading.Thread(target=AutoAttach("window").loop, daemon=True).start()
     icon = app_icon_file()
     try:
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")), icon=str(icon) if icon.exists() else None)
@@ -2806,6 +3013,18 @@ def main():
     if stale_extraction():
         log(f"Restarting cleanly (started with files from v{build_info().get('version')})")
         subprocess.Popen([sys.executable, *args], env=child_env({"ORBIT_REEXEC": "1"}))
+        return
+    if ATTACH_FLAG in args:
+        try:
+            attach_main()
+        except Exception:
+            log("Attach failed:\n" + traceback.format_exc())
+        return
+    if BACKGROUND_FLAG in args:
+        try:
+            background_main()
+        except Exception:
+            log("Background mode failed:\n" + traceback.format_exc())
         return
     if "--selftest-spawn" in args:
         subprocess.Popen([sys.executable, "--selftest"], env=child_env())

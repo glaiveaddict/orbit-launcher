@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.7.0
+- **Works however you open Roblox:** while Orbit is open, it notices Roblox running and turns on tracking, the location banner and the server badge, even if you started Roblox from its own app or another launcher.
+- **Start with Windows (optional):** a tiny background helper with no window, so all of this works even when Orbit is closed. Turn it on in Stats.
+- **Link guard:** if another launcher takes over the Roblox Play links, Orbit switches them back.
+- **New server badge:** smaller and on the side of the Roblox window, below Roblox's top bar, and it follows the window. Choose top left, top right, bottom left, bottom right or center, in Small (location only) or Normal (with the game name).
+
 ## v1.6.9
 - **Fix:** live tracking works again. v1.6.7 mistook real Roblox game logs for short helper logs and ignored them, so nothing showed during play.
 - **Now playing card:** Home shows the game you're in, its server location and a live timer while you play.

@@ -1149,7 +1149,12 @@ function renderSession() {
   box.append(
     toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
     ...(cfg.presets.exclusive_fullscreen ? [h("div", { class: "vstatus err" }, "Exclusive fullscreen is on in FastFlags, so the banner and badge can't show over the game while it's in exclusive fullscreen (Alt+Enter).")] : []),
-    toggleRow("Server badge while playing", "A small pill at the top of the screen shows the game and server location for as long as you're in that server. Clicks pass through it, and it hides when Roblox isn't in front.", s.server_badge !== false, (v) => { s.server_badge = v; save(); }),
+    toggleRow("Server badge while playing", "A small pill on the Roblox screen shows the server location for as long as you're in that server. Clicks pass through it, and it hides when Roblox isn't in front.", s.server_badge !== false, (v) => { s.server_badge = v; save(); }),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Badge position"), h("span", {}, "Where the badge sits on the Roblox window. Changes apply on your next server.")),
+      segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"], ["Top center", "Center"]], s.badge_pos || "Top right", (v) => { s.badge_pos = v; save(); })),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Badge size"), h("span", {}, "Small shows just the location. Normal adds the game name.")),
+      segmented([["Small", "Small"], ["Normal", "Normal"]], s.badge_size || "Small", (v) => { s.badge_size = v; save(); })),
+    toggleRow("Start with Windows", "Runs a tiny background helper (no window) so the badge, banner and stats work even when Orbit's window is closed, no matter how you open Roblox.", !!s.start_with_windows, async (v) => { const r = await api.set_startup(v); if (r && r.error) toast(r.error, "err"); else { s.start_with_windows = v; toast(v ? "Orbit now tracks Roblox in the background." : "Background tracking is off.", "ok"); } }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
   renderStats(); renderRecap(); renderTimeline();
