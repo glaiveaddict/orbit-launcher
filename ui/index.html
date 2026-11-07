@@ -960,8 +960,14 @@ function buildNav() {
     nav.append(b);
   });
 }
+async function refreshLive() {
+  try { Object.assign(S, await api.live_state()); } catch (e) {}
+}
 function go(id) {
   page = id;
+  if (["home", "session", "achievements", "library"].includes(id) && api && api.live_state && !go._busy) {
+    go._busy = true; refreshLive().then(() => { go._busy = false; if (page === id) ({ home: renderHome, session: renderSession, library: renderLibrary })[id]?.(); });
+  }
   $$(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === id));
   const active = $(`.nav-item[data-page="${id}"]`);
   $("#navInd").style.transform = `translateY(${active.offsetTop}px)`;
@@ -1749,6 +1755,15 @@ async function init() {
   buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits();
   go("home");
   api.ui_ready("app");
+  let liveSig = JSON.stringify([S.playtime, S.last_server]);
+  const liveTick = async () => {
+    if (!["home", "session", "achievements"].includes(page)) return;
+    await refreshLive();
+    const sig = JSON.stringify([S.playtime, S.last_server]);
+    if (sig !== liveSig) { liveSig = sig; ({ home: renderHome, session: renderSession, achievements: renderAchievements })[page]?.(); checkAchievements(); }
+  };
+  setInterval(liveTick, 15000);
+  window.addEventListener("focus", liveTick);
   setTimeout(showWhatsNew, 900);
   setTimeout(checkAchievements, 2600);
   setTimeout(() => checkUpdates(false), 1800);

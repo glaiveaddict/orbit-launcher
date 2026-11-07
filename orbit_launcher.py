@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.2"
+APP_VERSION = "1.6.3"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -42,6 +42,7 @@ SESSIONS_FILE = DATA_DIR / "sessions.json"
 ACHIEVEMENTS_FILE = DATA_DIR / "achievements.json"
 THUMBS_DIR = DATA_DIR / "Thumbs"
 SHOW_FLAG = DATA_DIR / "show.flag"
+MONITOR_FILE = DATA_DIR / "monitor.json"
 ICON_FILE = DATA_DIR / "roblox_icon.ico"
 EXTENSIONS_DIR = DATA_DIR / "Extensions"
 EXTENSION_NAME = "orbit_preview"
@@ -1045,12 +1046,16 @@ class SessionMonitor:
                     log_path = newer
                     fh = open(log_path, encoding="utf-8", errors="ignore")
                     log(f"Switched to {log_path.name}")
+                if getattr(self, "token", None) and monitor_claimed_by_other(self.token):
+                    log("A newer Orbit launch took over session tracking")
+                    self.handed_over = True
+                    break
                 not_running = 0 if roblox_running() else not_running + 1
                 if not_running >= 2:
                     break
         finally:
             fh.close()
-            if self.game and self.session.get("crash_rejoin"):
+            if self.game and self.session.get("crash_rejoin") and not getattr(self, "handed_over", False):
                 g = self.game
                 self.crashed = {"place_id": g["place_id"], "job_id": g["job_id"],
                                 "name": g["name"] or f"Place {g['place_id']}"}
@@ -1129,15 +1134,51 @@ def start_roblox(settings, uri):
 _MONITOR_MUTEX = None
 
 
-def acquire_monitor_lock():
+def acquire_monitor_lock(wait=0.0):
     global _MONITOR_MUTEX
     if not IS_WINDOWS:
         return True
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.CreateMutexW.restype = ctypes.c_void_p
     k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
-    _MONITOR_MUTEX = k32.CreateMutexW(None, False, "Local\\OrbitLauncherSessionMonitor")
-    return ctypes.get_last_error() != 183
+    k32.CloseHandle.argtypes = [ctypes.c_void_p]
+    end = time.time() + wait
+    while True:
+        handle = k32.CreateMutexW(None, False, "Local\\OrbitLauncherSessionMonitor")
+        if ctypes.get_last_error() != 183:
+            _MONITOR_MUTEX = handle
+            return True
+        k32.CloseHandle(handle)
+        if time.time() >= end:
+            return False
+        time.sleep(0.5)
+
+
+def stop_stale_copies():
+    if not IS_WINDOWS or not is_frozen():
+        return
+    me = str(Path(sys.executable).resolve()).replace("'", "''")
+    script = ("Get-Process -Name OrbitLauncher,OrbitSetup -ErrorAction SilentlyContinue | "
+              f"Where-Object {{ $_.Path -and $_.Path -ne '{me}' }} | "
+              "ForEach-Object { try { Stop-Process -Id $_.Id -Force -ErrorAction Stop; $_.Path } catch {} }")
+    try:
+        out = subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", script], capture_output=True,
+                             text=True, timeout=20, creationflags=CREATE_NO_WINDOW).stdout.strip()
+        if out:
+            log("Stopped old Orbit copies: " + ", ".join(sorted(set(out.splitlines()))))
+    except Exception as e:
+        log(f"Couldn't check for old Orbit copies: {e}")
+
+
+def claim_monitor():
+    token = uuid.uuid4().hex
+    save_json(MONITOR_FILE, {"token": token, "pid": os.getpid(), "version": APP_VERSION, "time": int(time.time())})
+    return token
+
+
+def monitor_claimed_by_other(token):
+    data = load_json(MONITOR_FILE, {}) or {}
+    return bool(data.get("token")) and data.get("token") != token
 
 
 def ask_rejoin(info):
@@ -1161,7 +1202,11 @@ def headless_main(uri):
     if not IS_WINDOWS:
         message_box("Launching Roblox only works on Windows.", error=True)
         return
-    owns_monitor = acquire_monitor_lock()
+    stop_stale_copies()
+    token = claim_monitor()
+    owns_monitor = acquire_monitor_lock(wait=15)
+    if not owns_monitor:
+        log("Another Orbit is still tracking the previous session; it will hand over shortly")
     updater = None
     while True:
         settings = load_settings()
@@ -1172,6 +1217,7 @@ def headless_main(uri):
         if not owns_monitor or not SessionMonitor.wanted(settings):
             break
         monitor = SessionMonitor(settings, launch_time)
+        monitor.token = token
         companions = start_companions(settings)
         monitor.boost.begin()
         try:
@@ -2111,6 +2157,10 @@ class Api:
         if launch and INSTALLED_EXE.exists():
             subprocess.Popen([str(INSTALLED_EXE)])
         self._window.destroy()
+
+    def live_state(self):
+        return {"playtime": load_json(PLAYTIME_FILE, {}), "last_server": load_json(LAST_SERVER_FILE, None),
+                "registered": is_registered(), "install": (player_dirs()[:1] or [None])[0] and player_dirs()[0].name}
 
     def play_game(self, pid):
         if not str(pid).isdigit():

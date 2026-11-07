@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.3
+- **Fix:** the server location popup and stats now work even if an older copy of Orbit was still running. Orbit shuts down stale copies and takes over tracking.
+- **Fix:** Orbit ignores Roblox's crash-handler log and always follows the real game log.
+- **Live stats:** Home, Stats and Achievements refresh on their own while Orbit is open.
+
 ## v1.6.2
 - **Setup fix:** setup no longer fails with "cannot find the file specified" on PCs where PowerShell isn't on the system PATH. Orbit now finds Windows tools directly.
 - **Setup fix:** if a shortcut can't be created, setup still finishes and tells you.
