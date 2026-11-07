@@ -1192,7 +1192,7 @@ function renderAppearance() {
   snd.append(segmented([["Warp", "Warp"], ["Nova", "Nova"], ["Pulse", "Pulse"], ["Chime", "Chime"], ["Off", "Off"]], cfg.sounds.pack, (v) => { cfg.sounds.pack = v; save(); sfx("launch", v); }));
   const vol = Math.round((cfg.sounds.volume ?? .6) * 100); $("#sndVol").value = vol; $("#sndVolVal").textContent = vol + "%"; $("#sndVol").style.setProperty("--fill", vol + "%");
   const tt = $("#trayToggle"); tt.innerHTML = "";
-  tt.append(toggleRow("Keep Orbit in the system tray", "Closing the window keeps Orbit by the clock with quick Launch, Rejoin and Library options. Takes effect next time Orbit opens.", a.tray !== false, (v) => { a.tray = v; save(); }));
+  tt.append(toggleRow("Close to the system tray", "Off: the X button fully shuts Orbit down. On: closing keeps Orbit by the clock with quick Launch, Rejoin and Library options. Takes effect next time Orbit opens.", !!a.close_to_tray, (v) => { a.close_to_tray = v; save(); }));
   const it = $("#iconToggle"); it.innerHTML = "";
   it.append(toggleRow("Use it on the Roblox window", "Shows your icon on Roblox's title bar and taskbar while it runs. No Roblox files are changed.", a.custom_window_icon, (v) => { a.custom_window_icon = v; save(); }));
 }

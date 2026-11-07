@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.6.8
+- **The X button now fully closes Orbit.** No more hunting for the tray icon to quit.
+- **Updates install when you close:** if an update has finished downloading, closing Orbit installs it, so the next time you open Orbit it's already on the new version.
+- Want the old behavior back? Turn on **Close to the system tray** in Appearance.
+
 ## v1.6.7
 - **Server badge:** a small pill at the top of your screen shows the game and server location for as long as you're in that server. Clicks pass through it, and it hides when you tab out of Roblox. Turn it off in Stats.
 - **Fix:** old background trackers are now always replaced, even on PCs where Windows' process info service (WMI) doesn't respond. If one still won't let go, Orbit tracks your session anyway.

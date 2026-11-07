@@ -18,7 +18,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.6.7"
+APP_VERSION = "1.6.8"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -141,6 +141,7 @@ DEFAULT_SETTINGS = {
         "bg_file": "",
         "bg_dim": 0.55,
         "tray": True,
+        "close_to_tray": False,
     },
     "updates": {"auto": True},
     "registration": {"registered": False, "backups": {}},
@@ -1810,7 +1811,7 @@ def swap_exe(new_exe, target_exe):
         raise
 
 
-def apply_pending_update(restart_args=()):
+def apply_pending_update(restart_args=(), restart=True):
     version = pending_update()
     if not version or not is_frozen():
         return False
@@ -1819,7 +1820,8 @@ def apply_pending_update(restart_args=()):
         (UPDATE_DIR / "OrbitLauncher.exe").unlink(missing_ok=True)
         (UPDATE_DIR / "pending.json").unlink(missing_ok=True)
         log(f"Updated to {version}")
-        subprocess.Popen([sys.executable, *restart_args], env=child_env())
+        if restart:
+            subprocess.Popen([sys.executable, *restart_args], env=child_env())
         return True
     except Exception as e:
         log(f"Applying update failed: {e}")
@@ -2635,7 +2637,7 @@ class Api:
         return self._maximized
 
     def close(self):
-        if self._tray is not None and self._settings["appearance"].get("tray", True) and not self._quitting:
+        if self._tray is not None and self._settings["appearance"].get("close_to_tray") and not self._quitting:
             self._window.hide()
             if not self._tray_hint:
                 self._tray_hint = True
@@ -2644,11 +2646,15 @@ class Api:
                 except Exception:
                     pass
             return "hidden"
+        self._quitting = True
         if self._tray is not None:
             try:
                 self._tray.stop()
             except Exception:
                 pass
+        if self._settings["updates"].get("auto", True) and pending_update():
+            apply_pending_update(restart=False)
+        log("Orbit closed")
         self._window.destroy()
 
 
@@ -2726,7 +2732,7 @@ def _run_gui(mode, after_update, selftest):
             window.destroy()
         threading.Thread(target=finish_selftest, daemon=True).start()
     elif mode == "app":
-        if api._settings["appearance"].get("tray", True):
+        if api._settings["appearance"].get("close_to_tray"):
             try:
                 api._tray = start_tray(api)
             except Exception as e:
@@ -2744,6 +2750,13 @@ def _run_gui(mode, after_update, selftest):
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")), icon=str(icon) if icon.exists() else None)
     except TypeError:
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")))
+    if mode == "app" and not selftest:
+        if api._tray is not None:
+            try:
+                api._tray.stop()
+            except Exception:
+                pass
+        os._exit(0)
 
 
 def _log_unhandled(kind, exc_type, exc, tb):
