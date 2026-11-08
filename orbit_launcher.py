@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.6.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -4591,8 +4591,6 @@ def revoked_premium_ids(refresh=False, fetch=True):
 
 def premium_status(settings, refresh=False, fetch=True):
     code = settings.get("premium_key") or ""
-    if is_owner():
-        return {"active": True, "owner": True, "for": "Owner", "exp": 0}
     if not code:
         return {"active": False, "reason": "none"}
     data = read_premium_key(code)
@@ -4679,7 +4677,7 @@ def push_revoked(key_id, revoked, token):
     return ids
 
 
-PREMIUM_LOCKED = "Boost is a Premium feature. Activate a premium key in Credits to use it."
+PREMIUM_LOCKED = "Boost is a Premium feature. Put in a premium key on the Premium page to use it."
 PERF_PREMIUM = {"high_priority": False, "power_plan": False, "gpu_high": False, "game_mode": False, "no_dvr": False,
                 "fps_cap": None, "graphics_quality": None}
 
@@ -6547,7 +6545,7 @@ class Api:
 
     def quick_preset(self, name, pid=None):
         if name == "Potato" and not has_premium(self._settings):
-            return {"error": "The Potato preset is a Premium feature. Activate a premium key in Credits to use it."}
+            return {"error": "The Potato preset is a Premium feature. Put in a premium key on the Premium page to use it."}
         try:
             apply_quick_preset(self._settings, name, pid)
             return {"settings": self._settings}

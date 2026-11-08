@@ -2748,11 +2748,6 @@ async function renderPremium(refresh = true) {
   const box = $("#premiumCard"); if (!box) return;
   const st = refresh && cfg.premium_key ? await api.premium(true) : (S.premium || { active: false, reason: "none" });
   premChanged(st); box.innerHTML = "";
-  if (st.owner) {
-    box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),
-      h("div", {}, h("h3", { style: "margin:0" }, "Orbit Premium"), h("p", { class: "sub", style: "margin:4px 0 0" }, "You're the owner, so premium is always on here."))));
-    return;
-  }
   if (st.active) {
     const left = st.exp ? Math.max(0, st.exp - Date.now() / 1000) : 0, days = Math.ceil(left / 86400);
     box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),

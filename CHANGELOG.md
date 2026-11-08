@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.6.1
+- The owner no longer gets premium automatically. To test premium, make a key for yourself on the Owner page and put it in on the Premium page, like any player.
+
 ## v2.6.0
 - **Premium page:** a new Premium section in the menu. Put in a premium key to unlock premium, see how many days you have left, and see everything premium unlocks.
 - **Keys work for one player only:** each new premium key is made for one Roblox account and only works while that account is the one playing. A shared key does nothing for anyone else. The time starts when the key is made.
