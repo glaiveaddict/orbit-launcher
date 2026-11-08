@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.11.0
+- **Custom skies fixed:** installing a sky now turns off Plain gray sky, which was replacing it with a flat light sky (it was on for BedWars). There's also a new **Hide Roblox's clouds** switch in the Pack store, so custom skies aren't covered by clouds. Orbit also warns you when your texture quality is on Lowest, which makes skies blurry.
+- **Discover:** a new page with what's trending on Roblox and a game search. Play in one click or add games to your Library.
+- **Orbit Wrapped (Premium):** your month, your year or all time as a story, plus a shareable image (Stats page).
+- **Auto-tune (Premium):** Orbit checks your graphics card, CPU, memory and screen and picks the best settings (Boost page).
+- **Auto-setups (Premium):** link a saved setup to a game in your Library, and it switches on when you launch that game.
+- **Auto-clip lag spikes (Premium):** saves an instant replay when your ping suddenly jumps.
+- **Theme maker (Premium):** make your own Orbit theme and share it with a code (Appearance page).
+- **AFK kick warning:** a heads-up about 3 minutes before Roblox kicks you for being idle.
+- **Private servers:** save private server links for each game and join in one click (the ⋯ button on Library games).
+- **Daily time limit per game:** a heads-up 10 minutes before, and when you hit it.
+- **Share codes:** share your crosshairs, cursors, setups and themes as a code a friend can import.
+- **Weekly recap to Discord:** posts your recap every Sunday. Friend and game update alerts can go to Discord too.
+
 ## v2.10.1
 - The connection test works on networks that block ping. Orbit measures your connection a different way there instead of reporting 100% lost packets.
 

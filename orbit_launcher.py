@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.10.1"
+APP_VERSION = "2.11.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -139,6 +139,8 @@ DEFAULT_SETTINGS = {
     "recent_players": [],
     "party": {},
     "setups": [],
+    "custom_themes": [],
+    "hide_clouds": False,
     "emoji": "",
     "language": "en",
     "sync": {"folder": ""},
@@ -186,6 +188,10 @@ DEFAULT_SETTINGS = {
         "pause_music": False,
         "auto_shot": 0,
         "net_check": False,
+        "afk_warn": True,
+        "clip_spikes": False,
+        "weekly_post": False,
+        "discord_alerts": False,
         "hop_ping": 150,
         "badge_pc": True,
     },
@@ -291,7 +297,7 @@ PREMIUM_FORCED = {("session", "server_popup"): False, ("session", "server_badge"
                   ("session", "lag_alerts"): False, ("hotkeys", "enabled"): False, ("fps", "enabled"): False,
                   ("replay", "enabled"): False, ("session", "auto_hop"): "off", ("session", "badge_pc"): False,
                   ("session", "mute_tabbed"): False, ("session", "dnd"): False, ("overlay", "stats_fps"): False,
-                  ("overlay", "stats_ping"): False}
+                  ("overlay", "stats_ping"): False, ("session", "clip_spikes"): False}
 
 
 def load_settings(raw=False):
@@ -1680,9 +1686,59 @@ class SessionMonitor:
                 self._publish(game)
             try:
                 self._check_hop(game)
+                self._check_spike(game, ms)
             except Exception as e:
                 log(f"Auto hop check failed: {e}")
             time.sleep(10)
+
+    def _afk_watch(self):
+        last_active, warned = time.time(), False
+
+        class LII(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_ulong)]
+        while not getattr(self, "finished", False) and roblox_running():
+            time.sleep(15)
+            try:
+                lii = LII(ctypes.sizeof(LII), 0)
+                ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii))
+                idle = (ctypes.windll.kernel32.GetTickCount() - lii.dwTime) / 1000
+            except Exception:
+                idle = 0
+            if self.game and roblox_in_front() and idle < 20:
+                last_active, warned = time.time(), False
+                continue
+            if not self.game:
+                last_active = time.time()
+                continue
+            away = time.time() - last_active
+            if away > 17 * 60 and not warned:
+                warned = True
+                spawn_toast("You'll be kicked for being idle soon", "Roblox kicks you after 20 minutes without moving. Click into Roblox and move a little.")
+                log("AFK warning shown")
+
+    def _limit_watch(self):
+        warned = {}
+        while not getattr(self, "finished", False) and roblox_running():
+            time.sleep(60)
+            g = self.game
+            if not g or not g.get("place_id"):
+                continue
+            entry = next((x for x in self.settings.get("library") or [] if str(x.get("pid")) == str(g["place_id"])), None)
+            limit = int((entry or {}).get("daily_limit") or 0) * 60
+            if not limit:
+                continue
+            today = time.strftime("%Y-%m-%d")
+            used = sum(int(x.get("seconds") or 0) for x in _sessions() if str(x.get("place_id")) == str(g["place_id"])
+                       and time.strftime("%Y-%m-%d", time.localtime(x.get("start", 0))) == today)
+            used += int(time.time() - g["joined"])
+            name = g.get("name") or (entry or {}).get("name") or "this game"
+            key = (today, str(g["place_id"]))
+            if used >= limit and warned.get(key) != "done":
+                warned[key] = "done"
+                spawn_toast(f"Time's up for {name}", f"You've hit your {fmt_duration(limit)} for today.")
+            elif used >= limit - 600 and not warned.get(key):
+                warned[key] = "soon"
+                spawn_toast(f"10 minutes left in {name}", f"You're close to your {fmt_duration(limit)} for today.")
 
     def _auto_shots(self, minutes):
         taken = 0
@@ -1698,6 +1754,25 @@ class SessionMonitor:
                     log(f"Auto screenshot failed: {e}")
         if taken:
             log(f"Took {taken} auto screenshot(s)")
+
+    def _check_spike(self, game, ms):
+        if ms is None or not self.session.get("clip_spikes") or not (Replay.proc and Replay.proc.poll() is None):
+            return
+        hist = [p for _, p in game["pings"][-8:-1] if p is not None]
+        if len(hist) < 4:
+            return
+        base = sorted(hist)[len(hist) // 2]
+        if ms <= max(150, base * 2.2, base + 80) or time.time() - getattr(self, "last_spike_clip", 0) < 120:
+            return
+        self.last_spike_clip = time.time()
+
+        def later():
+            time.sleep(5)
+            out = Replay.save(20, "Lag spike")
+            if out:
+                log(f"Saved a lag spike clip ({ms} ms, usual {base} ms)")
+                spawn_toast("Lag spike clipped", f"Your ping jumped to {ms} ms. The clip is in your Clips.")
+        threading.Thread(target=later, daemon=True).start()
 
     def _check_hop(self, game):
         mode = self.session.get("auto_hop") or "off"
@@ -1988,6 +2063,10 @@ class SessionMonitor:
             threading.Thread(target=self._auto_shots, args=(int(self.session["auto_shot"]),), daemon=True).start()
         if self.session.get("net_check"):
             threading.Thread(target=launch_net_check, daemon=True).start()
+        if self.session.get("afk_warn", True) and IS_WINDOWS:
+            threading.Thread(target=self._afk_watch, daemon=True).start()
+        if any((x.get("daily_limit") or 0) for x in self.settings.get("library") or []):
+            threading.Thread(target=self._limit_watch, daemon=True).start()
         if (self.settings.get("fps") or {}).get("enabled"):
             try:
                 self.fps = FpsTracker()
@@ -4290,6 +4369,7 @@ def check_friend_alerts():
             where = p.get("lastLocation") or "a game"
             save_json(DATA_DIR / "friend_alert.json", {"id": u["id"], "name": u.get("display") or u.get("name"), "at": int(time.time())})
             spawn_toast(f"{u.get('display') or u.get('name')} is playing", f"{where}. Press Ctrl+Alt+F to join them.")
+            discord_alert(settings, f"🎮 **{u.get('display') or u.get('name')}** just started playing **{where}**.")
             log(f"Friend alert: {u.get('name')} started playing {where}")
     save_json(PRESENCE_FILE, new)
 
@@ -4313,6 +4393,7 @@ def check_game_updates():
             continue
         if seen.get(uid) and seen[uid] != updated:
             spawn_toast(f"{d.get('name') or unis.get(uid)} just updated", "New version is live. Rejoin to get it.")
+            discord_alert(settings, f"🆕 **{d.get('name') or unis.get(uid)}** just released an update.")
             log(f"Game update: {d.get('name')} ({updated})")
         seen[uid] = updated
     save_json(GAME_UPDATES_FILE, seen)
@@ -4574,6 +4655,15 @@ def install_store_item(settings, item_id):
         else:
             download_file(url, folder / target)
         count += 1
+    if it["kind"] == "sky":
+        changed = settings["presets"].get("gray_sky")
+        settings["presets"]["gray_sky"] = False
+        for prof in (settings.get("game_profiles") or {}).values():
+            if (prof.get("presets") or {}).get("gray_sky"):
+                prof["presets"]["gray_sky"] = False
+                changed = True
+        if changed:
+            log("Turned off Plain gray sky so the new sky can show")
     if it["kind"] != "font":
         mine = load_json(STORE_INSTALLED, {}) or {}
         targets = set(it["files"])
@@ -4700,7 +4790,7 @@ def periodic_jobs(owner):
     st = load_json(DATA_DIR / "periodic_runs.json", {}) or {}
     jobs = [("premium", 3600, lambda: load_settings().get("premium_key") and revoked_premium_ids(True)),
             ("premium_left", 6 * 3600, premium_reminder), ("challenges", 600, check_challenges),
-            ("leftovers", 300, cleanup_leftovers),
+            ("leftovers", 300, cleanup_leftovers), ("weekly_post", 3600, weekly_post),
             ("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
             ("sync", 30 * 60, lambda: run_sync(load_settings())), ("clean", 24 * 3600, auto_clean)]
     for name, every, fn in jobs:
@@ -5455,6 +5545,351 @@ def cleanup_leftovers():
     MEDIA_FILE.unlink(missing_ok=True)
 
 
+def discord_alert(settings, text):
+    sess = settings.get("session") or {}
+    hook = (settings.get("discord") or {}).get("webhook")
+    if not sess.get("discord_alerts") or not hook:
+        return
+    try:
+        share_to_discord(hook, text)
+    except Exception as e:
+        log(f"Discord alert failed: {e}")
+
+
+def weekly_post():
+    settings = load_settings(raw=True)
+    if not settings["session"].get("weekly_post") or not (settings.get("discord") or {}).get("webhook"):
+        return
+    if time.localtime().tm_wday != 6 or time.localtime().tm_hour < 12:
+        return
+    key = week_key()
+    st = load_json(DATA_DIR / "weekly_post.json", {}) or {}
+    if st.get("week") == key:
+        return
+    recap = weekly_recap()
+    save_json(DATA_DIR / "weekly_post.json", {"week": key})
+    if recap.get("empty") or not has_pillow():
+        return
+    try:
+        dest = DATA_DIR / "weekly_post.png"
+        render_recap_png(recap, settings, dest)
+        share_to_discord(settings["discord"]["webhook"], "📊 My Orbit week", dest)
+        log("Posted the weekly recap to Discord")
+    except Exception as e:
+        log(f"Weekly recap post failed: {e}")
+
+
+CLOUD_FILES = ("content/sky/clouds.dds", "content/sky/clouds-bc4.dds", "content/sky/cloudsfb.dds")
+
+
+def blank_dds(src):
+    data = Path(src).read_bytes()
+    if data[:4] != b"DDS ":
+        raise ValueError("Not a DDS file")
+    head = 128 + (20 if data[84:88] == b"DX10" else 0)
+    return data[:head] + bytes(len(data) - head)
+
+
+def set_hide_clouds(settings, on):
+    folder = mods_dir(settings)
+    vdir = (player_dirs()[:1] or [None])[0]
+    made = 0
+    for rel in CLOUD_FILES:
+        dest = folder / rel
+        if not on:
+            dest.unlink(missing_ok=True)
+            continue
+        src = None
+        if vdir:
+            for cand in (Path(vdir) / MOD_BACKUP_DIR / rel, Path(vdir) / rel):
+                if cand.is_file():
+                    src = cand
+                    break
+        if not src:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(blank_dds(src))
+        made += 1
+    settings["hide_clouds"] = bool(on)
+    if on:
+        settings["apply_mods"] = True
+    save_settings(settings)
+    log(f"Hide clouds {'on' if on else 'off'} ({made} file(s))")
+    if on and not made:
+        raise ValueError("Orbit couldn't find Roblox's cloud files. Open Roblox once, then try again.")
+    return made
+
+
+def hardware_info():
+    info = {"cores": os.cpu_count() or 4, "ram_gb": None, "gpu": None, "vram_gb": None, "hz": None, "res": None}
+    if not IS_WINDOWS:
+        return info
+    try:
+        class MS(ctypes.Structure):
+            _fields_ = [("len", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong), ("avail", ctypes.c_ulonglong),
+                        ("tp", ctypes.c_ulonglong), ("ap", ctypes.c_ulonglong), ("tv", ctypes.c_ulonglong), ("av", ctypes.c_ulonglong),
+                        ("ave", ctypes.c_ulonglong)]
+        ms = MS()
+        ms.len = ctypes.sizeof(MS)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+        info["ram_gb"] = round(ms.total / 1024 ** 3)
+    except Exception:
+        pass
+    best = (None, 0)
+    try:
+        base = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as k:
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(k, i)
+                except OSError:
+                    break
+                i += 1
+                if not sub.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(k, sub) as g:
+                        name = winreg.QueryValueEx(g, "DriverDesc")[0]
+                        try:
+                            mem = int(winreg.QueryValueEx(g, "HardwareInformation.qwMemorySize")[0])
+                        except OSError:
+                            try:
+                                raw = winreg.QueryValueEx(g, "HardwareInformation.MemorySize")[0]
+                                mem = int.from_bytes(raw, "little") if isinstance(raw, bytes) else int(raw)
+                            except OSError:
+                                mem = 0
+                        if mem >= best[1] or best[0] is None:
+                            best = (name, mem)
+                except OSError:
+                    continue
+    except OSError:
+        pass
+    info["gpu"], info["vram_gb"] = best[0], round(best[1] / 1024 ** 3, 1) if best[1] else None
+    try:
+        class DM(ctypes.Structure):
+            _fields_ = [("name", ctypes.c_wchar * 32), ("spec", ctypes.c_ushort), ("drv", ctypes.c_ushort), ("size", ctypes.c_ushort),
+                        ("extra", ctypes.c_ushort), ("fields", ctypes.c_ulong), ("pos", ctypes.c_long * 2), ("orient", ctypes.c_ulong),
+                        ("fixed", ctypes.c_ulong), ("color", ctypes.c_short), ("duplex", ctypes.c_short), ("yres", ctypes.c_short),
+                        ("tt", ctypes.c_short), ("collate", ctypes.c_short), ("form", ctypes.c_wchar * 32), ("logpix", ctypes.c_ushort),
+                        ("bits", ctypes.c_ulong), ("w", ctypes.c_ulong), ("h", ctypes.c_ulong), ("flags", ctypes.c_ulong),
+                        ("hz", ctypes.c_ulong)]
+        dm = DM()
+        dm.size = ctypes.sizeof(DM)
+        if ctypes.windll.user32.EnumDisplaySettingsW(None, -1, ctypes.byref(dm)):
+            info["hz"], info["res"] = int(dm.hz), f"{dm.w}x{dm.h}"
+    except Exception:
+        pass
+    return info
+
+
+def autotune_plan(info):
+    gpu = (info.get("gpu") or "").lower()
+    vram = info.get("vram_gb") or 0
+    weak_gpu = any(x in gpu for x in ("intel", "uhd", "iris", "hd graphics", "vega 3", "vega 8", "radeon graphics", "basic display")) or (vram and vram < 2.5)
+    strong_gpu = (vram and vram >= 7) or any(x in gpu for x in ("rtx 30", "rtx 40", "rtx 50", "rx 6", "rx 7", "rx 9", "arc a7", "arc b"))
+    cores, ram = info.get("cores") or 4, info.get("ram_gb") or 8
+    if weak_gpu or cores <= 4 or ram < 8:
+        tier = "light"
+    elif strong_gpu and cores >= 8 and ram >= 16:
+        tier = "high"
+    else:
+        tier = "medium"
+    hz = info.get("hz") or 60
+    cap = min(MAX_FPS_CAP, max(60, hz)) if hz > 1 else 60
+    if tier == "light":
+        cap = min(cap, 60)
+    presets = {"light": QUICK_PRESETS["Balanced"], "medium": {"graphics_api": "Direct3D 11", "msaa": "1x", "texture_quality": "3 (highest)",
+               "lighting_quality": "Automatic", "remove_grass": False, "low_poly_meshes": False}, "high": QUICK_PRESETS["Quality"]}[tier]
+    quality = {"light": 3, "medium": 6, "high": 9}[tier]
+    why = {"light": "Your PC is on the lighter side, so Orbit picks smooth frames over looks.",
+           "medium": "Your PC can handle sharp textures with steady frames.",
+           "high": "Your PC is strong, so Orbit turns the looks up and matches your screen's refresh rate."}[tier]
+    return {"tier": tier, "presets": dict(presets), "fps_cap": cap, "graphics_quality": quality, "why": why}
+
+
+def apply_autotune(settings, plan):
+    settings["presets"].update({k: v for k, v in plan["presets"].items() if k in DEFAULT_PRESETS})
+    settings["performance"]["fps_cap"] = plan["fps_cap"]
+    settings["performance"]["graphics_quality"] = plan["graphics_quality"]
+    save_settings(settings)
+    log(f"Auto-tune applied: {plan['tier']}, {plan['fps_cap']} FPS, quality {plan['graphics_quality']}")
+
+
+SHARE_PREFIX = "ORBIT1-"
+
+
+def make_share_code(kind, payload):
+    import zlib
+    body = zlib.compress(json.dumps({"k": kind, "v": payload}, separators=(",", ":")).encode(), 9)
+    return SHARE_PREFIX + _b64u(body)
+
+
+def read_share_code(code):
+    import zlib
+    code = re.sub(r"\s", "", code or "")
+    if not code.startswith(SHARE_PREFIX):
+        raise ValueError("That isn't an Orbit share code. It starts with ORBIT1-.")
+    try:
+        dec = zlib.decompressobj()
+        raw = dec.decompress(_unb64u(code[len(SHARE_PREFIX):]), 1 << 20)
+        if dec.unconsumed_tail:
+            raise ValueError("too big")
+        data = json.loads(raw)
+    except Exception:
+        raise ValueError("That share code is broken. Copy the whole thing.")
+    if not isinstance(data, dict) or data.get("k") not in ("crosshair", "cursor", "setup", "theme"):
+        raise ValueError("That share code isn't something Orbit can use.")
+    return data["k"], data.get("v")
+
+
+PRIVATE_RE = re.compile(r"privateServerLinkCode=([\w-]+)", re.I)
+
+
+def private_server_uri(place_id, link):
+    m = PRIVATE_RE.search(link or "")
+    return f"roblox://experiences/start?placeId={int(place_id)}&linkCode={m.group(1)}" if m else None
+
+
+def wrapped_data(period="month"):
+    now = time.time()
+    lt = time.localtime(now)
+    if period == "year":
+        start = time.mktime((lt.tm_year, 1, 1, 0, 0, 0, 0, 0, -1))
+        label = str(lt.tm_year)
+    elif period == "all":
+        start, label = 0, "All time"
+    else:
+        start = time.mktime((lt.tm_year, lt.tm_mon, 1, 0, 0, 0, 0, 0, -1))
+        label = time.strftime("%B %Y", lt)
+    sess = [x for x in _sessions() if x.get("start", 0) >= start]
+    if not sess:
+        return {"empty": True, "label": label}
+    games = {}
+    for x in sess:
+        g = games.setdefault(str(x.get("place_id")), {"name": x.get("name") or str(x.get("place_id")), "seconds": 0, "sessions": 0, "place_id": str(x.get("place_id"))})
+        g["seconds"] += int(x.get("seconds") or 0)
+        g["sessions"] += 1
+    top = sorted(games.values(), key=lambda g: -g["seconds"])[:5]
+    total = sum(int(x.get("seconds") or 0) for x in sess)
+    cities = {}
+    for x in sess:
+        if x.get("location"):
+            c = ", ".join(part.strip() for part in x["location"].split(",")[:2])
+            cities[c] = cities.get(c, 0) + 1
+    hours = [0] * 24
+    for x in sess:
+        hours[time.localtime(x.get("start", 0)).tm_hour] += int(x.get("seconds") or 0)
+    peak = max(range(24), key=lambda h: hours[h])
+    longest = max(sess, key=lambda x: int(x.get("seconds") or 0))
+    days = len({time.strftime("%Y-%m-%d", time.localtime(x.get("start", 0))) for x in sess})
+    share_top = top[0]["seconds"] / total if total else 0
+    night = sum(hours[h] for h in (22, 23, 0, 1, 2, 3, 4)) / total if total else 0
+    if night > 0.4:
+        ptype, pdesc = "Night Owl", "Your best gaming happens after dark."
+    elif share_top > 0.7:
+        ptype, pdesc = "Loyalist", f"You know {top[0]['name']} inside out."
+    elif len(games) >= 10:
+        ptype, pdesc = "Explorer", "Always trying something new."
+    elif total / max(1, len(sess)) > 5400:
+        ptype, pdesc = "Grinder", "Long sessions, no breaks, all focus."
+    else:
+        ptype, pdesc = "All-Rounder", "A little bit of everything."
+    return {"label": label, "period": period, "hours": round(total / 3600, 1), "sessions": len(sess), "games": len(games), "days": days,
+            "top": top, "city": max(cities, key=cities.get) if cities else None, "cities": len(cities), "peak_hour": peak,
+            "longest": {"name": longest.get("name"), "seconds": int(longest.get("seconds") or 0), "start": longest.get("start")},
+            "type": ptype, "type_desc": pdesc}
+
+
+def wrapped_image(data, settings, dest):
+    from PIL import Image, ImageDraw, ImageFilter
+    W, H = 1080, 1350
+    c1, c2 = accent_pair(settings["appearance"])
+    a1, a2 = (tuple(int(x[i:i + 2], 16) for i in (1, 3, 5)) for x in (c1, c2))
+    img = Image.new("RGB", (W, H), (8, 5, 16))
+    glow = Image.new("RGB", (W, H), (0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([500, -300, 1400, 600], fill=a2)
+    gd.ellipse([-400, 700, 600, 1700], fill=a1)
+    img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(180)), 0.6)
+    d = ImageDraw.Draw(img)
+    d.text((80, 90), "ORBIT WRAPPED", font=_font(34, True), fill=(220, 210, 255))
+    d.text((80, 140), data["label"], font=_font(84, True), fill=(255, 255, 255))
+    d.text((80, 280), f"{data['hours']} hours", font=_font(110, True), fill=a2)
+    d.text((86, 410), f"{data['sessions']} sessions · {data['games']} games · {data['days']} days", font=_font(34), fill=(210, 200, 240))
+    y = 500
+    d.text((80, y), "TOP GAMES", font=_font(26, True), fill=(170, 160, 210))
+    for i, g in enumerate(data["top"]):
+        d.text((80, y + 46 + i * 66), f"{i + 1}. {g['name'][:30]}", font=_font(40, True), fill=(255, 255, 255))
+        d.text((W - 80, y + 52 + i * 66), fmt_duration(g["seconds"]), font=_font(32), fill=a2, anchor="ra")
+    y = 900
+    for label, val in (("MOST VISITED SERVER", data.get("city") or "-"), ("LONGEST SESSION", f"{fmt_duration(data['longest']['seconds'])} · {(data['longest']['name'] or '')[:22]}")):
+        d.text((80, y), label, font=_font(24, True), fill=(170, 160, 210))
+        d.text((80, y + 34), val, font=_font(38, True), fill=(255, 255, 255))
+        y += 110
+    d.rounded_rectangle([70, 1130, W - 70, 1270], 32, fill=(20, 14, 34), outline=a1, width=3)
+    d.text((110, 1150), "YOU'RE A", font=_font(24, True), fill=(170, 160, 210))
+    d.text((110, 1182), data["type"].upper(), font=_font(52, True), fill=a2)
+    d.text((W - 110, 1205), data["type_desc"][:40], font=_font(26), fill=(210, 200, 240), anchor="ra")
+    d.text((W // 2, H - 30), "Orbit Launcher", font=_font(22), fill=(150, 140, 180), anchor="ms")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img.save(dest)
+    return dest
+
+
+EXPLORE_CACHE = {}
+
+
+def _game_list(items):
+    out = []
+    for g in items or []:
+        if not isinstance(g, dict):
+            continue
+        uni, place = g.get("universeId"), g.get("rootPlaceId") or g.get("placeId")
+        if not uni or not place:
+            continue
+        out.append({"universe": int(uni), "place_id": str(place), "name": g.get("name") or "", "players": g.get("playerCount"),
+                    "up": g.get("totalUpVotes"), "down": g.get("totalDownVotes")})
+    return out
+
+
+def explore_sorts():
+    hit = EXPLORE_CACHE.get("sorts")
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    data = fetch_json(f"https://apis.roblox.com/explore-api/v1/get-sorts?sessionId={uuid.uuid4()}&device=computer&country=all", timeout=12)
+    sorts = []
+    for st in data.get("sorts") or []:
+        games = _game_list(st.get("games"))
+        if games:
+            sorts.append({"id": st.get("sortId"), "name": st.get("sortDisplayName") or st.get("sortId") or "Games", "games": games[:24]})
+    EXPLORE_CACHE["sorts"] = (time.time(), sorts)
+    return sorts
+
+
+def search_games(q):
+    data = fetch_json(f"https://apis.roblox.com/search-api/omni-search?searchQuery={urllib.parse.quote(q)}&sessionId={uuid.uuid4()}&pageType=all", timeout=12)
+    items = []
+    for grp in data.get("searchResults") or []:
+        if str(grp.get("contentGroupType", "")).lower() in ("game", "games"):
+            items += grp.get("contents") or []
+    return _game_list(items)[:24]
+
+
+def universe_icons(ids):
+    out = {}
+    for i in range(0, len(ids), 50):
+        chunk = ",".join(str(x) for x in ids[i:i + 50])
+        try:
+            data = fetch_json(f"https://thumbnails.roblox.com/v1/games/icons?universeIds={chunk}&size=150x150&format=Png&isCircular=false", timeout=10)
+            for x in data.get("data") or []:
+                if x.get("imageUrl"):
+                    out[str(x.get("targetId"))] = x["imageUrl"]
+        except Exception as e:
+            log(f"Game icons failed: {e}")
+    return out
+
+
 def premium_reminder():
     st = premium_status(load_settings(raw=True), fetch=False)
     if not st.get("active") or not st.get("exp"):
@@ -5884,7 +6319,15 @@ def headless_main(uri):
     updater, token, owns_monitor = None, None, None
     while True:
         try:
-            enforce_premium(load_settings(raw=True))
+            raw = load_settings(raw=True)
+            enforce_premium(raw)
+            pid = place_id_from_uri(uri)
+            entry = next((x for x in raw.get("library") or [] if pid and str(x.get("pid")) == str(pid)), None)
+            if entry and entry.get("setup") and has_premium(raw):
+                snap = next((x for x in raw.get("setups") or [] if x.get("name") == entry["setup"]), None)
+                if snap:
+                    apply_setup(raw, snap.get("data") or {})
+                    log(f"Switched to the {entry['setup']} setup for {entry.get('name') or pid}")
         except Exception as e:
             log(f"Premium check failed: {e}")
         settings = load_settings()
@@ -8398,6 +8841,160 @@ class Api:
         try:
             r = weekly_challenges() if has_premium(self._settings) else {"items": [], "locked": True}
             return r
+        except Exception as e:
+            return self._err(e)
+
+    def set_hide_clouds(self, on):
+        try:
+            set_hide_clouds(self._settings, bool(on))
+            push_mods_now(self._settings)
+            return {"settings": self._settings, "running": roblox_running()}
+        except Exception as e:
+            return self._err(e)
+
+    def autotune(self, apply=False):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED, "locked": True}
+        try:
+            info = hardware_info()
+            plan = autotune_plan(info)
+            if apply:
+                apply_autotune(self._settings, plan)
+            return {"info": info, "plan": plan, "settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def set_game_option(self, pid, key, value):
+        if key not in ("setup", "daily_limit"):
+            return {"error": "Unknown option."}
+        if key == "setup" and value and not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        for g in self._settings.get("library") or []:
+            if str(g.get("pid")) == str(pid):
+                g[key] = (int(value) if key == "daily_limit" else str(value)[:24]) if value else None
+                save_settings(self._settings)
+                return {"settings": self._settings}
+        return {"error": "That game isn't in your Library."}
+
+    def add_private_server(self, pid, name, link):
+        link = (link or "").strip()
+        if not re.match(r"https?://(www\.)?roblox\.com/", link):
+            return {"error": "Paste the private server link from Roblox (it starts with https://www.roblox.com/)."}
+        for g in self._settings.get("library") or []:
+            if str(g.get("pid")) == str(pid):
+                ps = g.setdefault("private_servers", [])
+                ps.append({"name": (name or "").strip()[:30] or f"Private server {len(ps) + 1}", "link": link})
+                save_settings(self._settings)
+                return {"settings": self._settings}
+        return {"error": "That game isn't in your Library."}
+
+    def remove_private_server(self, pid, index):
+        for g in self._settings.get("library") or []:
+            if str(g.get("pid")) == str(pid) and 0 <= int(index) < len(g.get("private_servers") or []):
+                g["private_servers"].pop(int(index))
+                save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def join_private_server(self, pid, index):
+        g = next((x for x in self._settings.get("library") or [] if str(x.get("pid")) == str(pid)), None)
+        ps = (g or {}).get("private_servers") or []
+        if not 0 <= int(index) < len(ps):
+            return {"error": "That server is gone."}
+        uri = private_server_uri(pid, ps[int(index)]["link"])
+        if uri:
+            return self.launch(uri)
+        webbrowser.open(ps[int(index)]["link"])
+        return {"opened": True}
+
+    def share_code(self, kind, ref=None):
+        try:
+            if kind in ("crosshair", "cursor"):
+                f = pack_file(ref)
+                if not f.exists():
+                    return {"error": "That one is gone."}
+                meta = load_json(f.with_suffix(".json"), {}) or {}
+                payload = {"name": meta.get("name") or f.stem, "png": base64.b64encode(f.read_bytes()).decode()}
+            elif kind == "setup":
+                items = self._settings.get("setups") or []
+                st = items[int(ref)]
+                payload = {"name": st["name"], "data": st["data"]}
+            elif kind == "theme":
+                items = self._settings.get("custom_themes") or []
+                payload = items[int(ref)]
+            else:
+                return {"error": "Unknown kind."}
+            code = make_share_code(kind, payload)
+            copy_to_clipboard(code)
+            return {"code": code}
+        except Exception as e:
+            return self._err(e)
+
+    def import_code(self, code):
+        try:
+            kind, v = read_share_code(code)
+            name = re.sub(r"[^A-Za-z0-9 _-]", "", str((v or {}).get("name") or "")).strip()[:30] or "Shared"
+            if kind in ("crosshair", "cursor"):
+                url = "data:image/png;base64," + str(v.get("png") or "")
+                cid = save_custom_crosshair(name, url) if kind == "crosshair" else save_custom_cursor(name, url)
+                return {"kind": kind, "id": cid, "name": name}
+            if kind == "setup":
+                if not has_premium(self._settings):
+                    return {"error": PREMIUM_LOCKED}
+                items = self._settings.setdefault("setups", [])
+                if len(items) >= 6:
+                    return {"error": "You can keep 6 setups. Delete one first."}
+                data = {k: val for k, val in (v.get("data") or {}).items() if k in SETUP_PARTS}
+                items.append({"name": name, "at": int(time.time()), "data": data})
+                save_settings(self._settings)
+                return {"kind": kind, "name": name, "settings": self._settings}
+            t = v or {}
+            cols = [c for c in (t.get("colors") or []) if re.fullmatch(r"#[0-9a-fA-F]{6}", str(c))][:2]
+            if len(cols) != 2:
+                return {"error": "That theme code is broken."}
+            theme = {"name": name, "colors": cols, "mode": "Light" if t.get("mode") == "Light" else "Dark",
+                     "bg": t.get("bg") if t.get("bg") in ("Starfield", "Warp", "Nebula", "Aurora") else "Starfield",
+                     "glow": max(0, min(100, int(t.get("glow") or 60)))}
+            self._settings.setdefault("custom_themes", []).append(theme)
+            save_settings(self._settings)
+            return {"kind": kind, "name": name, "settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def wrapped(self, period="month"):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED, "locked": True}
+        try:
+            return wrapped_data(period if period in ("month", "year", "all") else "month")
+        except Exception as e:
+            return self._err(e)
+
+    def save_wrapped(self, period="month"):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            data = wrapped_data(period)
+            if data.get("empty"):
+                return {"error": "Play a few games first."}
+            dest = pictures_dir() / "Orbit" / f"Orbit Wrapped {data['label']}.png"
+            wrapped_image(data, self._settings, dest)
+            open_path(dest)
+            return {"path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def discover(self, query=""):
+        try:
+            if query and query.strip():
+                games = search_games(query.strip())
+                sorts = [{"id": "search", "name": f"Results for \"{query.strip()[:30]}\"", "games": games}]
+            else:
+                sorts = explore_sorts()
+            ids = sorted({g["universe"] for st in sorts for g in st["games"]})
+            icons = universe_icons(ids)
+            for st in sorts:
+                for g in st["games"]:
+                    g["icon"] = icons.get(str(g["universe"]))
+            return {"sorts": sorts}
         except Exception as e:
             return self._err(e)
 

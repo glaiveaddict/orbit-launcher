@@ -258,6 +258,15 @@ jobs:
           print("CHECK stats overlay:", "alive", sp.poll() is None, "ready" if "Stats overlay ready" in lt else "no ready line", "ERROR" if "Stats overlay error" in lt else "")
           ok &= sp.poll() is None and "Stats overlay error" not in lt
           ol.kill_tree(sp.pid); fake2.destroy()
+          hw = ol.hardware_info(); print("CHECK hardware:", hw, "->", ol.autotune_plan(hw)["tier"]); ok &= bool(hw["cores"])
+          try:
+              srt = ol.explore_sorts(); print("CHECK discover sorts:", [(x["name"], len(x["games"])) for x in srt][:6])
+          except Exception as e:
+              print("CHECK discover sorts failed:", e)
+          try:
+              sg = ol.search_games("bedwars"); print("CHECK discover search:", [(g["name"], g["place_id"]) for g in sg][:3])
+          except Exception as e:
+              print("CHECK discover search failed:", e)
           sealed = ol._dpapi(b"github_pat_test")
           print("CHECK token encryption:", sealed != b"github_pat_test", ol._dpapi(sealed, False) == b"github_pat_test")
           ok &= sealed != b"github_pat_test" and ol._dpapi(sealed, False) == b"github_pat_test"
