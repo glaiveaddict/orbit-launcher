@@ -209,6 +209,10 @@ jobs:
           print("CHECK replay:", out, [l.strip() for l in dur.splitlines() if "Duration" in l])
           ok &= bool(out)
           print("CHECK fps_ready:", ol.fps_ready())
+          me = os.getpid()
+          thr, pri = ol.set_power_throttle(me, True), ol.set_priority(pid=me, cls=0x4000)
+          print("CHECK tab-out guard calls:", thr, pri, ol.set_power_throttle(me, False), ol.set_priority(pid=me, cls=0x20))
+          ok &= thr and pri == 1
           print("CHECK frames:", ol.summarize_frames(ol.parse_frame_times(["MsBetweenPresents"], ["6.9"] * 200)))
           sys.exit(0 if ok else 1)
           PY

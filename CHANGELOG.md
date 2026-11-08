@@ -1,6 +1,7 @@
 # Changelog
 
 ## v2.2.0
+- **Unlimited FPS is back** as an option, now with a **tab-out guard**: when Roblox isn't the window in front, Orbit drops it to low priority and Windows' power-saving mode, so Discord, your browser and the desktop stay smooth. Full speed returns the moment you click back into Roblox. The guard is on by default (Boost > Fine-tune).
 - **Join a player:** type a Roblox username in the Library to see if they're online or in a game, then join their server in one click. It works whenever their Roblox privacy lets you join them. Recent players are saved for quick rejoining.
 - **Auto-reconnect:** if Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone.
 - **Lag spike alerts:** the in-game badge flashes red when your ping suddenly jumps.

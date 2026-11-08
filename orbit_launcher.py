@@ -127,7 +127,7 @@ DEFAULT_SETTINGS = {
     "launch_with": [],
     "performance": {"high_priority": False, "power_plan": False, "boost": False, "boost_level": "Max",
                     "boost_profiles": True, "fps_cap": None, "graphics_quality": None, "gpu_high": False,
-                    "game_mode": False, "no_dvr": False, "gpu_applied": False, "boost_backup": {}, "win_backup": {}},
+                    "game_mode": False, "no_dvr": False, "gpu_applied": False, "bg_guard": True, "boost_backup": {}, "win_backup": {}},
     "smart_join": False,
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
@@ -260,6 +260,7 @@ def ensure_dirs():
 
 
 MAX_FPS_CAP = 240
+UNLIMITED_FPS = 9999
 
 
 def load_settings():
@@ -268,7 +269,7 @@ def load_settings():
     perf = settings.get("performance") or {}
     for holder in (perf, (perf.get("boost_backup") or {}).get("perf") or {}):
         cap = holder.get("fps_cap")
-        if isinstance(cap, (int, float)) and cap > MAX_FPS_CAP:
+        if isinstance(cap, (int, float)) and cap > MAX_FPS_CAP and cap != UNLIMITED_FPS:
             holder["fps_cap"] = MAX_FPS_CAP
     return settings
 
@@ -794,7 +795,7 @@ def write_gbs(perf):
         return False
     text = GBS_FILE.read_text(encoding="utf-8", errors="ignore")
     if cap is not None:
-        cap = max(30, min(MAX_FPS_CAP, int(cap)))
+        cap = UNLIMITED_FPS if int(cap) >= UNLIMITED_FPS else max(30, min(MAX_FPS_CAP, int(cap)))
     elif (DATA_DIR / "GlobalBasicSettings_13.orbit-backup.xml").exists():
         m = re.search(r'<int name="FramerateCap">(-?\d+)</int>', text)
         if m and int(m.group(1)) > MAX_FPS_CAP:
@@ -1032,6 +1033,68 @@ def set_priority(pid=None, image=None, cls=0x00008000):
         except Exception:
             pass
     return done
+
+
+def set_power_throttle(pid, on):
+    if not IS_WINDOWS:
+        return False
+    try:
+        class PPTS(ctypes.Structure):
+            _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
+        st = PPTS(1, 1 if on else 0, 1 if on else 0)
+        k32, h = _open_process(pid, 0x0200)
+        if not h:
+            return False
+        k32.SetProcessInformation.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+        ok = bool(k32.SetProcessInformation(h, 4, ctypes.byref(st), ctypes.sizeof(st)))
+        k32.CloseHandle.argtypes = [ctypes.c_void_p]
+        k32.CloseHandle(h)
+        return ok
+    except Exception:
+        return False
+
+
+class BackgroundGuard:
+    def __init__(self, perf):
+        self.perf = perf or {}
+        self.dimmed = False
+        self.stop_event = threading.Event()
+        self.pids = []
+        self.pids_at = 0
+
+    def _pids(self):
+        if time.time() - self.pids_at > 5:
+            self.pids, self.pids_at = pids_named("RobloxPlayerBeta.exe"), time.time()
+        return self.pids
+
+    def apply(self, dim):
+        normal = 0x00008000 if self.perf.get("high_priority") else 0x00000020
+        for pid in self._pids():
+            set_priority(pid=pid, cls=0x00004000 if dim else normal)
+            set_power_throttle(pid, dim)
+        self.dimmed = dim
+
+    def run(self):
+        while not self.stop_event.wait(0.35):
+            try:
+                if not self._pids():
+                    continue
+                front = roblox_in_front()
+                if not front and not self.dimmed:
+                    self.apply(True)
+                elif front and self.dimmed:
+                    self.apply(False)
+            except Exception:
+                pass
+        if self.dimmed:
+            self.apply(False)
+
+    def start(self):
+        threading.Thread(target=self.run, daemon=True).start()
+        return self
+
+    def stop(self):
+        self.stop_event.set()
 
 
 def raise_own_priority():
@@ -1753,6 +1816,8 @@ class SessionMonitor:
         log(f"Watching {log_path.name}")
         if (self.settings.get("overlay") or {}).get("keystrokes"):
             start_keys()
+        perf = self.settings.get("performance") or {}
+        self.guard = BackgroundGuard(perf).start() if IS_WINDOWS and perf.get("bg_guard", True) else None
         if (self.settings.get("fps") or {}).get("enabled"):
             try:
                 self.fps = FpsTracker()
@@ -1822,6 +1887,8 @@ class SessionMonitor:
                 Replay.stop()
             if getattr(self, "fps", None):
                 self.fps.stop()
+            if getattr(self, "guard", None):
+                self.guard.stop()
             if self.ipc:
                 self.ipc.close()
 
@@ -3773,8 +3840,13 @@ def apply_jump_list():
     if not IS_WINDOWS or not is_frozen():
         return False
     import clr
-    for asm in ("PresentationFramework", "PresentationCore", "WindowsBase"):
-        clr.AddReference(asm)
+    token = ", Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35"
+    for asm in ("WindowsBase", "PresentationCore", "PresentationFramework"):
+        try:
+            clr.AddReference(asm + token)
+        except Exception:
+            from System.Reflection import Assembly
+            Assembly.Load(asm + token)
     from System.Threading import ApartmentState, Thread, ThreadStart
     from System.Windows.Shell import JumpList, JumpTask
     exe = str(helper_ready() or sys.executable)
