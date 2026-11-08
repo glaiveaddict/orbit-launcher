@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.1.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -248,9 +248,18 @@ def ensure_dirs():
     (PROFILES_DIR / "Default").mkdir(parents=True, exist_ok=True)
 
 
+MAX_FPS_CAP = 240
+
+
 def load_settings():
     loaded = load_json(SETTINGS_FILE, {})
-    return _merge(DEFAULT_SETTINGS, loaded if isinstance(loaded, dict) else {})
+    settings = _merge(DEFAULT_SETTINGS, loaded if isinstance(loaded, dict) else {})
+    perf = settings.get("performance") or {}
+    for holder in (perf, (perf.get("boost_backup") or {}).get("perf") or {}):
+        cap = holder.get("fps_cap")
+        if isinstance(cap, (int, float)) and cap > MAX_FPS_CAP:
+            holder["fps_cap"] = MAX_FPS_CAP
+    return settings
 
 
 def save_settings(settings):
@@ -764,9 +773,17 @@ def _reg_del(path, name):
 
 def write_gbs(perf):
     cap, quality = perf.get("fps_cap"), perf.get("graphics_quality")
-    if (cap is None and not quality) or not GBS_FILE.exists() or roblox_running():
+    if not GBS_FILE.exists() or roblox_running():
         return False
     text = GBS_FILE.read_text(encoding="utf-8", errors="ignore")
+    if cap is not None:
+        cap = max(30, min(MAX_FPS_CAP, int(cap)))
+    elif (DATA_DIR / "GlobalBasicSettings_13.orbit-backup.xml").exists():
+        m = re.search(r'<int name="FramerateCap">(-?\d+)</int>', text)
+        if m and int(m.group(1)) > MAX_FPS_CAP:
+            cap = MAX_FPS_CAP
+    if cap is None and not quality:
+        return False
     new = text
     if cap is not None:
         new = re.sub(r'(<int name="FramerateCap">)-?\d+(</int>)', rf"\g<1>{int(cap)}\g<2>", new)
@@ -1641,7 +1658,6 @@ class SessionMonitor:
         return fh
 
     def run(self):
-        raise_own_priority()
         self.positions = {}
         log_path = None
         deadline = time.time() + 90
@@ -1886,6 +1902,11 @@ class AutoAttach:
                 check_roblox_update(load_settings())
             except Exception as e:
                 log(f"Roblox update check failed: {e}")
+            try:
+                if IS_WINDOWS and not roblox_running():
+                    write_gbs(load_settings().get("performance") or {})
+            except Exception as e:
+                log(f"Frame rate cap check failed: {e}")
         if time.time() - getattr(self, "last_predownload", 0) > 20 * 60 and not roblox_running():
             self.last_predownload = time.time()
             threading.Thread(target=predownload_roblox, daemon=True).start()
@@ -2763,7 +2784,6 @@ def close_keys():
 
 
 def show_keys_window():
-    raise_own_priority()
     import tkinter as tk
     import tkinter.font as tkfont
     settings = load_settings()
@@ -2842,10 +2862,19 @@ def show_keys_window():
             pass
     log(f"Keystrokes overlay at {xy} ({pos})")
 
+    state["shown"] = True
+
     def poll():
         try:
             now = time.time()
             visible = roblox_in_front()
+            if visible and not state["shown"]:
+                overlay_show(hwnd, True)
+                state["shown"] = True
+                state["xy"] = None
+            if not visible and state["alpha"] == 0.0 and state["shown"]:
+                overlay_show(hwnd, False)
+                state["shown"] = False
             target = peak if visible else 0.0
             state["alpha"] += (target - state["alpha"]) * 0.35
             if abs(state["alpha"] - target) < 0.02:
@@ -2867,16 +2896,15 @@ def show_keys_window():
                 nxy = target_xy()
                 if nxy != state["xy"]:
                     state["xy"] = nxy
-                    u32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), nxy[0], nxy[1], 0, 0, 0x0001 | 0x0010 | 0x0040) \
+                    u32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), nxy[0], nxy[1], 0, 0, 0x0001 | 0x0010) \
                         if u32 and hwnd else root.geometry(f"+{nxy[0]}+{nxy[1]}")
-                root.attributes("-topmost", True)
         except tk.TclError:
             return
         except Exception:
             if not state.get("logged"):
                 state["logged"] = True
                 log("Keystrokes error:\n" + traceback.format_exc())
-        root.after(16 if state["alpha"] > 0 else 200, poll)
+        root.after(16 if state["alpha"] > 0 else 250, poll)
 
     poll()
     root.mainloop()
@@ -3892,6 +3920,21 @@ def roblox_rect():
         return None
 
 
+def overlay_show(hwnd, on):
+    if not hwnd or not IS_WINDOWS:
+        return
+    try:
+        u = ctypes.windll.user32
+        u.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        u.ShowWindow(ctypes.c_void_p(hwnd), 4 if on else 0)
+        if on:
+            u.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                       ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+            u.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010)
+    except Exception:
+        pass
+
+
 def ping_ms(ip):
     if not ip or not IS_WINDOWS:
         return None
@@ -3905,7 +3948,6 @@ def ping_ms(ip):
 
 
 def show_badge_window(title, body, ip=None, joined=None):
-    raise_own_priority()
     import tkinter as tk
     import tkinter.font as tkfont
     settings = load_settings()
@@ -3991,8 +4033,7 @@ def show_badge_window(title, body, ip=None, joined=None):
                 u = ctypes.windll.user32
                 u.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
                                            ctypes.c_int, ctypes.c_int, ctypes.c_uint]
-                moved = bool(u.SetWindowPos(state["hwnd"], ctypes.c_void_p(-1), xy[0], xy[1], 0, 0,
-                                            0x0001 | 0x0010 | 0x0040))
+                moved = bool(u.SetWindowPos(state["hwnd"], ctypes.c_void_p(-1), xy[0], xy[1], 0, 0, 0x0001 | 0x0010))
             except Exception:
                 moved = False
         if not moved:
@@ -4033,17 +4074,26 @@ def show_badge_window(title, body, ip=None, joined=None):
             hh, mm, ss = sec // 3600, sec % 3600 // 60, sec % 60
             cv.itemconfigure(items["timer"], text=f"{hh}:{mm:02d}:{ss:02d}" if hh else f"{mm}:{ss:02d}")
 
+    state["shown"] = True
+
     def tick():
         try:
             visible = roblox_in_front() and not BADGE_HIDDEN.exists()
+            if visible and not state["shown"]:
+                overlay_show(state["hwnd"], True)
+                state["shown"] = True
+                state["xy"] = None
             target = peak if visible else 0.0
             state["alpha"] += (target - state["alpha"]) * 0.35
             if abs(state["alpha"] - target) < 0.02:
                 state["alpha"] = target
-            place()
-            refresh_numbers()
-            root.attributes("-alpha", state["alpha"])
-            root.attributes("-topmost", True)
+            if state["shown"]:
+                place()
+                refresh_numbers()
+                root.attributes("-alpha", state["alpha"])
+            if not visible and state["alpha"] == 0.0 and state["shown"]:
+                overlay_show(state["hwnd"], False)
+                state["shown"] = False
         except tk.TclError:
             return
         except Exception:

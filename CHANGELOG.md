@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.1.1
+- **Fix: PC freezing when you tab out of Roblox.** The Unlimited frame rate option let Roblox push your graphics card so hard (especially on loading screens and teleports) that Windows couldn't draw the desktop or other apps. Unlimited is gone: the highest cap is now 240 (Roblox's own maximum), and anyone who had Unlimited is moved to 240 automatically, even if they launch Roblox without Orbit.
+- **Overlays step aside properly:** the server badge and keystrokes overlay now fully hide whenever Roblox isn't the window in front, instead of staying as invisible always-on-top windows, and no longer re-assert "always on top" several times a second.
+- Orbit's background helpers run at normal priority again.
+
 ## v2.1.0
 - **Crosshair maker:** design your own shift-lock crosshair on the Mods page. Pick a style (cross, dot, circle, T or X), color, length, gap, thickness, outline, opacity and center dot, with a live preview over a BedWars-style map. Save it and use it everywhere or for one game.
 - **Per-game crosshairs:** every game in your Library can have its own crosshair. It switches in when you launch that game from Orbit and switches back for everything else. The BedWars kit now uses this too.

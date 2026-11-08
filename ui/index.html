@@ -1826,7 +1826,7 @@ async function openLightbox(i) {
   const full = await api.screenshot_full(it.path); if (full && shotItems[lbIndex] === it) img.src = full;
 }
 
-const FPS_CAPS = [["", "Roblox's choice"], ["60", "60"], ["144", "144"], ["240", "240"], ["9999", "Unlimited"]];
+const FPS_CAPS = [["", "Roblox's choice"], ["60", "60"], ["120", "120"], ["144", "144"], ["165", "165"], ["240", "240"]];
 const QUALITIES = [["", "Roblox's choice"], ["1", "Lowest"], ["3", "Low"], ["5", "Medium"], ["8", "High"], ["10", "Max"]];
 function syncSettings(r) { if (r && r.settings) for (const k of Object.keys(r.settings)) cfg[k] = r.settings[k]; }
 async function applySystem(msg) {
@@ -1862,11 +1862,10 @@ function renderFps() {
 }
 function renderFpsTune() {
   const p = cfg.performance, box = $("#fpsTune"); box.innerHTML = "";
-  const capSeg = segmented(FPS_CAPS, p.fps_cap == null ? "" : String(p.fps_cap), (v) => { p.fps_cap = v === "" ? null : Number(v); applySystem(v === "9999" ? "FPS unlocked. Above 240 can make some PCs run hotter, so drop it if things get unstable." : "FPS cap saved."); renderFps(); renderFpsTune(); });
+  const capSeg = segmented(FPS_CAPS, p.fps_cap == null ? "" : String(p.fps_cap), (v) => { p.fps_cap = v === "" ? null : Number(v); applySystem("FPS cap saved. Matching your monitor's refresh rate is the smoothest choice."); renderFps(); renderFpsTune(); });
   const qSeg = segmented(QUALITIES, p.graphics_quality ? String(p.graphics_quality) : "", (v) => { p.graphics_quality = v === "" ? null : Number(v); applySystem("Graphics quality saved."); renderFps(); });
   box.append(h("h3", { style: "margin-bottom:4px" }, "Fine-tune"), h("p", { class: "sub" }, "Orbit writes these into Roblox's own settings before it starts, so they work in every game. Roblox has to be launched through Orbit (or restarted) to pick them up."),
     h("div", { class: "field" }, h("label", {}, "Frame rate cap"), capSeg),
-    ...(p.fps_cap >= 9999 ? [h("div", { class: "vstatus err", style: "margin:-6px 0 12px" }, "Unlimited makes Roblox use as much CPU and GPU as it can, which can make your PC and overlays (like the server badge) lag. 240, or your monitor's refresh rate, is smoother for most people.")] : []),
     h("div", { class: "field" }, h("label", {}, "Roblox graphics quality"), qSeg),
     toggleRow("Use my fastest graphics card", "On laptops with two GPUs, makes Windows run Roblox on the powerful one.", p.gpu_high, (v) => { p.gpu_high = v; applySystem(v ? "Roblox will use your high performance GPU." : "GPU choice is back to Windows' default."); renderFps(); }),
     toggleRow("Windows Game Mode", "Tells Windows to prioritize the game you're playing.", p.game_mode, (v) => { p.game_mode = v; applySystem(v ? "Game Mode is on." : "Game Mode is back to how it was."); renderFps(); }),

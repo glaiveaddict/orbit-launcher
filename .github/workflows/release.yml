@@ -111,7 +111,7 @@ jobs:
               print(f"FOUND {name}: {len(hits)} purple samples, box x={min(xs)}-{max(xs)} y={min(ys)}-{max(ys)}, screen {full.size}")
           else:
               print(f"FOUND {name}: nothing purple in the top 400px, screen {full.size}")
-          box = {"badge": (W - 460, 40, W, 120), "keys": (W - 260, img.height - 360, W, img.height)}.get(name, (W // 2 - 360, 0, W // 2 + 360, 130))
+          box = {"badge": (W - 460, 40, W, 120), "badgehidden": (W - 460, 40, W, 120), "keys": (W - 260, img.height - 360, W, img.height)}.get(name, (W // 2 - 360, 0, W // 2 + 360, 130))
           crop = img.crop(box).convert("RGB")
           px = crop.load()
           purple = sum(1 for x in range(crop.width) for y in range(crop.height)
@@ -151,6 +151,11 @@ jobs:
           ORBIT_BADGE_ALWAYS=1 "$HELPER" --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge --ip 8.8.8.8 --joined $(( $(date +%s) - 754 )) &
           sleep 4
           python render_check.py badge
+          taskkill //IM OrbitHelper.exe //F > /dev/null 2>&1
+          "$HELPER" --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge --ip 8.8.8.8 --joined $(( $(date +%s) - 754 )) &
+          sleep 4
+          python render_check.py badgehidden
+          taskkill //IM OrbitHelper.exe //F > /dev/null 2>&1
           ORBIT_BADGE_ALWAYS=1 "$HELPER" --orbit-toast keys x --keys &
           sleep 4
           python render_check.py keys
