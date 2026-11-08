@@ -610,6 +610,21 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .report span { font-size: 12.5px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.05); }
 .pj-chip .bell { opacity: .55; padding: 0 2px; } .pj-chip .bell.on { opacity: 1; filter: drop-shadow(0 0 4px #fbbf24); }
 .lib-upd { font-size: 11px; color: var(--accent2); font-weight: 650; }
+.nav-item[hidden] { display: none; }
+.prem-pill { margin-left: 8px; font-size: 10px; font-weight: 850; letter-spacing: .12em; padding: 3px 9px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; box-shadow: 0 0 14px -4px #f59e0b; }
+.prem-pill[hidden] { display: none; }
+.code-box { font-family: "DejaVu Mono", monospace; font-size: 11.5px; word-break: break-all; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); line-height: 1.5; max-height: 92px; overflow: auto; flex: 1; user-select: all; }
+.key-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); animation: rise .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.key-row:first-child { border-top: 0; }
+.key-row b { display: block; } .key-row span { color: var(--muted); font-size: 12.5px; }
+.key-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: rgba(74,222,128,.12); color: #4ade80; }
+.key-tag.off { background: rgba(251,113,133,.12); color: #fb7185; } .key-tag.wait { background: rgba(251,191,36,.12); color: #fbbf24; } .key-tag.old { background: rgba(255,255,255,.06); color: var(--muted); }
+.prem-head { display: flex; align-items: center; gap: 14px; }
+.prem-gem { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(135deg, #f59e0b, #fde047); color: #1a1205; font-size: 22px; flex: none; box-shadow: 0 8px 24px -10px #f59e0b; }
+.prem-gem.off { background: var(--panel3); color: var(--muted); box-shadow: none; }
+.cov { display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: start; }
+.cov-pv { width: 96px; height: 96px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
+.cov-pv img { image-rendering: pixelated; }
 </style>
 </head>
 <body>
@@ -618,7 +633,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
   <header class="titlebar">
     <div class="drag pywebview-drag-region">
       <svg width="24" height="24" viewBox="-50 -50 100 100"><defs><linearGradient id="tg" x1="0" x2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent2)"/></linearGradient></defs><ellipse rx="46" ry="14" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/><circle r="20" fill="#000" stroke="#f5f3ff" stroke-width="3"/><path d="M -46 0 A 46 14 0 0 0 46 0" fill="none" stroke="url(#tg)" stroke-width="7" transform="rotate(-14)"/></svg>
-      <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span>
+      <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span><span class="prem-pill" id="premPill" hidden>PREMIUM</span>
     </div>
     <button class="win-btn mini-btn" id="miniBtn" title="Mini player (small always-on-top window)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/></svg></button>
     <button class="kbd-btn" id="palBtn" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<kbd>Ctrl K</kbd></button>
@@ -756,6 +771,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:3" id="storeCard"></div>
       <div class="card rise" style="--i:3" id="fontCard"></div>
       <div class="card rise" style="--i:3" id="xmakerCard"></div>
+      <div class="card rise" style="--i:3" id="crossOvCard"></div>
       <div class="card rise" style="--i:3">
         <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original crosshairs, cursors and death sounds made for Orbit. The crosshair is what you see in shift lock and first person. Installs into the selected mod profile.</p></div><span class="spacer"></span><div id="packTabs"></div></div>
         <div class="packs" id="packGrid" style="margin-top:12px"></div>
@@ -885,9 +901,16 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="rise" style="--i:0;margin-bottom:12px"><button class="btn ghost" id="gameBack">← Back</button></div>
       <div id="gameBody"></div>
     </section>
+    <section class="page" id="page-owner">
+      <div class="page-head rise" style="--i:0"><h1>Owner panel</h1><p>Only you can see this. Give players premium access with a key.</p></div>
+      <div class="card rise" style="--i:1" id="ownerIssue"></div>
+      <div class="card rise" style="--i:2" id="ownerKeys"></div>
+      <div class="card rise" style="--i:3" id="ownerSafe"></div>
+    </section>
     <section class="page" id="page-credits">
       <div class="page-head rise" style="--i:0"><h1>Credits</h1><p>The people behind Orbit.</p></div>
       <div class="grid2" id="creditList"></div>
+      <div class="card rise" style="--i:5" id="premiumCard"></div>
       <div class="card rise" style="--i:6">
         <div class="row"><div><h3>About &amp; updates</h3><p class="sub" style="margin:0" id="creditFoot"></p></div><span class="spacer"></span>
           <button class="btn" id="checkUpd">Check for updates</button></div>
@@ -963,13 +986,14 @@ const ICONS = {
   file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
   box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
   news: '<path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2M8 9h6M8 13h6M8 17h4"/>',
+  owner: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 21h14"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["servers", "Servers"],
                ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
-               ["#Orbit"], ["news", "News"], ["health", "Health"], ["credits", "Credits"]];
+               ["#Orbit"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
 
 let api = null, S = null, cfg = null, page = "home";
 const iconCache = {};
@@ -1236,6 +1260,7 @@ function buildNav() {
   PAGES.forEach(([id, label]) => {
     if (id.startsWith("#")) { nav.append(h("div", { class: "nav-group" }, id.slice(1).toUpperCase())); return; }
     const b = h("button", { class: "nav-item", "data-page": id });
+    if (id === "owner") b.hidden = !S.owner;
     b.innerHTML = svg(id) + `<span>${label}</span>`;
     b.addEventListener("click", () => go(id));
     nav.append(b);
@@ -1245,6 +1270,7 @@ async function refreshLive() {
   try { Object.assign(S, await api.live_state()); } catch (e) {}
 }
 function go(id) {
+  if (id === "owner" && !S.owner) id = "home";
   page = id;
   if (["home", "session", "achievements", "library"].includes(id) && api && api.live_state && !go._busy) {
     go._busy = true; refreshLive().then(() => { go._busy = false; if (page === id) ({ home: renderHome, session: renderSession, library: renderLibrary })[id]?.(); });
@@ -1256,7 +1282,7 @@ function go(id) {
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
-     appearance: renderAppearance, extensions: () => {}, credits: () => {}, library: renderLibrary, servers: renderServers,
+     appearance: renderAppearance, extensions: () => {}, credits: renderPremium, owner: renderOwner, library: renderLibrary, servers: renderServers,
      achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
@@ -1425,7 +1451,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
-  renderStore(); renderFonts(); renderMaker(); renderPacks();
+  renderStore(); renderFonts(); renderMaker(); renderCrossOverlay(); renderPacks();
 }
 
 
@@ -2285,7 +2311,11 @@ function renderMaker() {
     if (r.error) return toast(r.error, "err");
     crossList = null; sfx("ready"); packKind = "crosshair"; renderPacks();
     const use = await modal({ title: "Crosshair saved", text: "Use it everywhere now? You can also pick it for just one game in your Library.", ok: "Use everywhere" });
-    if (use) { const x = await api.install_pack(r.id, true); x.error ? toast(x.error, "err") : (toast("Your crosshair is on. It shows next time Roblox starts.", "ok"), renderPacks()); }
+    if (use) {
+      const x = await api.install_pack(r.id, true); if (x.error) return toast(x.error, "err");
+      const o = await api.set_overlay_crosshair(r.id); if (!o.error) syncSettings(o);
+      toast("Your crosshair is on, as a mod and as the overlay, so it shows in games like BedWars too.", "ok"); renderPacks(); renderCrossOverlay();
+    }
   };
   box.append(h("h3", { style: "margin-bottom:4px" }, "Crosshair maker"), h("p", { class: "sub" }, "Design your own shift-lock crosshair. The big preview is zoomed in; the small one in the corner is real size."),
     h("div", { class: "xmaker" }, h("div", { class: "xprev" }, big, real, h("span", { class: "tag" }, "preview")),
@@ -2652,10 +2682,126 @@ async function renderOverlay() {
       h("button", { class: "btn", onclick: async () => { await api.copy_text(url); toast("Overlay link copied.", "ok"); } }, "Copy link"),
       h("button", { class: "btn", onclick: () => api.open_url(url) }, "Open in browser")));
 }
+function setPremPill(st) { $("#premPill").hidden = !(st && st.active); }
+const fmtDay = (ts) => new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+async function unlockOwner() {
+  const r = await api.import_owner_key(); if (!r) return;
+  if (r.error) return toast(r.error, "err");
+  S.owner = true; $('.nav-item[data-page="owner"]').hidden = false; go("owner"); sfx("ready"); toast("Owner panel unlocked on this PC.", "ok");
+}
+async function renderPremium(refresh = true) {
+  const box = $("#premiumCard"); if (!box) return;
+  const st = refresh && cfg.premium_key ? await api.premium(true) : (S.premium || { active: false, reason: "none" });
+  S.premium = st; setPremPill(st); box.innerHTML = "";
+  if (st.active) {
+    box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),
+      h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Orbit Premium"),
+        h("p", { class: "sub", style: "margin:4px 0 0" }, (st.for ? `Given to ${st.for}. ` : "") + (st.exp ? `Active until ${fmtDay(st.exp)}.` : "Active forever."))),
+      h("button", { class: "btn danger", onclick: async () => {
+        if (!await modal({ title: "Remove premium?", text: "You'll need the key again to turn it back on.", ok: "Remove", danger: true })) return;
+        const r = await api.remove_premium(); syncSettings(r); S.premium = r.status; renderPremium(false); toast("Premium removed.", "ok");
+      } }, "Remove")));
+    return;
+  }
+  const why = { expired: "Your premium key has expired.", revoked: "Your premium key was turned off by the owner.", invalid: "Your saved premium key isn't valid anymore." }[st.reason];
+  const inp = h("input", { class: "input mono", placeholder: "ORBIT-PREMIUM-...", style: "flex:1" });
+  const btn = h("button", { class: "btn primary" }, "Activate");
+  const go_ = async () => {
+    if (!inp.value.trim()) return;
+    btn.disabled = true; const r = await api.activate_premium(inp.value); btn.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    syncSettings(r); S.premium = r.status; sfx("ready"); toast("Premium is on. Welcome!", "ok"); renderPremium(false);
+  };
+  btn.onclick = go_; inp.onkeydown = (e) => { if (e.key === "Enter") go_(); };
+  box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem off" }, "💎"),
+    h("div", {}, h("h3", { style: "margin:0" }, "Orbit Premium"), h("p", { class: "sub", style: "margin:4px 0 0" }, why || "Got a premium key from the owner? Paste it here."))),
+    h("div", { class: "row", style: "margin-top:12px" }, inp, btn));
+}
+async function renderOwner() {
+  if (!S.owner) return go("home");
+  const iss = $("#ownerIssue"); iss.innerHTML = "";
+  let days = "0";
+  const name = h("input", { class: "input", placeholder: "Player's Roblox username", style: "flex:1", maxlength: 40 });
+  const dur = segmented([["0", "Forever"], ["30", "30 days"], ["7", "7 days"]], days, (v) => { days = v; });
+  const make = h("button", { class: "btn primary" }, "Create premium key");
+  const out = h("div");
+  make.onclick = async () => {
+    make.disabled = true; const r = await api.owner_issue(name.value.trim(), +days); make.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    await api.copy_text(r.code); sfx("ready"); toast("Key created and copied.", "ok");
+    out.innerHTML = "";
+    out.append(h("div", { class: "stat-label", style: "margin-top:14px" }, `Key for ${r.key.for || "a player"}` + (r.key.exp ? ` · ends ${fmtDay(r.key.exp)}` : " · never ends")),
+      h("div", { class: "row", style: "margin-top:6px;align-items:stretch" }, h("div", { class: "code-box" }, r.code),
+        h("button", { class: "btn", onclick: async () => { await api.copy_text(r.code); toast("Key copied.", "ok"); } }, "Copy")),
+      h("p", { class: "sub", style: "margin:8px 0 0" }, "Send this to the player. They paste it in Credits > Orbit Premium."));
+    name.value = ""; renderOwnerKeys();
+  };
+  name.onkeydown = (e) => { if (e.key === "Enter") make.click(); };
+  iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Creates a key signed with your owner key. Nobody else can make one, and changing anything in a key breaks it."),
+    h("div", { class: "row" }, name, dur, make), out);
+  requestAnimationFrame(() => dur._remeasure());
+  renderOwnerKeys();
+  const safe = $("#ownerSafe"); safe.innerHTML = "";
+  safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
+    h("button", { class: "btn", onclick: async () => { const r = await api.owner_backup_key(); if (!r) return; r.error ? toast(r.error, "err") : toast("Owner key backed up.", "ok"); } }, "Back up owner key")));
+}
+async function renderOwnerKeys() {
+  const box = $("#ownerKeys"); box.innerHTML = "";
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Keys you've given out"), h("div", { class: "row", style: "margin:10px 0" }, h("span", { class: "spinner", style: "color:var(--accent)" })));
+  const r = await api.owner_keys();
+  box.innerHTML = "";
+  if (r.error) return box.append(h("p", { class: "sub" }, r.error));
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Keys you've given out"),
+    h("p", { class: "sub" }, "Turning a key off copies the updated list and opens premium_revoked.json on GitHub. Select everything there, paste, and press Commit changes. Players lose premium within an hour."));
+  if (!r.issued.length) return box.append(h("p", { class: "muted small" }, "No keys yet."));
+  const live = new Set(r.revoked_live || []), now = Date.now() / 1000;
+  const list = h("div");
+  r.issued.forEach((k, i) => {
+    const expired = k.exp && now > k.exp, pending = k.revoked !== live.has(k.id);
+    const tag = k.revoked ? (pending ? ["wait", "Turning off"] : ["off", "Off"]) : expired ? ["old", "Expired"] : pending ? ["wait", "Turning on"] : ["", "Active"];
+    list.append(h("div", { class: "key-row", style: `--i:${i}` },
+      h("div", { style: "min-width:0" }, h("b", {}, k.for || "Unnamed"), h("span", {}, `Made ${fmtDay(k.iat)} · ` + (k.exp ? `ends ${fmtDay(k.exp)}` : "never ends") + ` · #${k.id}`)),
+      h("span", { class: "key-tag " + tag[0] }, tag[1]),
+      h("div", { class: "row" },
+        h("button", { class: "btn ghost", onclick: async () => { await api.copy_text(k.code); toast("Key copied.", "ok"); } }, "Copy"),
+        h("button", { class: "btn" + (k.revoked ? "" : " danger"), onclick: async () => {
+          if (!k.revoked && !await modal({ title: `Turn off ${k.for || "this"} key?`, text: "GitHub opens next. Paste the copied list into premium_revoked.json and commit it.", ok: "Turn off", danger: true })) return;
+          const x = await api.owner_revoke(k.id, !k.revoked); if (x.error) return toast(x.error, "err");
+          toast("List copied. Paste it on GitHub and commit.", "ok"); renderOwnerKeys();
+        } }, k.revoked ? "Turn on" : "Turn off"))));
+  });
+  box.append(list);
+}
+async function renderCrossOverlay() {
+  const box = $("#crossOvCard"); if (!box) return;
+  const list = await loadCrossList(true), ov = cfg.overlay || (cfg.overlay = {});
+  box.innerHTML = "";
+  const img = h("img", { alt: "" });
+  const sizePx = () => Math.round(64 * (ov.crosshair_size || 100) / 100);
+  const upd = () => { const c = list.find((x) => x.id === ov.crosshair); img.src = c ? c.data : ""; img.style.display = c ? "" : "none"; img.style.width = img.style.height = Math.min(92, sizePx()) + "px"; };
+  const push = async (cid, mode, size) => { const r = await api.set_overlay_crosshair(cid, mode, size); if (r.error) return toast(r.error, "err"); syncSettings(r); upd(); };
+  const sel = h("select", { class: "input" }, h("option", { value: "" }, "Off"), ...list.map((c) => h("option", { value: c.id }, c.name + (c.custom ? " (yours)" : ""))));
+  sel.value = ov.crosshair || "";
+  sel.onchange = async () => { await push(sel.value, null, null); toast(sel.value ? "Crosshair overlay on. It shows while you're in a game." : "Crosshair overlay off.", "ok"); };
+  const mode = segmented([["locked", "When the mouse is locked"], ["always", "Always"]], ov.crosshair_mode || "locked", (v) => push(null, v, null));
+  const r = h("input", { type: "range", min: 50, max: 200, step: 10, value: ov.crosshair_size || 100 }), v = h("div", { class: "range-val" }, (ov.crosshair_size || 100) + "%");
+  const fill = () => r.style.setProperty("--fill", ((r.value - 50) / 150 * 100) + "%");
+  r.oninput = () => { v.textContent = r.value + "%"; ov.crosshair_size = +r.value; fill(); upd(); };
+  r.onchange = () => push(null, null, +r.value); fill();
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Crosshair overlay"),
+    h("p", { class: "sub" }, "Games like BedWars swap out Roblox's cursor for their own, so a crosshair mod never shows up there. The overlay draws your crosshair on top of Roblox, in the exact middle of the game window, so it works in every game. Clicks go straight through it, and it hides when you tab out."),
+    h("div", { class: "cov" }, h("div", { class: "cov-pv" }, img),
+      h("div", {}, h("div", { class: "field" }, h("label", {}, "Crosshair"), sel),
+        h("div", { class: "field" }, h("label", {}, "Show it"), mode),
+        h("div", { class: "field" }, h("label", {}, "Size"), h("div", { class: "range-wrap" }, r, v)))),
+    h("p", { class: "muted small", style: "margin:10px 0 0" }, "A crosshair you pick for one game in your Library takes over while you play that game."));
+  upd(); requestAnimationFrame(() => mode._remeasure());
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
-  PAGES.filter(([id]) => !id.startsWith("#")).forEach(([id, label]) => A.push({ ico: "→", t: `Go to ${label}`, k: "Page", run: () => go(id) }));
+  PAGES.filter(([id]) => !id.startsWith("#") && (id !== "owner" || S.owner)).forEach(([id, label]) => A.push({ ico: "→", t: `Go to ${label}`, k: "Page", run: () => go(id) }));
   A.push({ ico: "▶", t: "Launch Roblox", k: "Action", run: () => $("#launchBtn").click() });
   if (S.last_server && S.last_server.place_id) A.push({ ico: "↻", t: "Rejoin last server", k: S.last_server.name || "", run: () => $("#rejoinBtn").click() });
   cfg.library.forEach((g) => { A.push({ ico: "🎮", t: `Play ${g.name}`, k: "Library", run: () => playGame(g) }); A.push({ ico: "🛰", t: `Find servers: ${g.name}`, k: "Servers", run: () => { go("servers"); findServers(g.pid); } }); });
@@ -2692,6 +2838,10 @@ function palActions() {
   A.push({ ico: "📁", t: "Open Roblox folder", k: "Folders", run: () => api.open_roblox_folder() });
   A.push({ ico: "🖼", t: "Open screenshots folder", k: "Folders", run: () => api.open_screenshots_folder() });
   A.push({ ico: "💾", t: "Export backup", k: "Orbit", run: () => $("#bkExport").click() });
+  A.push({ ico: "💎", t: S.premium && S.premium.active ? "My premium" : "Activate premium", k: "Orbit", run: () => { go("credits"); setTimeout(() => $("#premiumCard").scrollIntoView({ behavior: "smooth" }), 400); } });
+  if (S.owner) A.push({ ico: "👑", t: "Create premium key", k: "Owner", run: () => { go("owner"); setTimeout(() => $("#ownerIssue input")?.focus(), 400); } });
+  else A.push({ ico: "🔑", t: "Unlock owner panel", k: "Orbit", secret: true, run: unlockOwner });
+  A.push({ ico: "✛", t: "Crosshair overlay", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#crossOvCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "📊", t: "Save weekly recap image", k: "Stats", run: async () => { const x = await api.export_recap(); x.error ? toast(x.error, "err") : toast("Recap saved.", "ok"); } });
   return A;
 }
@@ -2701,7 +2851,7 @@ function fuzzy(q, t) {
 }
 function drawPalette() {
   const q = $("#palInput").value.trim(), list = $("#palList");
-  palItems = palActions().map((a) => ({ ...a, s: fuzzy(q, a.t + " " + a.k) })).filter((a) => a.s > 0).sort((a, b) => b.s - a.s).slice(0, 40);
+  palItems = palActions().filter((a) => !a.secret || q.toLowerCase().includes("owner")).map((a) => ({ ...a, s: fuzzy(q, a.t + " " + a.k) })).filter((a) => a.s > 0).sort((a, b) => b.s - a.s).slice(0, 40);
   palSel = Math.min(palSel, Math.max(0, palItems.length - 1)); list.innerHTML = "";
   if (!palItems.length) list.append(h("div", { class: "pal-item" }, "No matches"));
   palItems.forEach((a, i) => { const el = h("div", { class: "pal-item" + (i === palSel ? " on" : "") }, h("span", { class: "ico" }, a.ico), h("b", {}, a.t), h("span", { class: "k" }, a.k));
@@ -2945,6 +3095,8 @@ async function init() {
   if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
   buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits(); startI18n();
+  setPremPill(S.premium);
+  if (cfg.premium_key) api.premium(true).then((st) => { S.premium = st; setPremPill(st); });
   go("home");
   api.ui_ready("app");
   let liveSig = JSON.stringify([S.playtime, S.last_server]), curSig = JSON.stringify(S.current || null);

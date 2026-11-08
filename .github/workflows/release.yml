@@ -219,6 +219,19 @@ jobs:
           print("CHECK tab-out guard calls:", thr, pri, ol.set_power_throttle(me, False), ol.set_priority(pid=me, cls=0x20))
           ok &= thr and pri == 1
           print("CHECK frames:", ol.summarize_frames(ol.parse_frame_times(["MsBetweenPresents"], ["6.9"] * 200)))
+          import tkinter as tk
+          st = ol.load_settings(); st["overlay"].update({"crosshair": "crosshair_green_plus", "crosshair_mode": "always", "crosshair_size": 200}); ol.save_settings(st)
+          fake = tk.Tk(); fake.title("Roblox"); fake.geometry("900x600+80+80"); fake.configure(bg="#203040")
+          for _ in range(30): fake.update(); time.sleep(0.05)
+          cp = subprocess.Popen([sys.executable, "orbit_launcher.py", ol.TOAST_FLAG, "crosshair", "", ol.CROSS_FLAG], env=dict(os.environ, ORBIT_BADGE_ALWAYS="1"))
+          for _ in range(100): fake.update(); time.sleep(0.05)
+          c = ol.roblox_client_center(); alive = cp.poll() is None
+          cw, chh, cdata = ol.capture_rect((c[0] - 70, c[1] - 70, c[0] + 70, c[1] + 70))
+          cols = {bytes(cdata[i:i + 3]) for i in range(0, len(cdata), 4)}
+          logtxt = ol.LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+          print("CHECK crosshair overlay:", "center", c, "alive", alive, "colors", len(cols), "ready" if "Crosshair overlay ready" in logtxt else "no ready line", "ERROR" if "Crosshair overlay error" in logtxt else "")
+          ok &= alive and "Crosshair overlay error" not in logtxt
+          ol.kill_tree(cp.pid); fake.destroy()
           sys.exit(0 if ok else 1)
           PY
 

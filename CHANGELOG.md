@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.4.0
+- **Orbit Premium:** paste a premium key in Credits > Orbit Premium to turn it on. A PREMIUM tag shows next to the version in the title bar while it's active.
+- **Owner panel:** a new page that only shows on the owner's PC. It creates premium keys for players (forever, 30 days or 7 days), lists every key given out, and can turn keys off or back on.
+- **Crosshair overlay fix:** games like BedWars replace Roblox's cursor with their own, so custom crosshairs never showed up there. Orbit now draws your crosshair on top of the game, in the exact middle of the Roblox window, so it works in every game. It's click-through and hides when you tab out. Turn it on in Mods > Crosshair overlay. Saving a crosshair in the maker turns it on for you.
+
 ## v2.3.0
 - **Friend alerts:** tap the bell next to a player in Library > Join a player and you'll get a popup when they start playing. Press Ctrl+Alt+F to join them.
 - **Share to Discord:** paste a channel webhook once, then post your player card, weekly recap or a join link with one click (Discord page).

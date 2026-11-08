@@ -1,3 +1,4 @@
+import hashlib
 import base64
 import calendar
 import ipaddress
@@ -19,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -142,9 +143,11 @@ DEFAULT_SETTINGS = {
     "storage": {"auto_clean": False},
     "news_seen": [],
     "last_level": 0,
+    "premium_key": "",
     "fps": {"enabled": False},
     "replay": {"enabled": False, "seconds": 30, "fps": 30},
-    "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True},
+    "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True, "crosshair": "",
+                "crosshair_mode": "locked", "crosshair_size": 100},
     "hotkeys": {"enabled": True},
     "mod_profile": "Default",
     "discord": {
@@ -1838,6 +1841,8 @@ class SessionMonitor:
         log(f"Watching {log_path.name}")
         if (self.settings.get("overlay") or {}).get("keystrokes"):
             start_keys()
+        if (self.settings.get("overlay") or {}).get("crosshair"):
+            start_crosshair_overlay()
         perf = self.settings.get("performance") or {}
         self.guard = BackgroundGuard(perf).start() if IS_WINDOWS and perf.get("bg_guard", True) else None
         if (self.settings.get("fps") or {}).get("enabled"):
@@ -1906,6 +1911,7 @@ class SessionMonitor:
             self.on_leave(record=not handed)
             if not handed:
                 close_keys()
+                close_crosshair_overlay()
                 Replay.stop()
             if getattr(self, "fps", None):
                 self.fps.stop()
@@ -4358,6 +4364,202 @@ def auto_clean():
             log(f"Auto clean {cat}: {e}")
 
 
+_P = 2 ** 255 - 19
+_L = 2 ** 252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_I = pow(2, (_P - 1) // 4, _P)
+
+
+def _inv(x):
+    return pow(x, _P - 2, _P)
+
+
+def _xrecover(y):
+    xx = (y * y - 1) * _inv(_D * y * y + 1)
+    x = pow(xx, (_P + 3) // 8, _P)
+    if (x * x - xx) % _P:
+        x = x * _I % _P
+    if (x * x - xx) % _P:
+        raise ValueError("not on curve")
+    return x
+
+
+_BY = 4 * _inv(5) % _P
+_BX = _xrecover(_BY)
+if _BX & 1:
+    _BX = _P - _BX
+_B = (_BX, _BY, 1, _BX * _BY % _P)
+
+
+def _add(p, q):
+    x1, y1, z1, t1 = p
+    x2, y2, z2, t2 = q
+    a = (y1 - x1) * (y2 - x2) % _P
+    b = (y1 + x1) * (y2 + x2) % _P
+    c = t1 * 2 * _D * t2 % _P
+    d = z1 * 2 * z2 % _P
+    e, f, g, h = b - a, d - c, d + c, b + a
+    return (e * f % _P, g * h % _P, f * g % _P, e * h % _P)
+
+
+def _mul(s, p):
+    q = (0, 1, 1, 0)
+    while s > 0:
+        if s & 1:
+            q = _add(q, p)
+        p = _add(p, p)
+        s >>= 1
+    return q
+
+
+def _enc(p):
+    x, y, z, _ = p
+    zi = _inv(z)
+    x, y = x * zi % _P, y * zi % _P
+    return (y | ((x & 1) << 255)).to_bytes(32, "little")
+
+
+def _dec(s):
+    y = int.from_bytes(s, "little")
+    sign, y = y >> 255, y & ((1 << 255) - 1)
+    if y >= _P:
+        raise ValueError("bad point")
+    x = _xrecover(y)
+    if (x & 1) != sign:
+        if x == 0:
+            raise ValueError("bad point")
+        x = _P - x
+    return (x, y, 1, x * y % _P)
+
+
+def _h(m):
+    return hashlib.sha512(m).digest()
+
+
+def _clamp(h):
+    a = int.from_bytes(h[:32], "little")
+    a &= (1 << 254) - 8
+    return a | (1 << 254)
+
+
+def ed_public(seed):
+    return _enc(_mul(_clamp(_h(seed)), _B))
+
+
+def ed_sign(seed, msg):
+    h = _h(seed)
+    a = _clamp(h)
+    pub = _enc(_mul(a, _B))
+    r = int.from_bytes(_h(h[32:] + msg), "little") % _L
+    rr = _enc(_mul(r, _B))
+    k = int.from_bytes(_h(rr + pub + msg), "little") % _L
+    return rr + ((r + k * a) % _L).to_bytes(32, "little")
+
+
+def ed_verify(pub, msg, sig):
+    if len(sig) != 64 or len(pub) != 32:
+        return False
+    try:
+        r, a = _dec(sig[:32]), _dec(pub)
+    except ValueError:
+        return False
+    s = int.from_bytes(sig[32:], "little")
+    if s >= _L:
+        return False
+    k = int.from_bytes(_h(sig[:32] + pub + msg), "little") % _L
+    return _enc(_mul(s, _B)) == _enc(_add(r, _mul(k, a)))
+
+
+OWNER_PUBKEY = bytes.fromhex("e77c7f03f5c7d8fab5587faf7e99491cac4b6177cbd6ffd8254c40974a8f73b4")
+OWNER_KEY_FILE = DATA_DIR / "owner.key"
+OWNER_ISSUED_FILE = DATA_DIR / "owner_issued.json"
+PREMIUM_REVOKED_CACHE = DATA_DIR / "premium_revoked.json"
+PREMIUM_PREFIX = "ORBIT-PREMIUM-"
+
+
+def _b64u(b):
+    return base64.urlsafe_b64encode(b).decode().rstrip("=")
+
+
+def _unb64u(t):
+    return base64.urlsafe_b64decode(t + "=" * (-len(t) % 4))
+
+
+def owner_seed():
+    try:
+        data = json.loads(OWNER_KEY_FILE.read_text(encoding="utf-8"))
+        seed = bytes.fromhex(data["seed"])
+        return seed if len(seed) == 32 and ed_public(seed) == OWNER_PUBKEY else None
+    except Exception:
+        return None
+
+
+def is_owner():
+    return owner_seed() is not None
+
+
+def make_premium_key(name, days=0):
+    seed = owner_seed()
+    if not seed:
+        raise PermissionError("Only the owner can create premium keys.")
+    now = int(time.time())
+    payload = {"v": 1, "id": uuid.uuid4().hex[:12], "for": (name or "").strip()[:40], "iat": now,
+               "exp": now + int(days) * 86400 if days else 0}
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    code = PREMIUM_PREFIX + _b64u(body) + "." + _b64u(ed_sign(seed, body))
+    issued = load_json(OWNER_ISSUED_FILE, []) or []
+    issued.insert(0, {**payload, "code": code, "revoked": False})
+    save_json(OWNER_ISSUED_FILE, issued[:500])
+    log(f"Owner created a premium key for {payload['for'] or 'unnamed'} ({payload['id']})")
+    return payload, code
+
+
+def read_premium_key(code):
+    code = (code or "").strip().replace(" ", "").replace("\n", "")
+    if not code.startswith(PREMIUM_PREFIX) or "." not in code:
+        return None
+    try:
+        body_t, sig_t = code[len(PREMIUM_PREFIX):].split(".", 1)
+        body, sig = _unb64u(body_t), _unb64u(sig_t)
+    except Exception:
+        return None
+    if not ed_verify(OWNER_PUBKEY, body, sig):
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) and data.get("v") == 1 and data.get("id") else None
+
+
+def revoked_premium_ids(refresh=False, fetch=True):
+    cache = load_json(PREMIUM_REVOKED_CACHE, {}) or {}
+    if fetch and (refresh or time.time() - cache.get("at", 0) > 3600):
+        url = raw_url("premium_revoked.json")
+        if url:
+            try:
+                data = fetch_json(url + f"?t={int(time.time() // 300)}", timeout=8)
+                cache = {"ids": [str(x) for x in (data.get("revoked") or [])], "at": int(time.time())}
+                save_json(PREMIUM_REVOKED_CACHE, cache)
+            except Exception as e:
+                log(f"Couldn't check revoked premium keys: {e}")
+    return set(cache.get("ids") or [])
+
+
+def premium_status(settings, refresh=False, fetch=True):
+    code = settings.get("premium_key") or ""
+    if not code:
+        return {"active": False, "reason": "none"}
+    data = read_premium_key(code)
+    if not data:
+        return {"active": False, "reason": "invalid"}
+    if data.get("exp") and time.time() > data["exp"]:
+        return {"active": False, "reason": "expired", "for": data.get("for"), "exp": data["exp"]}
+    if data["id"] in revoked_premium_ids(refresh, fetch):
+        return {"active": False, "reason": "revoked", "for": data.get("for")}
+    return {"active": True, "for": data.get("for"), "exp": data.get("exp") or 0, "id": data["id"], "since": data.get("iat")}
+
+
 def claim_monitor():
     token = uuid.uuid4().hex
     save_json(MONITOR_FILE, {"token": token, "pid": os.getpid(), "version": APP_VERSION, "time": int(time.time())})
@@ -5201,6 +5403,174 @@ def roblox_rect():
         return None
 
 
+def roblox_client_center():
+    if not IS_WINDOWS:
+        return None
+    try:
+        u = ctypes.windll.user32
+        u.FindWindowW.restype = ctypes.c_void_p
+        u.FindWindowW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+        hwnd = u.FindWindowW(None, "Roblox")
+        if not hwnd or u.IsIconic(ctypes.c_void_p(hwnd)):
+            return None
+
+        class RECT(ctypes.Structure):
+            _fields_ = [("l", ctypes.c_long), ("t", ctypes.c_long), ("r", ctypes.c_long), ("b", ctypes.c_long)]
+
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+        rc, pt = RECT(), POINT(0, 0)
+        u.GetClientRect(ctypes.c_void_p(hwnd), ctypes.byref(rc))
+        u.ClientToScreen(ctypes.c_void_p(hwnd), ctypes.byref(pt))
+        if rc.r < 200:
+            return None
+        return pt.x + rc.r // 2, pt.y + rc.b // 2
+    except Exception:
+        return None
+
+
+def cursor_hidden():
+    if not IS_WINDOWS:
+        return False
+    try:
+        class POINT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+        class CURSORINFO(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_uint), ("flags", ctypes.c_uint), ("hCursor", ctypes.c_void_p), ("pt", POINT)]
+        ci = CURSORINFO()
+        ci.cbSize = ctypes.sizeof(CURSORINFO)
+        if not ctypes.windll.user32.GetCursorInfo(ctypes.byref(ci)):
+            return False
+        return not (ci.flags & 1) or not ci.hCursor
+    except Exception:
+        return False
+
+
+def overlay_crosshair_for(settings, place_id=None):
+    ov = settings.get("overlay") or {}
+    cid = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id else None
+    return cid or ov.get("crosshair") or ""
+
+
+def show_crosshair_window():
+    import tkinter as tk
+    settings = load_settings()
+    ov = settings.get("overlay") or {}
+    mode = ov.get("crosshair_mode") or "locked"
+    size = max(50, min(200, int(ov.get("crosshair_size") or 100)))
+    key = "#010203"
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.configure(bg=key)
+    try:
+        root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
+    except tk.TclError:
+        pass
+    side = int(64 * size / 100)
+    cv = tk.Canvas(root, width=side, height=side, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+    state = {"cid": None, "img": None, "item": None, "shown": False, "xy": None, "place": None, "hwnd": None, "checked": 0}
+
+    def load_image(cid):
+        src = crosshair_source(cid)
+        if not src:
+            return None
+        img = tk.PhotoImage(data=base64.b64encode(src.read_bytes()).decode())
+        if size != 100:
+            factor = size / 100
+            if factor >= 1:
+                img = img.zoom(round(factor))
+            else:
+                img = img.subsample(max(1, round(1 / factor)))
+            if img.width() != side:
+                cv.configure(width=img.width(), height=img.height())
+        return img
+
+    def refresh_choice():
+        cur = load_json(CURRENT_FILE, None) or {}
+        place = cur.get("place_id")
+        cid = overlay_crosshair_for(load_settings(), place)
+        if cid != state["cid"]:
+            state["cid"] = cid
+            state["img"] = load_image(cid) if cid else None
+            cv.delete("all")
+            if state["img"] is not None:
+                cv.create_image(int(cv.cget("width")) // 2, int(cv.cget("height")) // 2, image=state["img"])
+
+    root.geometry(f"{side}x{side}+-200+-200")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    state["hwnd"] = hwnd
+    if hwnd and IS_WINDOWS:
+        try:
+            u = ctypes.windll.user32
+            style = u.GetWindowLongW(hwnd, -20)
+            u.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+    overlay_show(hwnd, False)
+    log(f"Crosshair overlay ready ({mode}, {size}%)")
+
+    def tick():
+        try:
+            now = time.time()
+            if now - state["checked"] > 2:
+                state["checked"] = now
+                refresh_choice()
+            center = roblox_client_center() if roblox_in_front() else None
+            want = bool(center and state["img"] is not None and (mode == "always" or cursor_hidden()))
+            if want:
+                w, h = int(cv.cget("width")), int(cv.cget("height"))
+                xy = (center[0] - w // 2, center[1] - h // 2)
+                if xy != state["xy"] or not state["shown"]:
+                    state["xy"] = xy
+                    if IS_WINDOWS and hwnd:
+                        u = ctypes.windll.user32
+                        u.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int,
+                                                   ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+                        u.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), xy[0], xy[1], 0, 0, 0x0001 | 0x0010)
+                    else:
+                        root.geometry(f"+{xy[0]}+{xy[1]}")
+                if not state["shown"]:
+                    overlay_show(hwnd, True)
+                    state["shown"] = True
+            elif state["shown"]:
+                overlay_show(hwnd, False)
+                state["shown"] = False
+        except tk.TclError:
+            return
+        except Exception:
+            if not state.get("logged"):
+                state["logged"] = True
+                log("Crosshair overlay error:\n" + traceback.format_exc())
+        root.after(33 if state["shown"] else 120, tick)
+
+    tick()
+    root.mainloop()
+
+
+CROSS_FLAG = "--crosshair"
+CROSS_FILE = DATA_DIR / "crosshair_overlay.json"
+
+
+def start_crosshair_overlay():
+    close_crosshair_overlay()
+    proc = spawn_self(TOAST_FLAG, "crosshair", "", CROSS_FLAG)
+    if proc:
+        save_json(CROSS_FILE, {"pid": proc.pid})
+
+
+def close_crosshair_overlay():
+    data = load_json(CROSS_FILE, {}) or {}
+    if data.get("pid") and IS_WINDOWS:
+        kill_tree(data["pid"])
+    CROSS_FILE.unlink(missing_ok=True)
+
+
 def overlay_show(hwnd, on):
     if not hwnd or not IS_WINDOWS:
         return
@@ -5516,6 +5886,8 @@ class Api:
             "accents": ACCENTS,
             "quick_presets": QUICK_PRESETS,
             "regions": list(REGIONS),
+            "owner": is_owner(),
+            "premium": premium_status(self._settings, fetch=False),
             "game_updated": game_updated_times(self._settings),
             "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
             "credits": [{"role": r, "handle": h, "roblox_id": uid} for r, h, uid in CREDITS],
@@ -6128,6 +6500,23 @@ class Api:
         except Exception as e:
             return self._err(e)
 
+    def set_overlay_crosshair(self, cid, mode=None, size=None):
+        ov = self._settings.setdefault("overlay", {})
+        if cid is not None:
+            if cid and not crosshair_source(cid):
+                return {"error": "That crosshair isn't available."}
+            ov["crosshair"] = cid or ""
+        if mode in ("locked", "always"):
+            ov["crosshair_mode"] = mode
+        if size is not None:
+            ov["crosshair_size"] = max(50, min(200, int(size)))
+        save_settings(self._settings)
+        if roblox_running() and ov.get("crosshair"):
+            start_crosshair_overlay()
+        elif not ov.get("crosshair"):
+            close_crosshair_overlay()
+        return {"settings": self._settings}
+
     def custom_crosshairs(self):
         return custom_crosshairs()
 
@@ -6455,6 +6844,87 @@ class Api:
     def last_report(self):
         return load_json(LAST_REPORT_FILE, None)
 
+    def premium(self, refresh=False):
+        return premium_status(self._settings, bool(refresh))
+
+    def activate_premium(self, code):
+        data = read_premium_key(code)
+        if not data:
+            return {"error": "That premium key isn't valid. Copy the whole key, starting with ORBIT-PREMIUM-."}
+        if data.get("exp") and time.time() > data["exp"]:
+            return {"error": "That premium key has expired."}
+        if data["id"] in revoked_premium_ids(True):
+            return {"error": "That premium key has been turned off by the owner."}
+        self._settings["premium_key"] = code.strip()
+        save_settings(self._settings)
+        log(f"Premium activated ({data['id']})")
+        return {"status": premium_status(self._settings), "settings": self._settings}
+
+    def remove_premium(self):
+        self._settings["premium_key"] = ""
+        save_settings(self._settings)
+        return {"status": premium_status(self._settings), "settings": self._settings}
+
+    def owner_issue(self, name, days=0):
+        if not is_owner():
+            return {"error": "Owner only."}
+        try:
+            payload, code = make_premium_key(name, int(days or 0))
+            return {"key": payload, "code": code}
+        except Exception as e:
+            return self._err(e)
+
+    def owner_keys(self):
+        if not is_owner():
+            return {"error": "Owner only."}
+        issued = load_json(OWNER_ISSUED_FILE, []) or []
+        return {"issued": issued, "revoked_live": sorted(revoked_premium_ids(True)), "repo": update_repo()}
+
+    def owner_revoke(self, key_id, revoked=True):
+        if not is_owner():
+            return {"error": "Owner only."}
+        issued = load_json(OWNER_ISSUED_FILE, []) or []
+        for x in issued:
+            if x.get("id") == key_id:
+                x["revoked"] = bool(revoked)
+        save_json(OWNER_ISSUED_FILE, issued)
+        ids = sorted({x["id"] for x in issued if x.get("revoked")} | (revoked_premium_ids() - ({key_id} if not revoked else set())))
+        text = json.dumps({"revoked": ids}, indent=2)
+        copy_to_clipboard(text)
+        repo = update_repo()
+        if repo:
+            webbrowser.open(f"https://github.com/{repo}/edit/main/premium_revoked.json")
+        return {"issued": issued, "json": text}
+
+    def owner_backup_key(self):
+        if not is_owner():
+            return {"error": "Owner only."}
+        try:
+            picked = self._dialog("SAVE", save_filename="orbit-owner-key.key", file_types=("Orbit owner key (*.key)",))
+            if not picked:
+                return None
+            dest = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            shutil.copy2(OWNER_KEY_FILE, dest)
+            return {"path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def import_owner_key(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Orbit owner key (*.key)",))
+            if not picked:
+                return None
+            src = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            data = json.loads(src.read_text(encoding="utf-8"))
+            seed = bytes.fromhex(data.get("seed", ""))
+            if len(seed) != 32 or ed_public(seed) != OWNER_PUBKEY:
+                return {"error": "That isn't the owner key for this Orbit."}
+            shutil.copy2(src, OWNER_KEY_FILE)
+            log("Owner key imported")
+            return {"owner": True}
+        except Exception:
+            return {"error": "That file isn't an owner key."}
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -6687,6 +7157,8 @@ def main():
         try:
             if KEYS_FLAG in args:
                 show_keys_window()
+            elif CROSS_FLAG in args:
+                show_crosshair_window()
             elif "--badge" in args:
                 def opt(flag):
                     return args[args.index(flag) + 1] if flag in args and len(args) > args.index(flag) + 1 else None
