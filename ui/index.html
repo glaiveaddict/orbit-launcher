@@ -611,6 +611,15 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .pj-chip .bell { opacity: .55; padding: 0 2px; } .pj-chip .bell.on { opacity: 1; filter: drop-shadow(0 0 4px #fbbf24); }
 .lib-upd { font-size: 11px; color: var(--accent2); font-weight: 650; }
 .nav-item[hidden] { display: none; }
+.nav-item .nav-lock { margin-left: auto; font-size: 11px; opacity: .7; }
+.page.locked > :not(.page-head):not(.lock-card) { filter: blur(5px) saturate(.5); opacity: .4; pointer-events: none; user-select: none; }
+.lock-card { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 18px; padding: 20px 22px; margin-bottom: 14px; border-radius: 18px; border: 1px solid rgba(251,191,36,.35);
+  background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(20,12,30,.92) 60%); backdrop-filter: blur(14px); box-shadow: 0 18px 50px -20px rgba(0,0,0,.8); animation: rise .45s var(--spring) both; }
+.lock-card .lk { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; flex: none; background: linear-gradient(135deg, #f59e0b, #fde047); color: #1a1205; box-shadow: 0 10px 28px -10px #f59e0b; }
+.lock-card .lk svg { width: 26px; height: 26px; }
+.lock-card h3 { margin: 0 0 4px; } .lock-card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.preset.locked { position: relative; opacity: .55; }
+.preset.locked::after { content: "🔒 Premium"; position: absolute; top: 8px; right: 8px; font-size: 10.5px; font-weight: 750; padding: 2px 8px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; }
 .prem-pill { margin-left: 8px; font-size: 10px; font-weight: 850; letter-spacing: .12em; padding: 3px 9px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; box-shadow: 0 0 14px -4px #f59e0b; }
 .prem-pill[hidden] { display: none; }
 .code-box { font-family: "DejaVu Mono", monospace; font-size: 11.5px; word-break: break-all; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); line-height: 1.5; max-height: 92px; overflow: auto; flex: 1; user-select: all; }
@@ -1283,7 +1292,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: () => {}, credits: renderPremium, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
+     achievements: renderAchievements, screens: renderScreens, boost: () => { applyLocks(); renderBoost(); }, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -1376,7 +1385,8 @@ const PRESET_INFO = { Potato: "Most FPS. Lowest textures, lighting and detail.",
 function renderPresets() {
   const box = $("#presetCard"), t = target(); box.innerHTML = "";
   const row = h("div", { class: "preset-row" });
-  Object.keys(S.quick_presets).forEach((name) => row.append(h("button", { class: "preset", onclick: () => {
+  Object.keys(S.quick_presets).forEach((name) => row.append(h("button", { class: "preset" + (name === "Potato" && !hasPrem() ? " locked" : ""), onclick: () => {
+    if (name === "Potato" && !hasPrem()) return premiumNeeded("The Potato preset");
     Object.assign(t.presets, S.quick_presets[name]); save(); renderFlags();
     toast(`${name} preset applied to ${curProfile ? (cfg.game_profiles[curProfile]?.name || "this game") : "your default flags"}.`, "ok");
   } }, h("b", {}, name === "Reset" ? "Reset" : name), h("span", {}, PRESET_INFO[name]))));
@@ -2682,24 +2692,55 @@ async function renderOverlay() {
       h("button", { class: "btn", onclick: async () => { await api.copy_text(url); toast("Overlay link copied.", "ok"); } }, "Copy link"),
       h("button", { class: "btn", onclick: () => api.open_url(url) }, "Open in browser")));
 }
-function setPremPill(st) { $("#premPill").hidden = !(st && st.active); }
+const LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const hasPrem = () => !!(S && S.premium && S.premium.active);
+function setPremPill(st) {
+  $("#premPill").hidden = !(st && st.active);
+  const b = $('.nav-item[data-page="boost"]');
+  if (b) { let l = $(".nav-lock", b); if (!hasPrem() && !l) b.append(h("span", { class: "nav-lock" }, "🔒")); else if (hasPrem() && l) l.remove(); }
+}
+function premiumNeeded(what) {
+  modal({ title: `${what} is Premium`, text: "Ask the owner for a premium key, then paste it in Credits > Orbit Premium.", ok: "Enter a key" }).then((ok) => {
+    if (ok) { go("credits"); setTimeout(() => { $("#premiumCard").scrollIntoView({ behavior: "smooth" }); $("#premiumCard input")?.focus(); }, 400); }
+  });
+}
+function applyLocks() {
+  const pg = $("#page-boost"), locked = !hasPrem();
+  pg.classList.toggle("locked", locked);
+  $(".lock-card", pg)?.remove();
+  if (!locked) return;
+  const lk = h("div", { class: "lk" }); lk.innerHTML = LOCK_SVG;
+  $(".page-head", pg).after(h("div", { class: "lock-card" }, lk,
+    h("div", { style: "flex:1" }, h("h3", {}, "Boost is a Premium feature"), h("p", {}, "FPS Boost, game kits, the frame rate cap and graphics fine-tuning unlock with Orbit Premium. Ask the owner for a key.")),
+    h("button", { class: "btn primary", onclick: () => premiumNeeded("Boost") }, "I have a key")));
+}
 const fmtDay = (ts) => new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 async function unlockOwner() {
   const r = await api.import_owner_key(); if (!r) return;
   if (r.error) return toast(r.error, "err");
   S.owner = true; $('.nav-item[data-page="owner"]').hidden = false; go("owner"); sfx("ready"); toast("Owner panel unlocked on this PC.", "ok");
 }
+function premChanged(st) {
+  if (st && st.settings) syncSettings(st);
+  S.premium = st; setPremPill(st); applyLocks();
+  if (page === "boost") renderBoost(); if (page === "flags") renderPresets();
+}
 async function renderPremium(refresh = true) {
   const box = $("#premiumCard"); if (!box) return;
   const st = refresh && cfg.premium_key ? await api.premium(true) : (S.premium || { active: false, reason: "none" });
-  S.premium = st; setPremPill(st); box.innerHTML = "";
+  premChanged(st); box.innerHTML = "";
+  if (st.owner) {
+    box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),
+      h("div", {}, h("h3", { style: "margin:0" }, "Orbit Premium"), h("p", { class: "sub", style: "margin:4px 0 0" }, "You're the owner, so premium is always on here."))));
+    return;
+  }
   if (st.active) {
     box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),
       h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Orbit Premium"),
         h("p", { class: "sub", style: "margin:4px 0 0" }, (st.for ? `Given to ${st.for}. ` : "") + (st.exp ? `Active until ${fmtDay(st.exp)}.` : "Active forever."))),
       h("button", { class: "btn danger", onclick: async () => {
         if (!await modal({ title: "Remove premium?", text: "You'll need the key again to turn it back on.", ok: "Remove", danger: true })) return;
-        const r = await api.remove_premium(); syncSettings(r); S.premium = r.status; renderPremium(false); toast("Premium removed.", "ok");
+        const r = await api.remove_premium(); syncSettings(r); premChanged(r.status); renderPremium(false); toast("Premium removed.", "ok");
       } }, "Remove")));
     return;
   }
@@ -2710,7 +2751,7 @@ async function renderPremium(refresh = true) {
     if (!inp.value.trim()) return;
     btn.disabled = true; const r = await api.activate_premium(inp.value); btn.disabled = false;
     if (r.error) return toast(r.error, "err");
-    syncSettings(r); S.premium = r.status; sfx("ready"); toast("Premium is on. Welcome!", "ok"); renderPremium(false);
+    syncSettings(r); premChanged(r.status); sfx("ready"); toast("Premium is on. Boost and the Potato preset are unlocked.", "ok"); renderPremium(false);
   };
   btn.onclick = go_; inp.onkeydown = (e) => { if (e.key === "Enter") go_(); };
   box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem off" }, "💎"),
@@ -2812,7 +2853,7 @@ function palActions() {
   A.push({ ico: "💬", t: cfg.discord.enabled ? "Turn off Discord status" : "Turn on Discord status", k: "Discord", run: () => { cfg.discord.enabled = !cfg.discord.enabled; save(); toast(`Discord status ${cfg.discord.enabled ? "on" : "off"}.`, "ok"); } });
   A.push({ ico: "⬇", t: "Check for updates", k: "Orbit", run: () => checkUpdates(true) });
   A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
-  A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: "Boost", run: async () => { const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
+  A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: hasPrem() ? "Boost" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("FPS Boost"); const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
   A.push({ ico: "▣", t: "Mini player", k: "Window", run: () => $("#miniBtn").click() });
   A.push({ ico: "📰", t: "Orbit news", k: "Orbit", run: () => go("news") });
   A.push({ ico: "🛒", t: "Pack store", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#storeCard").scrollIntoView({ behavior: "smooth" }), 400); } });
@@ -2831,7 +2872,7 @@ function palActions() {
   A.push({ ico: "⌨", t: cfg.overlay && cfg.overlay.keystrokes ? "Turn off keystrokes overlay" : "Turn on keystrokes overlay", k: "Overlay", run: () => { cfg.overlay.keystrokes = !cfg.overlay.keystrokes; save(); toast(`Keystrokes overlay ${cfg.overlay.keystrokes ? "on" : "off"} for your next session.`, "ok"); } });
   THEMES.forEach((t) => A.push({ ico: "🎨", t: `Theme: ${t.name}`, k: "Appearance", run: () => { go("appearance"); setTimeout(() => [...$$(".theme-card")].find((b) => b.textContent.startsWith(t.name))?.click(), 300); } }));
   A.push({ ico: "🎯", t: cfg.smart_join ? "Turn off Smart join" : "Turn on Smart join", k: "Servers", run: () => { cfg.smart_join = !cfg.smart_join; save(); toast(`Smart join ${cfg.smart_join ? "on" : "off"}.`, "ok"); } });
-  Object.keys(S.quick_presets || {}).forEach((n) => A.push({ ico: "⚙", t: `FastFlags preset: ${n}`, k: "FastFlags", run: () => { Object.assign(cfg.presets, S.quick_presets[n]); save(); toast(`${n} preset applied.`, "ok"); } }));
+  Object.keys(S.quick_presets || {}).forEach((n) => A.push({ ico: "⚙", t: `FastFlags preset: ${n}`, k: n === "Potato" && !hasPrem() ? "🔒 Premium" : "FastFlags", run: () => { if (n === "Potato" && !hasPrem()) return premiumNeeded("The Potato preset"); Object.assign(cfg.presets, S.quick_presets[n]); save(); toast(`${n} preset applied.`, "ok"); } }));
   A.push({ ico: "🧹", t: "Clear Roblox cache", k: "Repair", run: () => { go("health"); setTimeout(() => $('[data-repair="cache"]').click(), 300); } });
   Object.entries(S.playtime || {}).forEach(([pid, e]) => A.push({ ico: "📈", t: `Stats: ${e.name || pid}`, k: "Game", run: () => openGame(pid) }));
   (cfg.saved_servers || []).forEach((x) => A.push({ ico: "★", t: `Join saved ${x.name}${x.location ? " (" + x.location + ")" : ""}`, k: "Saved", run: () => api.join_server(x.place_id, x.job_id) }));
@@ -3096,7 +3137,7 @@ async function init() {
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
   buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits(); startI18n();
   setPremPill(S.premium);
-  if (cfg.premium_key) api.premium(true).then((st) => { S.premium = st; setPremPill(st); });
+  if (cfg.premium_key) api.premium(true).then(premChanged);
   go("home");
   api.ui_ready("app");
   let liveSig = JSON.stringify([S.playtime, S.last_server]), curSig = JSON.stringify(S.current || null);

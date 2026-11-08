@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.5.0
+- **Boost is now a Premium feature.** Without premium, the Boost page shows a lock. FPS Boost, game kits, the frame rate cap, graphics quality and the other performance tweaks there need an active premium key. If you had them on without premium, Orbit puts your old settings back.
+- **The Potato preset in FastFlags is Premium too.** The other presets and every graphics option stay free.
+- A lock icon shows next to Boost in the menu until premium is active. "I have a key" takes you straight to Credits > Orbit Premium.
+
 ## v2.4.0
 - **Orbit Premium:** paste a premium key in Credits > Orbit Premium to turn it on. A PREMIUM tag shows next to the version in the title bar while it's active.
 - **Owner panel:** a new page that only shows on the owner's PC. It creates premium keys for players (forever, 30 days or 7 days), lists every key given out, and can turn keys off or back on.

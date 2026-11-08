@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.5.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -4342,7 +4342,8 @@ def periodic_jobs(owner):
         return
     now = time.time()
     st = load_json(DATA_DIR / "periodic_runs.json", {}) or {}
-    jobs = [("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
+    jobs = [("premium", 3600, lambda: load_settings().get("premium_key") and revoked_premium_ids(True)),
+            ("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
             ("sync", 30 * 60, lambda: run_sync(load_settings())), ("clean", 24 * 3600, auto_clean)]
     for name, every, fn in jobs:
         if now - st.get(name, 0) >= every:
@@ -4548,6 +4549,8 @@ def revoked_premium_ids(refresh=False, fetch=True):
 
 def premium_status(settings, refresh=False, fetch=True):
     code = settings.get("premium_key") or ""
+    if is_owner():
+        return {"active": True, "owner": True, "for": "Owner", "exp": 0}
     if not code:
         return {"active": False, "reason": "none"}
     data = read_premium_key(code)
@@ -4558,6 +4561,33 @@ def premium_status(settings, refresh=False, fetch=True):
     if data["id"] in revoked_premium_ids(refresh, fetch):
         return {"active": False, "reason": "revoked", "for": data.get("for")}
     return {"active": True, "for": data.get("for"), "exp": data.get("exp") or 0, "id": data["id"], "since": data.get("iat")}
+
+
+PREMIUM_LOCKED = "Boost is a Premium feature. Activate a premium key in Credits to use it."
+PERF_PREMIUM = {"high_priority": False, "power_plan": False, "gpu_high": False, "game_mode": False, "no_dvr": False,
+                "fps_cap": None, "graphics_quality": None}
+
+
+def has_premium(settings, fetch=False):
+    return premium_status(settings, fetch=fetch)["active"]
+
+
+def enforce_premium(settings):
+    if has_premium(settings):
+        return False
+    perf = settings.setdefault("performance", {})
+    if not perf.get("boost") and all(perf.get(k) == v for k, v in PERF_PREMIUM.items()):
+        return False
+    if perf.get("boost"):
+        set_boost(settings, False)
+    perf.update(PERF_PREMIUM)
+    save_settings(settings)
+    try:
+        apply_system_boost(settings, (player_dirs()[:1] or [None])[0])
+    except Exception as e:
+        log(f"Couldn't undo Boost settings: {e}")
+    log("Boost features turned off (no premium)")
+    return True
 
 
 def claim_monitor():
@@ -4595,6 +4625,10 @@ def headless_main(uri):
     updater, token, owns_monitor = None, None, None
     while True:
         settings = load_settings()
+        try:
+            enforce_premium(settings)
+        except Exception as e:
+            log(f"Premium check failed: {e}")
         started = start_roblox(settings, uri)
         if not started:
             return
@@ -5836,6 +5870,11 @@ class Api:
     def __init__(self, mode="app"):
         ensure_dirs()
         self._settings = load_settings()
+        if mode == "app":
+            try:
+                enforce_premium(self._settings)
+            except Exception as e:
+                log(f"Premium check failed: {e}")
         self._window = None
         self._mode = mode
         self._tray = None
@@ -5911,6 +5950,14 @@ class Api:
         try:
             merged = _merge(DEFAULT_SETTINGS, new if isinstance(new, dict) else {})
             merged["registration"] = self._settings["registration"]
+            merged["premium_key"] = self._settings.get("premium_key", "")
+            if not has_premium(merged):
+                perf = merged.setdefault("performance", {})
+                perf.update(PERF_PREMIUM)
+                perf["boost"] = bool(self._settings["performance"].get("boost"))
+                for k in ("boost_backup", "win_backup", "gpu_applied"):
+                    if k in self._settings["performance"]:
+                        perf[k] = self._settings["performance"][k]
             self._settings = merged
             save_settings(merged)
             return True
@@ -6363,6 +6410,8 @@ class Api:
         return saved
 
     def set_boost(self, on, level="Max"):
+        if on and not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             set_boost(self._settings, bool(on), level if level in ("Max", "Balanced") else "Max")
             return {"settings": self._settings}
@@ -6370,6 +6419,9 @@ class Api:
             return self._err(e)
 
     def apply_system(self):
+        if not has_premium(self._settings):
+            enforce_premium(self._settings)
+            return {"error": PREMIUM_LOCKED, "settings": self._settings}
         try:
             save_settings(self._settings)
             apply_system_boost(self._settings, (player_dirs()[:1] or [None])[0])
@@ -6378,6 +6430,8 @@ class Api:
             return self._err(e)
 
     def quick_preset(self, name, pid=None):
+        if name == "Potato" and not has_premium(self._settings):
+            return {"error": "The Potato preset is a Premium feature. Activate a premium key in Credits to use it."}
         try:
             apply_quick_preset(self._settings, name, pid)
             return {"settings": self._settings}
@@ -6490,6 +6544,8 @@ class Api:
                  "applied": v["place_id"] in self._settings["game_profiles"]} for k, v in GAME_KITS.items()]
 
     def apply_kit(self, kit_id, crosshair=None):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             if kit_id not in GAME_KITS:
                 return {"error": "Unknown game kit."}
@@ -6845,7 +6901,10 @@ class Api:
         return load_json(LAST_REPORT_FILE, None)
 
     def premium(self, refresh=False):
-        return premium_status(self._settings, bool(refresh))
+        st = premium_status(self._settings, bool(refresh))
+        if not st["active"] and enforce_premium(self._settings):
+            st = {**st, "settings": self._settings}
+        return st
 
     def activate_premium(self, code):
         data = read_premium_key(code)
@@ -6863,6 +6922,7 @@ class Api:
     def remove_premium(self):
         self._settings["premium_key"] = ""
         save_settings(self._settings)
+        enforce_premium(self._settings)
         return {"status": premium_status(self._settings), "settings": self._settings}
 
     def owner_issue(self, name, days=0):
