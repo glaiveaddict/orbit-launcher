@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.7.0"
+APP_VERSION = "2.7.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -4607,18 +4607,34 @@ def read_premium_key(code):
     return data if isinstance(data, dict) and data.get("v") in (1, 2) and data.get("id") else None
 
 
+def fetch_revoked_remote():
+    repo = update_repo()
+    if not repo:
+        return None
+    try:
+        data = fetch_json(f"https://api.github.com/repos/{repo}/contents/premium_revoked.json?ref=main", timeout=8)
+        return json.loads(base64.b64decode(data["content"]))
+    except Exception as e:
+        log(f"Revoked list via GitHub API failed, trying raw: {e}")
+    return fetch_json(raw_url("premium_revoked.json") + f"?t={int(time.time())}", timeout=8)
+
+
 def revoked_premium_ids(refresh=False, fetch=True):
     cache = load_json(PREMIUM_REVOKED_CACHE, {}) or {}
-    if fetch and (refresh or time.time() - cache.get("at", 0) > 3600):
-        url = raw_url("premium_revoked.json")
-        if url:
-            try:
-                data = fetch_json(url + f"?t={int(time.time() // 300)}", timeout=8)
+    if fetch and (refresh or time.time() - cache.get("at", 0) > 3600) and time.time() - cache.get("pushed", 0) > 600:
+        try:
+            data = fetch_revoked_remote()
+            if data is not None:
                 cache = {"ids": [str(x) for x in (data.get("revoked") or [])], "at": int(time.time())}
                 save_json(PREMIUM_REVOKED_CACHE, cache)
-            except Exception as e:
-                log(f"Couldn't check revoked premium keys: {e}")
-    return set(cache.get("ids") or [])
+        except Exception as e:
+            log(f"Couldn't check revoked premium keys: {e}")
+    ids = set(cache.get("ids") or [])
+    if OWNER_ISSUED_FILE.exists() and is_owner():
+        for x in load_json(OWNER_ISSUED_FILE, []) or []:
+            if x.get("id"):
+                (ids.add if x.get("revoked") else ids.discard)(x["id"])
+    return ids
 
 
 def premium_status(settings, refresh=False, fetch=True):
@@ -4704,7 +4720,8 @@ def push_revoked(key_id, revoked, token):
     if sha:
         body["sha"] = sha
     gh_api("PUT", path, token, body)
-    save_json(PREMIUM_REVOKED_CACHE, {"ids": sorted(ids), "at": int(time.time())})
+    save_json(PREMIUM_REVOKED_CACHE, {"ids": sorted(ids), "at": int(time.time()), "pushed": int(time.time())})
+    _PREM_MEMO.clear()
     log(f"Updated premium_revoked.json on GitHub ({len(ids)} turned off)")
     return ids
 
@@ -7138,6 +7155,7 @@ class Api:
             if x.get("id") == key_id:
                 x["revoked"] = bool(revoked)
         save_json(OWNER_ISSUED_FILE, issued)
+        _PREM_MEMO.clear()
         text = json.dumps({"revoked": sorted(ids)}, indent=2)
         if token:
             return {"issued": issued, "pushed": True}

@@ -2875,7 +2875,7 @@ async function renderOwnerKeys() {
           if (off && !await modal({ title: `Turn off ${k.for || "this"} key?`, text: gh.connected ? "They lose premium within an hour." : "GitHub opens next. Paste the copied list into premium_revoked.json and commit it.", ok: "Turn off", danger: true })) return;
           btn.disabled = true;
           const x = await api.owner_revoke(k.id, off); btn.disabled = false; if (x.error) return toast(x.error, "err");
-          toast(x.pushed ? (off ? `${k.for || "That"} key is off.` : `${k.for || "That"} key is back on.`) : "List copied. Paste it on GitHub and commit.", "ok"); renderOwnerKeys();
+          toast(x.pushed ? (off ? `${k.for || "That"} key is off.` : `${k.for || "That"} key is back on.`) : "List copied. Paste it on GitHub and commit.", "ok"); renderOwnerKeys(); api.premium(false).then(premChanged);
         } }, k.revoked ? "Turn on" : "Turn off"))));
   });
   box.append(list);
