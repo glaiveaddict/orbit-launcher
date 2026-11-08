@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.7.2"
+APP_VERSION = "2.8.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2403,7 +2403,13 @@ PACK_TARGETS = {
 CROSSHAIR_DIR = DATA_DIR / "crosshairs"
 
 
+CURSOR_DIR = DATA_DIR / "cursors"
+CURSOR_PREFIX = "mycursor:"
+
+
 def pack_file(pack_id):
+    if str(pack_id).startswith(CURSOR_PREFIX):
+        return CURSOR_DIR / (pack_id.split(":", 1)[1] + ".png")
     if pack_id in CHARSOUNDS:
         return resource_dir() / "ui" / "packs" / pack_id
     if str(pack_id).startswith("custom:"):
@@ -2430,6 +2436,56 @@ def custom_crosshairs():
                     "desc": "Made with the crosshair maker.", "design": meta.get("design"),
                     "data": "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode()})
     return out
+
+
+def custom_cursors():
+    CURSOR_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in sorted(CURSOR_DIR.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True):
+        meta = load_json(f.with_suffix(".json"), {}) or {}
+        out.append({"id": CURSOR_PREFIX + f.stem, "name": meta.get("name") or f.stem, "kind": "cursor", "custom": True,
+                    "desc": "Made with the cursor maker.", "design": meta.get("design"),
+                    "data": "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode()})
+    return out
+
+
+def _png_from_data_url(data_url, what):
+    m = re.match(r"data:image/png;base64,(.+)$", data_url or "", re.S)
+    if not m:
+        raise ValueError("That image didn't come through.")
+    raw = base64.b64decode(m.group(1))
+    if raw[:8] != b"\x89PNG\r\n\x1a\n" or len(raw) > 200_000:
+        raise ValueError(f"That image isn't a valid {what}.")
+    w, h = struct.unpack(">II", raw[16:24])
+    if not (16 <= w <= 256 and 16 <= h <= 256):
+        raise ValueError(f"A {what} must be between 16 and 256 pixels.")
+    return raw
+
+
+def save_custom_cursor(name, data_url, design=None):
+    raw = _png_from_data_url(data_url, "cursor")
+    clean = re.sub(r"[^A-Za-z0-9 _-]", "", name or "").strip()[:30] or "My cursor"
+    slug = re.sub(r"\s+", "-", clean.lower())
+    CURSOR_DIR.mkdir(parents=True, exist_ok=True)
+    (CURSOR_DIR / f"{slug}.png").write_bytes(raw)
+    save_json(CURSOR_DIR / f"{slug}.json", {"name": clean, "design": design, "at": int(time.time())})
+    log(f"Saved custom cursor '{clean}'")
+    return CURSOR_PREFIX + slug
+
+
+def delete_custom_cursor(cid, settings):
+    if not str(cid).startswith(CURSOR_PREFIX):
+        raise ValueError("Only your own cursors can be deleted.")
+    f = pack_file(cid)
+    if f.exists():
+        folder = mods_dir(settings)
+        body = f.read_bytes()
+        for t in PACK_TARGETS["cursor"]:
+            if (folder / t).exists() and (folder / t).read_bytes() == body:
+                (folder / t).unlink(missing_ok=True)
+    f.unlink(missing_ok=True)
+    f.with_suffix(".json").unlink(missing_ok=True)
+    log(f"Deleted custom cursor {cid}")
 
 
 def save_custom_crosshair(name, data_url, design=None):
@@ -2464,6 +2520,10 @@ def delete_custom_crosshair(cid, settings):
 def pack_states(settings):
     folder = mods_dir(settings)
     out = []
+    for c in custom_cursors():
+        body = pack_file(c["id"]).read_bytes()
+        c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == body for t in PACK_TARGETS["cursor"])
+        out.append(c)
     for c in custom_crosshairs():
         src = pack_file(c["id"])
         c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == src.read_bytes()
@@ -2504,6 +2564,10 @@ def install_pack(settings, pack_id, on=True):
         if not pack_file(pack_id).exists():
             raise ValueError("That crosshair is gone.")
         kind = "crosshair"
+    elif str(pack_id).startswith(CURSOR_PREFIX):
+        if not pack_file(pack_id).exists():
+            raise ValueError("That cursor is gone.")
+        kind = "cursor"
     elif pack_id not in PACKS:
         raise ValueError("Unknown pack")
     else:
@@ -6776,6 +6840,20 @@ class Api:
         try:
             cid = save_custom_crosshair(name, data_url, design)
             return {"id": cid, "list": custom_crosshairs()}
+        except Exception as e:
+            return self._err(e)
+
+    def save_cursor(self, name, data_url, design=None):
+        try:
+            return {"id": save_custom_cursor(name, data_url, design)}
+        except Exception as e:
+            return self._err(e)
+
+    def delete_cursor(self, cid):
+        try:
+            delete_custom_cursor(cid, self._settings)
+            push_mods_now(self._settings)
+            return {"packs": pack_states(self._settings)}
         except Exception as e:
             return self._err(e)
 

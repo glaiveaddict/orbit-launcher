@@ -543,6 +543,10 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .xswatch { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .xswatch button { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
 .xswatch button.on { border-color: var(--text); }
+.xprev.menu { background: linear-gradient(160deg, #1e2a44, #121826 60%, #0c0f18); }
+.xprev.menu::after { left: 14%; right: 14%; top: 24%; height: 52%; background: repeating-linear-gradient(180deg, rgba(255,255,255,.07) 0 26px, transparent 26px 34px); border-radius: 10px; opacity: 1; }
+.pack .del { margin-left: auto; opacity: .55; }
+.pack .del:hover { opacity: 1; color: #fb7185; }
 .xswatch input[type=color] { width: 34px; height: 26px; border: 1px solid var(--line); border-radius: 8px; background: none; padding: 1px; cursor: pointer; }
 .today { display: flex; align-items: center; gap: 18px; }
 .today svg { width: 74px; height: 74px; flex: none; }
@@ -796,6 +800,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:3" id="storeCard"></div>
       <div class="card rise" style="--i:3" id="fontCard"></div>
       <div class="card rise" style="--i:3" id="xmakerCard"></div>
+      <div class="card rise" style="--i:3" id="cmakerCard"></div>
       <div class="card rise" style="--i:3" id="crossOvCard"></div>
       <div class="card rise" style="--i:3">
         <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original crosshairs, cursors and death sounds made for Orbit. The crosshair is what you see in shift lock and first person. Installs into the selected mod profile.</p></div><span class="spacer"></span><div id="packTabs"></div></div>
@@ -1484,7 +1489,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
-  renderStore(); renderFonts(); renderMaker(); renderCrossOverlay(); renderPacks();
+  renderStore(); renderFonts(); renderMaker(); renderCursorMaker(); renderCrossOverlay(); renderPacks();
 }
 
 
@@ -2216,6 +2221,11 @@ async function renderPacks() {
       row.append(play);
     }
     const equip = p.kind === "cursor" || p.kind === "crosshair";
+    if (p.custom && p.kind === "cursor") {
+      const del = h("button", { class: "btn ghost del", title: "Delete this cursor" }, "Delete");
+      del.onclick = async () => { if (!await modal({ title: `Delete ${p.name}?`, text: p.installed ? "It's equipped right now, so Roblox's own cursor comes back." : "", ok: "Delete", danger: true })) return; const r = await api.delete_cursor(p.id); if (r.error) return toast(r.error, "err"); toast(`${p.name} deleted.`, "ok"); renderPacks(); };
+      setTimeout(() => row.append(del));
+    }
     if (equip && p.installed) card.querySelector("b").append(h("span", { class: "eq-tag" }, "EQUIPPED"));
     const btn = h("button", { class: "btn" + (p.installed ? " danger" : " primary") }, p.installed ? (equip ? "Unequip" : "Remove") : (equip ? "Equip" : "Install"));
     btn.onclick = async () => {
@@ -2331,11 +2341,70 @@ function drawCrosshair(ctx, d, S = 64) {
   paint(0, d.color);
   ctx.restore();
 }
-function rangeField(label, key, min, max, after) {
-  const r = h("input", { type: "range", min, max, value: xd[key] }), v = h("div", { class: "range-val" }, String(xd[key]));
-  const fill = () => r.style.setProperty("--fill", ((xd[key] - min) / (max - min) * 100) + "%");
-  r.oninput = () => { xd[key] = +r.value; v.textContent = r.value; fill(); after(); }; fill();
+function rangeField(label, key, min, max, after, o = xd) {
+  const r = h("input", { type: "range", min, max, value: o[key] }), v = h("div", { class: "range-val" }, String(o[key]));
+  const fill = () => r.style.setProperty("--fill", ((o[key] - min) / (max - min) * 100) + "%");
+  r.oninput = () => { o[key] = +r.value; v.textContent = r.value; fill(); after(); }; fill();
   return h("div", { class: "field" }, h("label", {}, label), h("div", { class: "range-wrap" }, r, v));
+}
+const CSTYLES = [["arrow", "Arrow"], ["dot", "Dot"], ["ring", "Ring"], ["ringdot", "Ring + dot"], ["cross", "Cross"], ["diamond", "Diamond"]];
+let cd = { style: "arrow", color: "#ffffff", size: 20, thick: 2, outline: 2, dark: true, glow: false, alpha: 100 };
+function drawCursor(ctx, d, S = 64) {
+  const k = S / 64, c = S / 2; ctx.clearRect(0, 0, S, S);
+  ctx.save(); ctx.globalAlpha = d.alpha / 100; ctx.translate(c, c); ctx.scale(k, k);
+  const L = d.size, t = d.thick, line = d.dark ? "rgba(0,0,0,.92)" : "rgba(255,255,255,.95)";
+  const path = () => {
+    const p = new Path2D();
+    if (d.style === "arrow") { const u = L / 18; [[0, 0], [0, 16], [4, 12.4], [7, 18.5], [9.6, 17.4], [6.6, 11.3], [11.6, 11.3]].forEach(([x, y], i) => i ? p.lineTo(x * u, y * u) : p.moveTo(x * u, y * u)); p.closePath(); }
+    if (d.style === "dot") p.arc(0, 0, Math.max(1.5, L / 4), 0, 6.2832);
+    if (d.style === "diamond") { const r = L / 2.6; p.moveTo(0, -r); p.lineTo(r, 0); p.lineTo(0, r); p.lineTo(-r, 0); p.closePath(); }
+    if (d.style === "ringdot") p.arc(0, 0, Math.max(1, t * .8), 0, 6.2832);
+    return p;
+  };
+  const ring = ["ring", "ringdot"].includes(d.style), cross = d.style === "cross";
+  const strokeShapes = (w, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = "butt";
+    if (ring) { ctx.beginPath(); ctx.arc(0, 0, Math.max(3, L / 2.4), 0, 6.2832); ctx.stroke(); }
+    if (cross) { const a = L / 2; ctx.beginPath(); ctx.moveTo(-a, 0); ctx.lineTo(a, 0); ctx.moveTo(0, -a); ctx.lineTo(0, a); ctx.stroke(); }
+  };
+  if (d.glow) { ctx.shadowColor = d.color; ctx.shadowBlur = 8; }
+  if (d.outline) {
+    ctx.lineJoin = "round"; ctx.strokeStyle = line; ctx.lineWidth = d.outline * 2; ctx.stroke(path());
+    strokeShapes(t + d.outline * 2, line);
+  }
+  ctx.fillStyle = d.color; ctx.fill(path()); strokeShapes(t, d.color);
+  ctx.restore();
+}
+function renderCursorMaker() {
+  const box = $("#cmakerCard"); if (!box) return; box.innerHTML = "";
+  const big = h("canvas", { width: 192, height: 192, style: "width:192px;height:192px" }), real = h("canvas", { class: "real", width: 64, height: 64, style: "width:64px;height:64px;left:auto;right:6px;top:auto;bottom:6px;transform:none" });
+  const draw = () => { drawCursor(big.getContext("2d"), cd, 192); drawCursor(real.getContext("2d"), cd, 64); };
+  const sw = h("div", { class: "xswatch" });
+  const drawSw = () => { sw.innerHTML = ""; [...new Set(["#ffffff", ...XCOLORS])].forEach((col) => sw.append(h("button", { class: cd.color === col ? "on" : "", style: `background:${col}`, onclick: () => { cd.color = col; drawSw(); draw(); } })));
+    const ci = h("input", { type: "color", value: cd.color }); ci.oninput = () => { cd.color = ci.value; draw(); $$("button", sw).forEach((b) => b.classList.remove("on")); }; sw.append(ci); };
+  drawSw();
+  const style = segmented(CSTYLES, cd.style, (v) => { cd.style = v; draw(); });
+  const edge = segmented([["dark", "Dark edge"], ["light", "Light edge"]], cd.dark ? "dark" : "light", (v) => { cd.dark = v === "dark"; draw(); });
+  const name = h("input", { class: "input", placeholder: "Name it, like \"White arrow\"", style: "flex:1", maxlength: 30 });
+  const saveBtn = h("button", { class: "btn primary" }, "Save cursor");
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true; const r = await api.save_cursor(name.value || "My cursor", real.toDataURL("image/png"), { ...cd }); saveBtn.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    sfx("ready"); packKind = "cursor"; renderPacks();
+    if (await modal({ title: "Cursor saved", text: "Equip it now? It replaces your current cursor in Roblox.", ok: "Equip it" })) {
+      const x = await api.install_pack(r.id, true); if (x.error) return toast(x.error, "err"); syncSettings(x);
+      toast("Your cursor is equipped." + (x.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok"); renderPacks();
+    }
+  };
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Cursor maker"), h("p", { class: "sub" }, "Design your own mouse cursor for Roblox menus and the game. The point of the cursor is the middle of the picture, so it clicks exactly where it points."),
+    h("div", { class: "xmaker" }, h("div", { class: "xprev menu" }, big, real, h("span", { class: "tag" }, "preview")),
+      h("div", { class: "xctl" }, h("div", { class: "field" }, h("label", {}, "Style"), style), h("div", { class: "field" }, h("label", {}, "Color"), sw),
+        h("div", { class: "grid2", style: "gap:0 16px" }, rangeField("Size", "size", 8, 30, draw, cd), rangeField("Thickness", "thick", 1, 6, draw, cd),
+          rangeField("Edge", "outline", 0, 3, draw, cd), rangeField("Opacity", "alpha", 40, 100, draw, cd)),
+        h("div", { class: "field" }, h("label", {}, "Edge color"), edge),
+        toggleRow("Glow", "A soft glow in your color around the cursor.", cd.glow, (v) => { cd.glow = v; draw(); }),
+        h("div", { class: "row", style: "margin-top:8px" }, name, saveBtn))));
+  draw(); requestAnimationFrame(() => { style._remeasure(); edge._remeasure(); });
 }
 function renderMaker() {
   const box = $("#xmakerCard"); box.innerHTML = "";
@@ -2940,6 +3009,7 @@ function palActions() {
   A.push({ ico: "📸", t: "Screenshot Roblox", k: hasPrem() ? "Capture" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("Screenshots from Orbit"); const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } });
   A.push({ ico: "🕶", t: cfg.session.streamer_mode ? "Turn off streamer mode" : "Turn on streamer mode", k: "Privacy", run: () => { cfg.session.streamer_mode = !cfg.session.streamer_mode; save(); toast(`Streamer mode ${cfg.session.streamer_mode ? "on" : "off"}.`, "ok"); if (page === "home") renderNow(); } });
   A.push({ ico: "🪪", t: "Make my player card", k: "Stats", run: () => { go("session"); setTimeout(() => renderPlayerCard(true), 400); } });
+  A.push({ ico: "🖱", t: "Cursor maker", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#cmakerCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "✛", t: "Crosshair maker", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#xmakerCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "⌨", t: cfg.overlay && cfg.overlay.keystrokes ? "Turn off keystrokes overlay" : "Turn on keystrokes overlay", k: "Overlay", run: () => { cfg.overlay.keystrokes = !cfg.overlay.keystrokes; save(); toast(`Keystrokes overlay ${cfg.overlay.keystrokes ? "on" : "off"} for your next session.`, "ok"); } });
   THEMES.forEach((t) => A.push({ ico: "🎨", t: `Theme: ${t.name}`, k: "Appearance", run: () => { go("appearance"); setTimeout(() => [...$$(".theme-card")].find((b) => b.textContent.startsWith(t.name))?.click(), 300); } }));

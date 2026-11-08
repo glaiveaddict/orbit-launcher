@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.8.0
+- **Cursor maker:** design your own mouse cursor in Mods. Pick a style (Arrow, Dot, Ring, Ring + dot, Cross or Diamond), a color, the size, thickness, edge and glow, then save it and equip it in one click. Your cursors show first in the Cursors tab, with a Delete button.
+
 ## v2.7.2
 - **Cursors and crosshairs fixed:** pressing **Equip** now puts it straight into Roblox. Before, it only changed once Roblox was launched through Orbit, so the game could keep an old cursor. Equipping one replaces the last one, an EQUIPPED tag shows which one is on, and **Unequip** puts Roblox's own back. Equipping also turns mods on if they were off. If Roblox is open, the new one shows after you restart Roblox.
 - **Remove grass, Plain gray sky and Low-detail meshes** in FastFlags are now Premium.
