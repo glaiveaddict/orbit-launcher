@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.0
+- **Crosshair maker:** design your own shift-lock crosshair on the Mods page. Pick a style (cross, dot, circle, T or X), color, length, gap, thickness, outline, opacity and center dot, with a live preview over a BedWars-style map. Save it and use it everywhere or for one game.
+- **Per-game crosshairs:** every game in your Library can have its own crosshair. It switches in when you launch that game from Orbit and switches back for everything else. The BedWars kit now uses this too.
+- **Roblox updates ahead of time:** when Roblox releases an update, Orbit downloads and installs it in the background while Roblox is closed, so launching never sits on Roblox's "Updating" screen. Every file is checked, and if Roblox ever changes how its update is packaged, Orbit steps aside and lets Roblox update itself. Status is on the Health page.
+- **Keystrokes and clicks overlay:** W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Turn it on in Stats and pick a corner.
+- **Daily play goal:** pick 1 to 6 hours. A progress ring at the top of Stats shows today's time, and a popup lets you know when you reach it.
+- **Theme gallery:** eight ready-made looks in Appearance, including Neon Tokyo, Bed Wars, Emerald, Inferno, Glacier, Gold Rush and Sakura.
+- **Fix:** the Library could show each game twice when it refreshed.
+
 ## v2.0.0
 - **Much faster:** the server location popup, the in-game badge and launching Roblox from the website no longer wait for the whole app to unpack every time. Orbit now keeps a small, always-ready helper for this background work, so they start almost instantly.
 - **Location in about a second:** Orbit looks up the server as soon as Roblox connects instead of waiting, remembers server locations and game names it has seen before, and shows the badge together with the popup instead of 7 seconds later.

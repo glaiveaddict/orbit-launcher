@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -132,6 +132,8 @@ DEFAULT_SETTINGS = {
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
     "saved_servers": [],
+    "game_crosshairs": {},
+    "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True},
     "hotkeys": {"enabled": True},
     "mod_profile": "Default",
     "discord": {
@@ -152,6 +154,7 @@ DEFAULT_SETTINGS = {
         "badge_timer": True,
         "break_minutes": 0,
         "sort_screenshots": False,
+        "daily_minutes": 0,
     },
     "appearance": {
         "mode": "Dark",
@@ -166,10 +169,10 @@ DEFAULT_SETTINGS = {
         "splash": True,
         "ui_scale": "Normal",
     },
-    "updates": {"auto": True},
+    "updates": {"auto": True, "roblox_predownload": True},
     "registration": {"registered": False, "backups": {}},
 }
-FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles", "boost_backup", "win_backup"}
+FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles", "boost_backup", "win_backup", "game_crosshairs"}
 
 
 def log(msg):
@@ -616,12 +619,15 @@ def list_mods(folder):
     return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file())
 
 
-def sync_mods(version_dir, folder=None):
+def sync_mods(version_dir, folder=None, overrides=None):
     vdir = Path(version_dir)
     manifest_path = vdir / MOD_MANIFEST
     backup_root = vdir / MOD_BACKUP_DIR
     old = load_json(manifest_path, [])
     current = list_mods(folder) if folder else []
+    overrides = {k: Path(v) for k, v in (overrides or {}).items() if v and Path(v).exists()}
+    if overrides:
+        current = sorted(set(current) | set(overrides))
 
     for rel in old:
         if rel in current:
@@ -637,7 +643,8 @@ def sync_mods(version_dir, folder=None):
             log(f"Could not restore {rel}: {e}")
 
     for rel in current:
-        source, target, backup = Path(folder) / rel, vdir / rel, backup_root / rel
+        source = overrides.get(rel) or Path(folder) / rel
+        target, backup = vdir / rel, backup_root / rel
         try:
             if rel not in old and target.exists() and not backup.exists():
                 backup.parent.mkdir(parents=True, exist_ok=True)
@@ -701,7 +708,13 @@ def apply_all(settings, version_dir=None, place_id=None):
             apply_system_boost(settings, d)
         except Exception as e:
             log(f"System boost failed: {e}")
-        n = sync_mods(d, folder)
+        overrides = {}
+        cross = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id is not None else None
+        if cross and settings.get("apply_mods", True):
+            src = crosshair_source(cross)
+            if src:
+                overrides["content/textures/MouseLockedCursor.png"] = src
+        n = sync_mods(d, folder, overrides)
         _, _, prof = profile_for(settings, place_id)
         log(f"Applied {len(flags)} flag(s){' [' + prof + ' profile]' if prof else ''} "
             f"and {n} mod file(s) to {d.name}")
@@ -1518,6 +1531,20 @@ class SessionMonitor:
             threading.Thread(target=sort_screenshots, daemon=True).start()
         self._discord(None)
 
+    def check_daily(self):
+        limit = int(self.session.get("daily_minutes") or 0)
+        if not limit:
+            return
+        today = time.strftime("%Y-%m-%d")
+        state = load_json(DAILY_FILE, {}) or {}
+        if state.get("date") == today and state.get("notified"):
+            return
+        played = today_seconds()
+        if played >= limit * 60:
+            save_json(DAILY_FILE, {"date": today, "notified": True})
+            spawn_toast("You hit your daily goal", f"{fmt_duration(played)} played today. Nice session!")
+            log(f"Daily goal reached ({fmt_duration(played)})")
+
     def check_break(self):
         minutes = int(self.session.get("break_minutes") or 0)
         if not minutes or not getattr(self, "play_start", None):
@@ -1629,6 +1656,8 @@ class SessionMonitor:
             log("No Roblox log appeared; session features disabled for this launch")
             return
         log(f"Watching {log_path.name}")
+        if (self.settings.get("overlay") or {}).get("keystrokes"):
+            start_keys()
         fh = self._open(log_path)
         last_check, not_running = 0, 0
         try:
@@ -1645,6 +1674,7 @@ class SessionMonitor:
                     self.icon.apply()
                 self.boost.tick()
                 self.check_break()
+                self.check_daily()
                 newer = self._newest_log()
                 try:
                     current_mtime = log_path.stat().st_mtime
@@ -1679,6 +1709,8 @@ class SessionMonitor:
                 except Exception as e:
                     log(f"Crash check failed: {e}")
             self.on_leave(record=not handed)
+            if not handed:
+                close_keys()
             if self.ipc:
                 self.ipc.close()
 
@@ -1854,6 +1886,9 @@ class AutoAttach:
                 check_roblox_update(load_settings())
             except Exception as e:
                 log(f"Roblox update check failed: {e}")
+        if time.time() - getattr(self, "last_predownload", 0) > 20 * 60 and not roblox_running():
+            self.last_predownload = time.time()
+            threading.Thread(target=predownload_roblox, daemon=True).start()
         if not roblox_running():
             self.replaced = False
             self.seen = 0
@@ -2079,14 +2114,73 @@ PACK_TARGETS = {
 }
 
 
+CROSSHAIR_DIR = DATA_DIR / "crosshairs"
+
+
 def pack_file(pack_id):
+    if str(pack_id).startswith("custom:"):
+        return CROSSHAIR_DIR / (pack_id.split(":", 1)[1] + ".png")
     ext = ".ogg" if PACKS[pack_id][1] == "sound" else ".png"
     return resource_dir() / "ui" / "packs" / (pack_id + ext)
+
+
+def crosshair_source(cid):
+    if not cid:
+        return None
+    if str(cid).startswith("custom:") or (cid in PACKS and PACKS[cid][1] == "crosshair"):
+        f = pack_file(cid)
+        return f if f.exists() else None
+    return None
+
+
+def custom_crosshairs():
+    CROSSHAIR_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in sorted(CROSSHAIR_DIR.glob("*.png"), key=lambda x: x.stat().st_mtime, reverse=True):
+        meta = load_json(f.with_suffix(".json"), {}) or {}
+        out.append({"id": "custom:" + f.stem, "name": meta.get("name") or f.stem, "kind": "crosshair", "custom": True,
+                    "desc": "Made with the crosshair maker.", "design": meta.get("design"),
+                    "data": "data:image/png;base64," + base64.b64encode(f.read_bytes()).decode()})
+    return out
+
+
+def save_custom_crosshair(name, data_url, design=None):
+    m = re.match(r"data:image/png;base64,(.+)$", data_url or "", re.S)
+    if not m:
+        raise ValueError("That image didn't come through.")
+    raw = base64.b64decode(m.group(1))
+    if raw[:8] != b"\x89PNG\r\n\x1a\n" or len(raw) > 200_000:
+        raise ValueError("That image isn't a valid crosshair.")
+    w, h = struct.unpack(">II", raw[16:24])
+    if not (16 <= w <= 256 and 16 <= h <= 256):
+        raise ValueError("Crosshairs must be between 16 and 256 pixels.")
+    clean = re.sub(r"[^A-Za-z0-9 _-]", "", name or "").strip()[:30] or "My crosshair"
+    slug = re.sub(r"\s+", "-", clean.lower())
+    CROSSHAIR_DIR.mkdir(parents=True, exist_ok=True)
+    (CROSSHAIR_DIR / f"{slug}.png").write_bytes(raw)
+    save_json(CROSSHAIR_DIR / f"{slug}.json", {"name": clean, "design": design, "at": int(time.time())})
+    log(f"Saved custom crosshair '{clean}'")
+    return "custom:" + slug
+
+
+def delete_custom_crosshair(cid, settings):
+    if not str(cid).startswith("custom:"):
+        raise ValueError("Only your own crosshairs can be deleted.")
+    slug = cid.split(":", 1)[1]
+    (CROSSHAIR_DIR / f"{slug}.png").unlink(missing_ok=True)
+    (CROSSHAIR_DIR / f"{slug}.json").unlink(missing_ok=True)
+    settings["game_crosshairs"] = {k: v for k, v in (settings.get("game_crosshairs") or {}).items() if v != cid}
+    save_settings(settings)
 
 
 def pack_states(settings):
     folder = mods_dir(settings)
     out = []
+    for c in custom_crosshairs():
+        src = pack_file(c["id"])
+        c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == src.read_bytes()
+                             for t in PACK_TARGETS["crosshair"])
+        out.append(c)
     for pid, (name, kind, desc) in PACKS.items():
         src = pack_file(pid)
         installed = src.exists() and all((folder / t).exists() and (folder / t).stat().st_size == src.stat().st_size
@@ -2098,9 +2192,14 @@ def pack_states(settings):
 
 
 def install_pack(settings, pack_id, on=True):
-    if pack_id not in PACKS:
+    if str(pack_id).startswith("custom:"):
+        if not pack_file(pack_id).exists():
+            raise ValueError("That crosshair is gone.")
+        kind = "crosshair"
+    elif pack_id not in PACKS:
         raise ValueError("Unknown pack")
-    kind = PACKS[pack_id][1]
+    else:
+        kind = PACKS[pack_id][1]
     folder = mods_dir(settings)
     for target in PACK_TARGETS[kind]:
         dest = folder / target
@@ -2627,14 +2726,327 @@ def apply_game_kit(settings, kit_id, crosshair=None):
     prof.setdefault("presets", {}).update(kit["preset"])
     if not any(str(g.get("pid")) == pid for g in settings["library"]):
         settings["library"].append({"pid": pid, "name": kit["name"], "mod_profile": None})
+    if crosshair and crosshair_source(crosshair):
+        settings.setdefault("game_crosshairs", {})[pid] = crosshair
+        settings["apply_mods"] = True
     save_settings(settings)
-    if crosshair:
-        install_pack(settings, crosshair, True)
-        if not settings.get("apply_mods"):
-            settings["apply_mods"] = True
-            save_settings(settings)
     log(f"Applied the {kit['name']} kit")
     return pid
+
+
+DAILY_FILE = DATA_DIR / "daily.json"
+KEYS_FILE = DATA_DIR / "keys.json"
+KEYS_FLAG = "--keys"
+
+
+def today_seconds():
+    today = time.strftime("%Y-%m-%d")
+    total = calendar_data().get(today, 0)
+    cur = load_json(CURRENT_FILE, None) or {}
+    if cur.get("joined") and time.strftime("%Y-%m-%d", time.localtime(cur["joined"])) == today:
+        total += max(0, time.time() - cur["joined"])
+    return int(total)
+
+
+def start_keys():
+    close_keys()
+    proc = spawn_self(TOAST_FLAG, "keys", "", KEYS_FLAG)
+    if proc:
+        save_json(KEYS_FILE, {"pid": proc.pid})
+
+
+def close_keys():
+    data = load_json(KEYS_FILE, {}) or {}
+    if data.get("pid") and IS_WINDOWS:
+        kill_tree(data["pid"])
+    KEYS_FILE.unlink(missing_ok=True)
+
+
+def show_keys_window():
+    raise_own_priority()
+    import tkinter as tk
+    import tkinter.font as tkfont
+    settings = load_settings()
+    ov = settings.get("overlay") or {}
+    pos = ov.get("keys_pos") or "Bottom right"
+    show_cps = ov.get("keys_cps", True)
+    c = theme_colors(settings["appearance"])
+    accent, accent2 = accent_pair(settings["appearance"])
+    key = "#010203"
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.configure(bg=key)
+    try:
+        root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
+        root.attributes("-alpha", 0.0)
+    except tk.TclError:
+        pass
+    u, g = 30, 4
+    rows = [[None, ("W", 0x57), None], [("A", 0x41), ("S", 0x53), ("D", 0x44)]]
+    W = 3 * u + 2 * g
+    H = 2 * u + g + g + 20 + g + 24 + (g + 18 if show_cps else 0)
+    cv = tk.Canvas(root, width=W, height=H, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+    f_key = tkfont.Font(family="Segoe UI Semibold", size=10)
+    f_small = tkfont.Font(family="Segoe UI Semibold", size=8)
+    boxes = []
+
+    def box(x1, y1, x2, y2, label, vk, font=f_key):
+        r = cv.create_rectangle(x1, y1, x2, y2, fill=c["panel"], outline=c["muted"], width=1)
+        t = cv.create_text((x1 + x2) / 2, (y1 + y2) / 2, text=label, fill=c["fg"], font=font)
+        boxes.append((r, t, vk))
+
+    y = 0
+    for row in rows:
+        for i, k in enumerate(row):
+            if k:
+                x = i * (u + g)
+                box(x, y, x + u, y + u, k[0], k[1])
+        y += u + g
+    box(0, y, W, y + 20, "SPACE", 0x20, f_small)
+    y += 20 + g
+    half = (W - g) // 2
+    box(0, y, half, y + 24, "LMB", 0x01, f_small)
+    box(half + g, y, W, y + 24, "RMB", 0x02, f_small)
+    y += 24 + g
+    cps_text = cv.create_text(W / 2, y + 8, text="0 | 0 CPS", fill=c["fg"], font=f_small) if show_cps else None
+    state = {"alpha": 0.0, "hwnd": None, "xy": None, "down": {}, "clicks": {0x01: [], 0x02: []}}
+    peak = 0.88
+    u32 = ctypes.windll.user32 if IS_WINDOWS else None
+
+    def target_xy():
+        rect = roblox_rect() or (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
+        L, T, R, B = rect
+        m = 16
+        if pos == "Bottom left":
+            return (L + m, B - H - m - 60)
+        if pos == "Top left":
+            return (L + m, T + 110)
+        if pos == "Top right":
+            return (R - W - m, T + 110)
+        return (R - W - m, B - H - m - 60)
+
+    xy = target_xy()
+    root.geometry(f"{W}x{H}+{xy[0]}+{xy[1]}")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    state["hwnd"] = hwnd
+    if hwnd and IS_WINDOWS:
+        try:
+            style = u32.GetWindowLongW(hwnd, -20)
+            u32.SetWindowLongW(hwnd, -20, style | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+    log(f"Keystrokes overlay at {xy} ({pos})")
+
+    def poll():
+        try:
+            now = time.time()
+            visible = roblox_in_front()
+            target = peak if visible else 0.0
+            state["alpha"] += (target - state["alpha"]) * 0.35
+            if abs(state["alpha"] - target) < 0.02:
+                state["alpha"] = target
+            root.attributes("-alpha", state["alpha"])
+            if state["alpha"] > 0:
+                for r, t, vk in boxes:
+                    down = bool(u32.GetAsyncKeyState(vk) & 0x8000) if u32 else False
+                    if down != state["down"].get(vk):
+                        state["down"][vk] = down
+                        cv.itemconfigure(r, fill=accent if down else c["panel"], outline=accent2 if down else c["muted"])
+                        cv.itemconfigure(t, fill="#ffffff" if down else c["fg"])
+                        if down and vk in state["clicks"]:
+                            state["clicks"][vk].append(now)
+                if cps_text:
+                    for vk in state["clicks"]:
+                        state["clicks"][vk] = [x for x in state["clicks"][vk] if now - x <= 1.0]
+                    cv.itemconfigure(cps_text, text=f"{len(state['clicks'][0x01])} | {len(state['clicks'][0x02])} CPS")
+                nxy = target_xy()
+                if nxy != state["xy"]:
+                    state["xy"] = nxy
+                    u32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), nxy[0], nxy[1], 0, 0, 0x0001 | 0x0010 | 0x0040) \
+                        if u32 and hwnd else root.geometry(f"+{nxy[0]}+{nxy[1]}")
+                root.attributes("-topmost", True)
+        except tk.TclError:
+            return
+        except Exception:
+            if not state.get("logged"):
+                state["logged"] = True
+                log("Keystrokes error:\n" + traceback.format_exc())
+        root.after(16 if state["alpha"] > 0 else 200, poll)
+
+    poll()
+    root.mainloop()
+
+
+ROBLOX_DEPLOY_FILE = DATA_DIR / "roblox_deploy.json"
+ROBLOX_CDN = "https://setup.rbxcdn.com/channel/common"
+ROBLOX_PACKAGE_MAP = {
+    "RobloxApp.zip": "", "Libraries.zip": "", "redist.zip": "", "shaders.zip": "shaders/", "ssl.zip": "ssl/",
+    "WebView2.zip": "", "WebView2RuntimeInstaller.zip": None,
+    "content-avatar.zip": "content/avatar/", "content-configs.zip": "content/configs/",
+    "content-fonts.zip": "content/fonts/", "content-sky.zip": "content/sky/", "content-sounds.zip": "content/sounds/",
+    "content-textures2.zip": "content/textures/", "content-models.zip": "content/models/",
+    "content-textures3.zip": "PlatformContent/pc/textures/", "content-terrain.zip": "PlatformContent/pc/terrain/",
+    "content-platform-fonts.zip": "PlatformContent/pc/fonts/",
+    "content-platform-dictionaries.zip": "PlatformContent/pc/shared_compression_dictionaries/",
+    "extracontent-luapackages.zip": "ExtraContent/LuaPackages/", "extracontent-translations.zip": "ExtraContent/translations/",
+    "extracontent-models.zip": "ExtraContent/models/", "extracontent-textures.zip": "ExtraContent/textures/",
+    "extracontent-places.zip": "ExtraContent/places/",
+}
+ROBLOX_APPSETTINGS = ('<?xml version="1.0" encoding="UTF-8"?>\r\n<Settings>\r\n\t<ContentFolder>content</ContentFolder>\r\n'
+                      '\t<BaseUrl>http://www.roblox.com</BaseUrl>\r\n</Settings>\r\n')
+
+
+def parse_pkg_manifest(text):
+    lines = [x.strip() for x in text.splitlines()]
+    if not lines or lines[0] != "v0":
+        raise ValueError(f"Unexpected Roblox package manifest ({lines[:1]})")
+    out, i = [], 1
+    while i + 3 < len(lines):
+        name, sig, packed, size = lines[i:i + 4]
+        if not name or not sig:
+            break
+        if name == "RobloxPlayerLauncher.exe":
+            break
+        out.append({"name": name, "sig": sig.lower(), "packed": int(packed), "size": int(size)})
+        i += 4
+    return out
+
+
+def _deploy_state(**kw):
+    state = load_json(ROBLOX_DEPLOY_FILE, {}) or {}
+    state.update(kw, at=int(time.time()))
+    save_json(ROBLOX_DEPLOY_FILE, state)
+    return state
+
+
+def predownload_roblox(force=False):
+    if not IS_WINDOWS and not force:
+        return None
+    settings = load_settings()
+    if not settings["updates"].get("roblox_predownload", True) and not force:
+        return None
+    if not player_dirs():
+        return None
+    state = load_json(ROBLOX_DEPLOY_FILE, {}) or {}
+    if state.get("state") == "downloading" and pid_alive(state.get("pid")) and time.time() - state.get("at", 0) < 900:
+        return None
+    latest = latest_roblox_version()
+    if not latest:
+        return None
+    root = LOCALAPPDATA / "Roblox" / "Versions"
+    final = root / latest
+    if (final / "RobloxPlayerBeta.exe").exists():
+        if state.get("version") != latest or state.get("state") not in ("ready", "current"):
+            _deploy_state(state="current", version=latest, progress=1.0, error=None, pid=None)
+        return None
+    if roblox_running() and not force:
+        return None
+    if state.get("state") == "failed" and state.get("version") == latest and time.time() - state.get("at", 0) < 6 * 3600 and not force:
+        return None
+    import hashlib
+    import zipfile
+    _deploy_state(state="downloading", version=latest, progress=0.0, error=None, pid=os.getpid())
+    log(f"Pre-downloading Roblox {latest}")
+    dl = DATA_DIR / "rbx-download"
+    stage = root / (latest + ".orbit-staging")
+    try:
+        with urllib.request.urlopen(urllib.request.Request(f"{ROBLOX_CDN}/{latest}-rbxPkgManifest.txt",
+                                                           headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"}), timeout=20) as r:
+            packages = parse_pkg_manifest(r.read().decode("utf-8", "ignore"))
+        unknown = [p["name"] for p in packages if p["name"] not in ROBLOX_PACKAGE_MAP]
+        if unknown or not any(p["name"] == "RobloxApp.zip" for p in packages):
+            raise ValueError("Roblox changed its package layout (" + ", ".join(unknown or ["no RobloxApp.zip"]) + "). "
+                             "Leaving this update to Roblox's own updater.")
+        wanted = [p for p in packages if ROBLOX_PACKAGE_MAP[p["name"]] is not None]
+        total = sum(p["packed"] for p in wanted) or 1
+        done = 0
+        dl.mkdir(parents=True, exist_ok=True)
+        for p in wanted:
+            f = dl / p["sig"]
+            if not (f.exists() and f.stat().st_size == p["packed"]):
+                h = hashlib.md5()
+                req = urllib.request.Request(f"{ROBLOX_CDN}/{latest}-{p['name']}", headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"})
+                with urllib.request.urlopen(req, timeout=30) as r, open(f.with_suffix(".part"), "wb") as out:
+                    last = 0
+                    while True:
+                        chunk = r.read(1 << 16)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        h.update(chunk)
+                        done += len(chunk)
+                        if time.time() - last > 1.5:
+                            last = time.time()
+                            _deploy_state(progress=round(min(done / total, 0.99) * 0.85, 3))
+                        if roblox_running() and not force:
+                            raise InterruptedError("Roblox started; pausing the pre-download until it closes.")
+                if h.hexdigest() != p["sig"]:
+                    f.with_suffix(".part").unlink(missing_ok=True)
+                    raise ValueError(f"{p['name']} didn't download correctly (checksum mismatch).")
+                os.replace(f.with_suffix(".part"), f)
+            else:
+                done += p["packed"]
+        _deploy_state(progress=0.88)
+        shutil.rmtree(stage, ignore_errors=True)
+        stage.mkdir(parents=True)
+        for p in wanted:
+            dest = stage / ROBLOX_PACKAGE_MAP[p["name"]]
+            dest.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(dl / p["sig"]) as z:
+                for info in z.infolist():
+                    name = info.filename.replace("\\", "/").lstrip("/")
+                    if not name or name.endswith("/") or ".." in name.split("/"):
+                        continue
+                    target = dest / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with z.open(info) as src, open(target, "wb") as out:
+                        shutil.copyfileobj(src, out)
+        (stage / "AppSettings.xml").write_text(ROBLOX_APPSETTINGS, encoding="utf-8")
+        if not (stage / "RobloxPlayerBeta.exe").exists():
+            raise ValueError("The download didn't include RobloxPlayerBeta.exe.")
+        if (final / "RobloxPlayerBeta.exe").exists():
+            shutil.rmtree(stage, ignore_errors=True)
+        else:
+            shutil.rmtree(final, ignore_errors=True)
+            stage.rename(final)
+            os.utime(final / "RobloxPlayerBeta.exe", None)
+        try:
+            apply_all(settings, final)
+        except Exception as e:
+            log(f"Applying settings to the new Roblox failed: {e}")
+        shutil.rmtree(dl, ignore_errors=True)
+        save_json(ROBLOX_VERSION_FILE, {"version": latest, "previous": (load_json(ROBLOX_VERSION_FILE, {}) or {}).get("version"),
+                                        "at": int(time.time())})
+        cleanup_old_roblox(root, keep={latest})
+        _deploy_state(state="ready", progress=1.0, pid=None)
+        log(f"Roblox {latest} is ready; next launch skips Roblox's updater")
+        spawn_toast("Roblox update ready", "Orbit downloaded the new Roblox in the background. Your next launch is instant.")
+        return latest
+    except InterruptedError as e:
+        _deploy_state(state="paused", error=str(e), pid=None)
+        log(str(e))
+    except Exception as e:
+        shutil.rmtree(stage, ignore_errors=True)
+        _deploy_state(state="failed", error=str(e)[:300], pid=None)
+        log(f"Roblox pre-download failed: {e}")
+    return None
+
+
+def cleanup_old_roblox(root, keep):
+    dirs = [d for d in root.iterdir() if d.is_dir() and d.name.startswith("version-") and (d / "RobloxPlayerBeta.exe").exists()]
+    dirs.sort(key=lambda d: (d / "RobloxPlayerBeta.exe").stat().st_mtime, reverse=True)
+    keepers = set(keep) | {d.name for d in dirs[:2]}
+    for d in dirs:
+        if d.name not in keepers:
+            shutil.rmtree(d, ignore_errors=True)
+            log(f"Removed old Roblox {d.name}")
+    for d in root.glob("*.orbit-staging"):
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def claim_monitor():
@@ -4333,6 +4745,57 @@ class Api:
         except Exception as e:
             return self._err(e)
 
+    def custom_crosshairs(self):
+        return custom_crosshairs()
+
+    def save_crosshair(self, name, data_url, design=None):
+        try:
+            cid = save_custom_crosshair(name, data_url, design)
+            return {"id": cid, "list": custom_crosshairs()}
+        except Exception as e:
+            return self._err(e)
+
+    def delete_crosshair(self, cid):
+        try:
+            delete_custom_crosshair(cid, self._settings)
+            return {"list": custom_crosshairs(), "settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def set_game_crosshair(self, pid, cid):
+        try:
+            pid = str(pid)
+            if not pid.isdigit():
+                return {"error": "Unknown game."}
+            gc = self._settings.setdefault("game_crosshairs", {})
+            if cid:
+                if not crosshair_source(cid):
+                    return {"error": "That crosshair isn't available."}
+                gc[pid] = cid
+                self._settings["apply_mods"] = True
+            else:
+                gc.pop(pid, None)
+            save_settings(self._settings)
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def today(self):
+        return {"seconds": today_seconds(), "limit": int(self._settings["session"].get("daily_minutes") or 0) * 60}
+
+    def roblox_update_status(self):
+        st = load_json(ROBLOX_DEPLOY_FILE, {}) or {}
+        players = player_dirs()
+        return {"installed": players[0].name if players else None, "state": st.get("state"), "version": st.get("version"),
+                "progress": st.get("progress"), "error": st.get("error"), "at": st.get("at"),
+                "enabled": self._settings["updates"].get("roblox_predownload", True)}
+
+    def predownload_now(self):
+        if roblox_running():
+            return {"error": "Close Roblox first. Orbit pre-downloads updates while Roblox is closed."}
+        threading.Thread(target=predownload_roblox, kwargs={"force": True}, daemon=True).start()
+        return True
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -4541,7 +5004,9 @@ def main():
         title = args[i + 1] if len(args) > i + 1 else APP_NAME
         body = args[i + 2] if len(args) > i + 2 else ""
         try:
-            if "--badge" in args:
+            if KEYS_FLAG in args:
+                show_keys_window()
+            elif "--badge" in args:
                 def opt(flag):
                     return args[args.index(flag) + 1] if flag in args and len(args) > args.index(flag) + 1 else None
                 show_badge_window(title, body, opt("--ip"), opt("--joined"))

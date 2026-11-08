@@ -531,6 +531,32 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .cross-pick button:hover { transform: translateY(-2px); }
 .cross-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .cross-pick img { width: 34px; height: 34px; }
+
+.xmaker { display: grid; grid-template-columns: 220px 1fr; gap: 20px; align-items: start; }
+.xprev { border-radius: 16px; overflow: hidden; position: relative; height: 220px; background: linear-gradient(180deg, #5aa7e6 0%, #9fd0f3 48%, #3d8a3a 49%, #2a5f28 100%); box-shadow: inset 0 0 0 1px var(--line); }
+.xprev::after { content: ""; position: absolute; left: 18%; right: 18%; top: 52%; height: 22%; background: repeating-linear-gradient(90deg, #d33 0 22px, #b22 22px 24px); border-radius: 3px; opacity: .85; }
+.xprev canvas { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1; }
+.xprev .real { image-rendering: auto; }
+.xprev .tag { position: absolute; bottom: 8px; left: 10px; z-index: 2; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 99px; }
+.xctl .field { margin-bottom: 10px; }
+.xswatch { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.xswatch button { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+.xswatch button.on { border-color: var(--text); }
+.xswatch input[type=color] { width: 34px; height: 26px; border: 1px solid var(--line); border-radius: 8px; background: none; padding: 1px; cursor: pointer; }
+.today { display: flex; align-items: center; gap: 18px; }
+.today svg { width: 74px; height: 74px; flex: none; }
+.themes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.theme-card { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; cursor: pointer; background: none; color: var(--text); padding: 0; text-align: left; font: inherit; transition: transform .3s var(--spring), border-color .25s; }
+.theme-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.theme-card .sw { height: 54px; position: relative; }
+.theme-card .sw i { position: absolute; width: 18px; height: 18px; border-radius: 50%; left: 10px; bottom: 8px; background: #05030a; box-shadow: 0 0 0 2px rgba(255,255,255,.85); }
+.theme-card b { display: block; padding: 8px 10px 2px; font-size: 13px; }
+.theme-card span { display: block; padding: 0 10px 9px; font-size: 11px; color: var(--muted); }
+.rbx-bar { height: 8px; border-radius: 99px; background: var(--panel3); overflow: hidden; margin-top: 10px; }
+.rbx-bar i { display: block; height: 100%; background: var(--grad); transition: width .6s var(--ease); }
+.lib-cross { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.lib-cross select { flex: 1; min-width: 0; width: 100%; }
+.lib-cross img { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
 </style>
 </head>
 <body>
@@ -669,6 +695,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <button class="btn" id="openModsBtn">Open folder</button><button class="btn danger" id="delModBtn">Delete profile</button></div>
         <div class="row" id="modChips"></div>
       </div>
+      <div class="card rise" style="--i:3" id="xmakerCard"></div>
       <div class="card rise" style="--i:3">
         <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original crosshairs, cursors and death sounds made for Orbit. The crosshair is what you see in shift lock and first person. Installs into the selected mod profile.</p></div><span class="spacer"></span><div id="packTabs"></div></div>
         <div class="packs" id="packGrid" style="margin-top:12px"></div>
@@ -683,6 +710,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     <section class="page" id="page-session">
       <div class="page-head rise" style="--i:0"><h1>Stats</h1><p>Your play time, weekly recap and full session history.</p></div>
       <div class="card rise" style="--i:1" id="sessionToggles"></div>
+      <div class="card rise" style="--i:2" id="todayCard"></div>
       <div class="grid3 rise" style="--i:2">
         <div class="card tilt"><div class="stat-label">Total play time</div><div class="big-num" id="statTotal">0m</div></div>
         <div class="card tilt"><div class="stat-label">Games played</div><div class="big-num" id="statGames">0</div></div>
@@ -732,6 +760,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       </div>
       <div class="card rise" style="--i:3" id="splashCard"></div>
       <div class="card rise" style="--i:3" id="shareCard"></div>
+      <div class="card rise" style="--i:3" id="galleryCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Sounds</h3><p class="sub">Played when you launch Roblox and unlock achievements.</p>
         <div class="field"><div id="sndSeg"></div></div>
@@ -770,6 +799,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:1"><div class="health-score"><div class="big-num" id="healthScore">–</div><div><b id="healthTitle">Checking...</b><div class="muted small" id="healthSub"></div></div></div></div>
       <div class="card rise" style="--i:2" id="healthList"></div>
       <div class="card rise" style="--i:2" id="probCard"></div>
+      <div class="card rise" style="--i:2" id="rbxUpdCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Repair Roblox</h3><p class="sub">Tools for when Roblox acts up. None of these touch your Orbit settings unless it says so.</p>
         <div class="repair-grid">
@@ -1320,7 +1350,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
-  renderPacks();
+  renderMaker(); renderPacks();
 }
 
 
@@ -1338,10 +1368,16 @@ function renderSession() {
     toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Break reminders"), h("span", {}, "A small popup suggests a break after this much play time. Applies from your next session.")),
       segmented([["0", "Off"], ["30", "30m"], ["60", "1h"], ["90", "1h 30m"], ["120", "2h"]], String(s.break_minutes || 0), (v) => { s.break_minutes = Number(v); save(); })),
+    toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Overlay position"), h("span", {}, "Where the keystrokes sit on the Roblox window.")),
+      segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"]], (cfg.overlay && cfg.overlay.keys_pos) || "Bottom right", (v) => { cfg.overlay.keys_pos = v; save(); })),
+    toggleRow("Show clicks per second", "Left | right clicks in the last second, under the mouse buttons.", !(cfg.overlay && cfg.overlay.keys_cps === false), (v) => { cfg.overlay.keys_cps = v; save(); }),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Daily play goal"), h("span", {}, "A popup when you reach this much play time in a day, and a progress ring at the top of Stats.")),
+      segmented([["0", "Off"], ["60", "1h"], ["120", "2h"], ["180", "3h"], ["240", "4h"], ["360", "6h"]], String(s.daily_minutes || 0), (v) => { s.daily_minutes = Number(v); save(); renderToday(); })),
     toggleRow("Start with Windows", "Runs a tiny background helper (no window) so the badge, banner and stats work even when Orbit's window is closed, no matter how you open Roblox.", !!s.start_with_windows, async (v) => { const r = await api.set_startup(v); if (r && r.error) toast(r.error, "err"); else { s.start_with_windows = v; toast(v ? "Orbit now tracks Roblox in the background." : "Background tracking is off.", "ok"); } }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
-  renderStats(); renderCalendar(); renderRecap(); renderTimeline();
+  renderToday(); renderStats(); renderCalendar(); renderRecap(); renderTimeline();
 }
 async function renderStats() {
   const data = S.playtime || {};
@@ -1416,7 +1452,7 @@ function renderAppearance() {
     nameEl.after(h("div", { class: "custom-colors", id: "customColors" }, pick(0), pick(1), prev, h("span", { class: "muted small" }, "Main and glow color. Also used for the in-game badge.")));
   }
   const spc = $("#splashCard"); spc.innerHTML = "";
-  renderShare();
+  renderShare(); renderGallery();
   spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
@@ -1553,10 +1589,27 @@ async function addToLibrary(text) {
   cfg.library.push({ pid: r.pid, name: r.name, mod_profile: null }); save();
   toast(`Added ${r.name} to your library.`, "ok"); renderLibrary();
 }
+let crossList = null;
+async function loadCrossList(force) { if (!crossList || force) crossList = (await api.packs()).filter((p) => p.kind === "crosshair"); return crossList; }
+function crossSelect(pid) {
+  const cur = (cfg.game_crosshairs || {})[String(pid)] || "";
+  const img = h("img", { alt: "" });
+  const sel = h("select", { class: "input", title: "Crosshair used when you launch this game" }, h("option", { value: "" }, "Crosshair: same as everywhere"),
+    ...(crossList || []).map((c) => h("option", { value: c.id }, "Crosshair: " + c.name + (c.custom ? " (yours)" : ""))));
+  sel.value = cur;
+  const upd = () => { const c = (crossList || []).find((x) => x.id === sel.value); img.src = c ? c.data : ""; img.style.display = c ? "" : "none"; };
+  sel.onchange = async () => { await saveNow(); const r = await api.set_game_crosshair(String(pid), sel.value || null); if (r.error) return toast(r.error, "err"); syncSettings(r); upd(); toast(sel.value ? "Crosshair saved for this game. It switches in when you launch it from Orbit." : "This game uses your normal crosshair again.", "ok"); };
+  upd();
+  return h("div", { class: "lib-cross", style: "flex:1" }, img, sel);
+}
 async function renderLibrary() {
+  const tok = renderLibrary.tok = (renderLibrary.tok || 0) + 1;
+  await loadCrossList();
+  if (tok !== renderLibrary.tok) return;
   const grid = $("#libGrid"); grid.innerHTML = "";
   if (!cfg.library.length) grid.append(h("div", { class: "card", style: "grid-column:1/-1;margin:0" }, emptyState("library", "Your library is empty.", "Click Add game, or add something you've played recently below.")));
   await loadGames(cfg.library.map((g) => g.pid));
+  if (tok !== renderLibrary.tok) return;
   cfg.library.forEach((g, i) => {
     const info = gameCache[g.pid] || {}, art = h("div", { class: "art", style: info.thumb || info.icon ? `background-image:url("${info.thumb || info.icon}")` : "" });
     const play = h("button", { class: "play", title: "Play" }); play.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
@@ -1564,6 +1617,7 @@ async function renderLibrary() {
     const x = h("button", { class: "x", title: "Remove" }, "✕");
     x.onclick = async () => { if (await modal({ title: `Remove ${g.name}?`, text: "It only leaves your library. Stats and flag profiles stay.", ok: "Remove", danger: true })) { cfg.library = cfg.library.filter((y) => y !== g); save(); renderLibrary(); } };
     art.append(play, x, h("div", { class: "pt" }, pt(g.pid) ? fmtDur(pt(g.pid)) + " played" : "Not played yet"));
+    const cross = crossSelect(g.pid);
     const sel = h("select", { class: "input", title: "Mod pack for this game" }, h("option", { value: "" }, "Mods: default profile"),
       S.mod_profiles.map((m) => h("option", { value: m }, "Mods: " + m)));
     sel.value = g.mod_profile || ""; sel.onchange = () => { g.mod_profile = sel.value || null; save(); toast(`${g.name} will use ${sel.value || "your default"} mods.`, "ok"); };
@@ -1578,7 +1632,7 @@ async function renderLibrary() {
         h("div", { class: "small muted" }, info.creator ? "by " + info.creator : " "),
         h("div", { class: "row" }, h("button", { class: "btn primary", onclick: () => playGame(g) }, "Play"),
           h("button", { class: "btn", onclick: () => { go("servers"); findServers(g.pid); } }, "Servers"), flagsBtn),
-        h("div", { class: "row" }, sel)));
+        h("div", { class: "row" }, sel), h("div", { class: "row" }, cross)));
     grid.append(card);
   });
   renderSaved();
@@ -1950,7 +2004,7 @@ async function resync() {
   const st = await api.get_state(); Object.assign(cfg, st.settings); S.registered = st.registered;
 }
 async function renderHealth() {
-  renderProblems();
+  renderProblems(); renderRobloxUpdates();
   const list = $("#healthList"); list.innerHTML = "";
   list.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Running checks...")));
   const checks = await api.health(); list.innerHTML = "";
@@ -2095,6 +2149,118 @@ function renderShare() {
       } }, "Paste a code")));
   requestAnimationFrame(() => scale._remeasure());
 }
+const XSTYLES = [["cross", "Cross"], ["dot", "Dot"], ["circle", "Circle"], ["t", "T"], ["x", "X"]];
+const XCOLORS = ["#22e6ff", "#4aff80", "#ff3b5c", "#ffffff", "#ffd60a", "#f060ff", "#ff8a00"];
+let xd = { style: "cross", color: "#22e6ff", size: 9, gap: 3, thick: 2, outline: 1, dot: true, alpha: 100 };
+function drawCrosshair(ctx, d, S = 64) {
+  const k = S / 64, c = S / 2; ctx.clearRect(0, 0, S, S);
+  ctx.save(); ctx.globalAlpha = d.alpha / 100;
+  const prims = [], t = d.thick, g = d.gap, L = d.size;
+  if (["cross", "t", "x"].includes(d.style)) {
+    const arms = d.style === "t" ? [[1, 0], [-1, 0], [0, 1]] : [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    arms.forEach(([dx, dy]) => prims.push({ kind: "rect", x: dx ? (dx > 0 ? g : -g - L) : -t / 2, y: dy ? (dy > 0 ? g : -g - L) : -t / 2, w: dx ? L : t, h: dy ? L : t }));
+  }
+  if (d.style === "circle") prims.push({ kind: "ring", r: Math.max(2, g + L / 2), w: t });
+  if (d.dot || d.style === "dot") prims.push({ kind: "dot", r: d.style === "dot" ? Math.max(1.5, t * 1.4) : Math.max(1, t * .75) });
+  const paint = (o, color) => {
+    ctx.fillStyle = color; ctx.strokeStyle = color;
+    prims.forEach((p) => {
+      ctx.save(); ctx.translate(c, c); ctx.scale(k, k); if (d.style === "x") ctx.rotate(Math.PI / 4);
+      if (p.kind === "rect") ctx.fillRect(p.x - o, p.y - o, p.w + 2 * o, p.h + 2 * o);
+      if (p.kind === "dot") { ctx.beginPath(); ctx.arc(0, 0, p.r + o, 0, 6.2832); ctx.fill(); }
+      if (p.kind === "ring") { ctx.lineWidth = p.w + 2 * o; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, 6.2832); ctx.stroke(); }
+      ctx.restore();
+    });
+  };
+  if (d.outline) paint(d.outline, "rgba(0,0,0,.9)");
+  paint(0, d.color);
+  ctx.restore();
+}
+function rangeField(label, key, min, max, after) {
+  const r = h("input", { type: "range", min, max, value: xd[key] }), v = h("div", { class: "range-val" }, String(xd[key]));
+  const fill = () => r.style.setProperty("--fill", ((xd[key] - min) / (max - min) * 100) + "%");
+  r.oninput = () => { xd[key] = +r.value; v.textContent = r.value; fill(); after(); }; fill();
+  return h("div", { class: "field" }, h("label", {}, label), h("div", { class: "range-wrap" }, r, v));
+}
+function renderMaker() {
+  const box = $("#xmakerCard"); box.innerHTML = "";
+  const big = h("canvas", { width: 192, height: 192, style: "width:192px;height:192px" }), real = h("canvas", { class: "real", width: 64, height: 64, style: "width:64px;height:64px;left:auto;right:6px;top:auto;bottom:6px;transform:none" });
+  const draw = () => { drawCrosshair(big.getContext("2d"), xd, 192); drawCrosshair(real.getContext("2d"), xd, 64); };
+  const sw = h("div", { class: "xswatch" });
+  const drawSw = () => { sw.innerHTML = ""; XCOLORS.forEach((col) => sw.append(h("button", { class: xd.color === col ? "on" : "", style: `background:${col}`, onclick: () => { xd.color = col; drawSw(); draw(); } })));
+    const ci = h("input", { type: "color", value: xd.color }); ci.oninput = () => { xd.color = ci.value; draw(); $$("button", sw).forEach((b) => b.classList.remove("on")); }; sw.append(ci); };
+  drawSw();
+  const style = segmented(XSTYLES, xd.style, (v) => { xd.style = v; draw(); });
+  const name = h("input", { class: "input", placeholder: "Name it, like \"BedWars cyan\"", style: "flex:1", maxlength: 30 });
+  const saveBtn = h("button", { class: "btn primary" }, "Save crosshair");
+  saveBtn.onclick = async () => {
+    const r = await api.save_crosshair(name.value || "My crosshair", real.toDataURL("image/png"), { ...xd });
+    if (r.error) return toast(r.error, "err");
+    crossList = null; sfx("ready"); packKind = "crosshair"; renderPacks();
+    const use = await modal({ title: "Crosshair saved", text: "Use it everywhere now? You can also pick it for just one game in your Library.", ok: "Use everywhere" });
+    if (use) { const x = await api.install_pack(r.id, true); x.error ? toast(x.error, "err") : (toast("Your crosshair is on. It shows next time Roblox starts.", "ok"), renderPacks()); }
+  };
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Crosshair maker"), h("p", { class: "sub" }, "Design your own shift-lock crosshair. The big preview is zoomed in; the small one in the corner is real size."),
+    h("div", { class: "xmaker" }, h("div", { class: "xprev" }, big, real, h("span", { class: "tag" }, "preview")),
+      h("div", { class: "xctl" }, h("div", { class: "field" }, h("label", {}, "Style"), style), h("div", { class: "field" }, h("label", {}, "Color"), sw),
+        h("div", { class: "grid2", style: "gap:0 16px" }, rangeField("Length", "size", 1, 22, draw), rangeField("Gap", "gap", 0, 12, draw),
+          rangeField("Thickness", "thick", 1, 6, draw), rangeField("Outline", "outline", 0, 3, draw), rangeField("Opacity", "alpha", 30, 100, draw)),
+        toggleRow("Center dot", "Adds a dot in the middle.", xd.dot, (v) => { xd.dot = v; draw(); }),
+        h("div", { class: "row", style: "margin-top:8px" }, name, saveBtn))));
+  draw(); requestAnimationFrame(() => style._remeasure());
+}
+
+async function renderToday() {
+  const box = $("#todayCard"); if (!box) return;
+  const r = await api.today(); box.innerHTML = "";
+  const limit = r.limit, frac = limit ? Math.min(1, r.seconds / limit) : 0, C = 2 * Math.PI * 30;
+  const ring = h("div"); ring.innerHTML = `<svg viewBox="0 0 74 74"><circle cx="37" cy="37" r="30" fill="none" stroke="var(--panel3)" stroke-width="7"/><circle cx="37" cy="37" r="30" fill="none" stroke="url(#achGrad)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - frac)}" transform="rotate(-90 37 37)" style="transition:stroke-dashoffset 1s var(--ease)"/></svg>`;
+  box.append(h("div", { class: "today" }, limit ? ring.firstChild : h("span"),
+    h("div", {}, h("div", { class: "stat-label" }, "Today"), h("div", { class: "big-num", style: "font-size:26px" }, fmtDur(r.seconds)),
+      h("div", { class: "muted small" }, limit ? (r.seconds >= limit ? `Goal of ${fmtDur(limit)} reached. Nice.` : `${fmtDur(limit - r.seconds)} left of your ${fmtDur(limit)} goal`) : "Set a daily goal below to track it here."))));
+}
+
+const THEMES = [
+  { name: "Void", note: "The original", mode: "Dark", accent: "Void", bg: "Starfield", snd: "Warp" },
+  { name: "Neon Tokyo", note: "Pink and cyan, warp speed", mode: "Dark", colors: ["#ff2bd6", "#00e5ff"], bg: "Warp", snd: "Pulse" },
+  { name: "Bed Wars", note: "Red team vs blue team", mode: "Dark", colors: ["#ef4444", "#3b82f6"], bg: "Warp", snd: "Pulse" },
+  { name: "Emerald", note: "Calm green nebula", mode: "Dark", colors: ["#22c55e", "#a3e635"], bg: "Nebula", snd: "Chime" },
+  { name: "Inferno", note: "Hot orange and red", mode: "Dark", colors: ["#f97316", "#ef4444"], bg: "Warp", snd: "Nova" },
+  { name: "Glacier", note: "Icy blues", mode: "Dark", colors: ["#38bdf8", "#a5f3fc"], bg: "Starfield", snd: "Chime" },
+  { name: "Gold Rush", note: "Gold on black", mode: "Dark", colors: ["#f59e0b", "#fde047"], bg: "Starfield", snd: "Nova" },
+  { name: "Sakura", note: "Light and pink", mode: "Light", colors: ["#ec4899", "#f9a8d4"], bg: "Nebula", snd: "Chime" },
+];
+function renderGallery() {
+  const box = $("#galleryCard"); box.innerHTML = "";
+  const grid = h("div", { class: "themes" });
+  THEMES.forEach((t) => {
+    const [c1, c2] = t.colors || S.accents[t.accent] || ["#9d6bff", "#d946ef"];
+    const base = t.mode === "Light" ? "#f4efff" : "#0b0714";
+    grid.append(h("button", { class: "theme-card", onclick: () => {
+      const a = cfg.appearance; a.mode = t.mode; a.background = t.bg;
+      if (t.colors) { a.accent = "Custom"; a.custom_colors = [...t.colors]; } else a.accent = t.accent;
+      cfg.sounds.pack = t.snd; applyTheme(); applyBackground(); save(); renderAppearance(); sfx("ready"); toast(`${t.name} theme applied.`, "ok");
+    } }, h("div", { class: "sw", style: `background:radial-gradient(120% 140% at 100% 0%, ${c2}, transparent 55%), radial-gradient(120% 160% at 0% 100%, ${c1}, ${base} 70%)` }, h("i")),
+      h("b", {}, t.name), h("span", {}, t.note)));
+  });
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Theme gallery"), h("p", { class: "sub" }, "Ready-made looks. One click sets colors, background and sounds."), grid);
+}
+
+let rbxTimer = null;
+async function renderRobloxUpdates() {
+  const box = $("#rbxUpdCard"); if (!box) return;
+  const r = await api.roblox_update_status(); box.innerHTML = "";
+  const labels = { downloading: "Downloading the new Roblox in the background...", ready: `Ready: ${r.version}. Your next launch skips Roblox's "Updating" screen.`,
+    current: "Roblox is up to date.", failed: `Last try didn't work: ${r.error || "unknown error"} Roblox will update itself as usual.`, paused: "Paused while Roblox is open. It continues after you close Roblox." };
+  const pct = Math.round((r.progress || 0) * 100);
+  box.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Roblox updates"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, `Installed: ${r.installed || "not found"}. ` + (labels[r.state] || "Orbit checks every 20 minutes while Roblox is closed."))),
+    h("button", { class: "btn", onclick: async () => { const x = await api.predownload_now(); if (x && x.error) return toast(x.error, "err"); toast("Checking for a Roblox update..."); setTimeout(renderRobloxUpdates, 1500); } }, "Check now")),
+    ...(r.state === "downloading" ? [h("div", { class: "rbx-bar" }, h("i", { style: `width:${pct}%` })), h("div", { class: "muted small", style: "margin-top:4px" }, pct + "%")] : []),
+    toggleRow("Download Roblox updates ahead of time", "When Roblox releases an update, Orbit downloads and installs it while Roblox is closed, so launching never waits on Roblox's updater.", r.enabled !== false, (v) => { cfg.updates.roblox_predownload = v; save(); }));
+  clearTimeout(rbxTimer);
+  if (r.state === "downloading" && page === "health") rbxTimer = setTimeout(renderRobloxUpdates, 1500);
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
@@ -2111,6 +2277,9 @@ function palActions() {
   A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
   A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: "Boost", run: async () => { const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
   A.push({ ico: "▣", t: "Mini player", k: "Window", run: () => $("#miniBtn").click() });
+  A.push({ ico: "✛", t: "Crosshair maker", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#xmakerCard").scrollIntoView({ behavior: "smooth" }), 400); } });
+  A.push({ ico: "⌨", t: cfg.overlay && cfg.overlay.keystrokes ? "Turn off keystrokes overlay" : "Turn on keystrokes overlay", k: "Overlay", run: () => { cfg.overlay.keystrokes = !cfg.overlay.keystrokes; save(); toast(`Keystrokes overlay ${cfg.overlay.keystrokes ? "on" : "off"} for your next session.`, "ok"); } });
+  THEMES.forEach((t) => A.push({ ico: "🎨", t: `Theme: ${t.name}`, k: "Appearance", run: () => { go("appearance"); setTimeout(() => [...$$(".theme-card")].find((b) => b.textContent.startsWith(t.name))?.click(), 300); } }));
   A.push({ ico: "🎯", t: cfg.smart_join ? "Turn off Smart join" : "Turn on Smart join", k: "Servers", run: () => { cfg.smart_join = !cfg.smart_join; save(); toast(`Smart join ${cfg.smart_join ? "on" : "off"}.`, "ok"); } });
   Object.keys(S.quick_presets || {}).forEach((n) => A.push({ ico: "⚙", t: `FastFlags preset: ${n}`, k: "FastFlags", run: () => { Object.assign(cfg.presets, S.quick_presets[n]); save(); toast(`${n} preset applied.`, "ok"); } }));
   A.push({ ico: "🧹", t: "Clear Roblox cache", k: "Repair", run: () => { go("health"); setTimeout(() => $('[data-repair="cache"]').click(), 300); } });
