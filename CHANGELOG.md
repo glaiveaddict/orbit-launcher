@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.7.0
+- **Premium now covers specific features instead of the whole Boost page.** Premium unlocks:
+  - FPS Boost, plus Roblox CPU priority, the high performance power plan, fastest GPU, Windows Game Mode, turning off Xbox recording, and boosting game profiles
+  - The server location popup and the in-game server badge (position, size, live ping, session timer)
+  - Game update alerts, auto-reconnect and lag spike alerts
+  - Join a player and friend alerts
+  - Session history
+  - Capture: FPS tracking, instant replay and Roblox screenshots
+  - Global hotkeys
+  - Extensions (Orbit Item Preview)
+  - The Potato FastFlags preset
+- **Free for everyone:** game kits, the frame rate cap (including Unlimited), Roblox graphics quality, Launch with Roblox, and everything else.
+- The tab-out guard stays on for everyone, so free players using Unlimited FPS keep a smooth PC.
+- Your premium settings are kept while premium is off and come back as they were when you activate a key. Hotkeys start within 30 seconds of activating.
+
 ## v2.6.1
 - The owner no longer gets premium automatically. To test premium, make a key for yourself on the Owner page and put it in on the Premium page, like any player.
 

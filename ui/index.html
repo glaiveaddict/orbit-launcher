@@ -618,6 +618,15 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .lock-card .lk { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; flex: none; background: linear-gradient(135deg, #f59e0b, #fde047); color: #1a1205; box-shadow: 0 10px 28px -10px #f59e0b; }
 .lock-card .lk svg { width: 26px; height: 26px; }
 .lock-card h3 { margin: 0 0 4px; } .lock-card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.plocked { position: relative; }
+.plocked > :not(.plock) { filter: blur(4px) saturate(.5); opacity: .4; pointer-events: none; user-select: none; }
+.plock { position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 99px; border: 0; cursor: pointer;
+  background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; font: inherit; font-size: 13px; font-weight: 750; box-shadow: 0 10px 30px -10px #f59e0b; white-space: nowrap; transition: transform .25s var(--spring); }
+.plock:hover { transform: translate(-50%, -50%) scale(1.05); }
+.plock svg { width: 15px; height: 15px; }
+.lock-group { border-radius: 12px; min-height: 64px; }
+.lock-note { font-size: 12px; color: var(--muted); padding: 8px 2px 2px; }
+.tl-ghost { height: 46px; border-radius: 10px; background: rgba(255,255,255,.05); margin: 8px 0; }
 .preset.locked { position: relative; opacity: .55; }
 .preset.locked::after { content: "🔒 Premium"; position: absolute; top: 8px; right: 8px; font-size: 10.5px; font-weight: 750; padding: 2px 8px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; }
 .prem-pill { margin-left: 8px; font-size: 10px; font-weight: 850; letter-spacing: .12em; padding: 3px 9px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; box-shadow: 0 0 14px -4px #f59e0b; }
@@ -1302,8 +1311,8 @@ function go(id) {
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
-     appearance: renderAppearance, extensions: () => {}, credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     achievements: renderAchievements, screens: renderScreens, boost: () => { applyLocks(); renderBoost(); }, health: renderHealth, news: renderNews })[id]?.();
+     appearance: renderAppearance, extensions: applyLocks, credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
+     achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -1479,7 +1488,7 @@ async function renderMods() {
 function renderSession() {
   const s = cfg.session, box = $("#sessionToggles"); box.innerHTML = "";
   box.append(
-    toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
+    lockGroup("The server badge and location popup", toggleRow("Server location popup", "Shows where the server is (like \"Ashburn, Virginia\") when you join.", s.server_popup, (v) => { s.server_popup = v; save(); }),
     ...(cfg.presets.exclusive_fullscreen ? [h("div", { class: "vstatus err" }, "Exclusive fullscreen is on in FastFlags, so the banner and badge can't show over the game while it's in exclusive fullscreen (Alt+Enter).")] : []),
     toggleRow("Server badge while playing", "A small pill on the Roblox screen shows the server location for as long as you're in that server. Clicks pass through it, and it hides when Roblox isn't in front.", s.server_badge !== false, (v) => { s.server_badge = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Badge position"), h("span", {}, "Where the badge sits on the Roblox window. Changes apply on your next server.")),
@@ -1487,13 +1496,13 @@ function renderSession() {
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Badge size"), h("span", {}, "Small shows just the location. Normal adds the game name.")),
       segmented([["Small", "Small"], ["Normal", "Normal"]], s.badge_size || "Small", (v) => { s.badge_size = v; save(); })),
     toggleRow("Live ping on the badge", "Shows your ping to the server, updated every few seconds. Green is great, yellow is okay, red is far.", s.badge_ping !== false, (v) => { s.badge_ping = v; save(); }),
-    toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); }),
+    toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); })),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Break reminders"), h("span", {}, "A small popup suggests a break after this much play time. Applies from your next session.")),
       segmented([["0", "Off"], ["30", "30m"], ["60", "1h"], ["90", "1h 30m"], ["120", "2h"]], String(s.break_minutes || 0), (v) => { s.break_minutes = Number(v); save(); })),
     toggleRow("Recap after each session", "When you leave a game you played for 2+ minutes, a popup sums up your time, ping, lag spikes and FPS.", s.session_report !== false, (v) => { s.session_report = v; save(); }),
-    toggleRow("Game update alerts", "A popup when a game in your Library releases an update.", s.game_update_alerts !== false, (v) => { s.game_update_alerts = v; save(); }),
+    lockGroup("Alerts and auto-reconnect", toggleRow("Game update alerts", "A popup when a game in your Library releases an update.", s.game_update_alerts !== false, (v) => { s.game_update_alerts = v; save(); }),
     toggleRow("Auto-reconnect", "If Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone. Stops after 3 tries in 10 minutes.", s.auto_reconnect !== false, (v) => { s.auto_reconnect = v; save(); }),
-    toggleRow("Lag spike alerts", "The badge flashes red when your ping suddenly jumps, so you know it was lag.", s.lag_alerts !== false, (v) => { s.lag_alerts = v; save(); }),
+    toggleRow("Lag spike alerts", "The badge flashes red when your ping suddenly jumps, so you know it was lag.", s.lag_alerts !== false, (v) => { s.lag_alerts = v; save(); })),
     toggleRow("Streamer mode", "Hides your server location and join buttons from the badge, popups, Home and Discord, so you can stream safely.", !!s.streamer_mode, (v) => { s.streamer_mode = v; save(); }),
     bedtimeRow(s),
     toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
@@ -1878,6 +1887,8 @@ let tlOffset = 0;
 async function renderTimeline(more) {
   const box = $("#timeline"); if (!more) { box.innerHTML = ""; tlOffset = 0; }
   const r = await api.sessions(tlOffset, 30); tlOffset += r.items.length;
+  lockCard($("#timelineCard"), "Session history");
+  if (r.locked) { box.innerHTML = ""; box.append(...[0, 1, 2, 3].map(() => h("div", { class: "tl-ghost" }))); $("#tlMore").hidden = true; return; }
   if (!r.total) { box.append(h("div", { class: "muted small" }, "Every session you play through Orbit is listed here with its server location.")); $("#tlMore").hidden = true; return; }
   let lastDay = box.dataset.lastDay || "";
   r.items.forEach((x, i) => {
@@ -1991,6 +2002,7 @@ function renderFps() {
     h("p", { class: "sub", style: "margin:0 0 10px" }, p.boost ? "Everything below is set for speed. Click again to put your old settings back." : "One click sets Roblox and Windows up for the most frames. Everything can be undone."),
     level)), h("div", { class: "boost-list" }, ...items.map(([t, on]) => h("div", { class: on ? "on" : "" }, h("i", {}, on ? "✓" : ""), t))));
   requestAnimationFrame(() => level._remeasure());
+  lockCard(box, "FPS Boost");
 }
 function renderFpsTune() {
   const p = cfg.performance, box = $("#fpsTune"); box.innerHTML = "";
@@ -2000,11 +2012,12 @@ function renderFpsTune() {
     h("div", { class: "field" }, h("label", {}, "Frame rate cap"), capSeg),
     ...(p.fps_cap >= 9999 ? [h("div", { class: "vstatus", style: "margin:-6px 0 12px" }, "Unlimited lets Roblox draw as many frames as your PC can, which keeps your graphics card at 100%. Orbit's tab-out guard below keeps the rest of your PC responsive when you switch away from Roblox.")] : []),
     h("div", { class: "field" }, h("label", {}, "Roblox graphics quality"), qSeg),
-    toggleRow("Let other apps go first when you tab out", "When Roblox isn't the window in front, Orbit drops it to low priority and Windows' power-saving mode, so Discord, your browser and the desktop stay smooth. Full speed comes back the moment you click into Roblox.", p.bg_guard !== false, (v) => { p.bg_guard = v; save(); toast(v ? "Tab-out guard is on from your next Roblox session." : "Tab-out guard is off.", "ok"); }),
+    lockGroup("Performance tweaks", toggleRow("Let other apps go first when you tab out", "When Roblox isn't the window in front, Orbit drops it to low priority and Windows' power-saving mode, so Discord, your browser and the desktop stay smooth. Full speed comes back the moment you click into Roblox.", p.bg_guard !== false, (v) => { p.bg_guard = v; save(); toast(v ? "Tab-out guard is on from your next Roblox session." : "Tab-out guard is off.", "ok"); }),
     toggleRow("Use my fastest graphics card", "On laptops with two GPUs, makes Windows run Roblox on the powerful one.", p.gpu_high, (v) => { p.gpu_high = v; applySystem(v ? "Roblox will use your high performance GPU." : "GPU choice is back to Windows' default."); renderFps(); }),
     toggleRow("Windows Game Mode", "Tells Windows to prioritize the game you're playing.", p.game_mode, (v) => { p.game_mode = v; applySystem(v ? "Game Mode is on." : "Game Mode is back to how it was."); renderFps(); }),
     toggleRow("Turn off Xbox background recording", "Stops Windows recording gameplay in the background, which costs FPS. Your old setting comes back when you turn this off.", p.no_dvr, (v) => { p.no_dvr = v; applySystem(v ? "Background recording is off." : "Background recording is back to how it was."); renderFps(); }),
-    toggleRow("Boost my game profiles too", "When FPS Boost is on, games with their own FastFlags profile get boosted as well.", p.boost_profiles !== false, (v) => { p.boost_profiles = v; save(); }));
+    toggleRow("Boost my game profiles too", "When FPS Boost is on, games with their own FastFlags profile get boosted as well.", p.boost_profiles !== false, (v) => { p.boost_profiles = v; save(); })),
+    ...(hasPrem() ? [] : [h("div", { class: "lock-note" }, "The tab-out guard stays on for everyone, so your PC stays smooth when you switch away from Roblox.")]));
   requestAnimationFrame(() => { capSeg._remeasure(); qSeg._remeasure(); });
 }
 let kitCross = null;
@@ -2037,6 +2050,7 @@ function renderBoost() {
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
     toggleRow("Priority for Roblox", "Gives Roblox above-normal CPU priority while you play, without starving the rest of your PC.", p.high_priority, (v) => { p.high_priority = v; save(); }),
     toggleRow("High performance power plan", "Switches Windows to its high performance power plan while Roblox runs, then switches back.", p.power_plan, (v) => { p.power_plan = v; save(); }));
+  lockCard(box, "Performance");
   const list = $("#appList"); list.innerHTML = "";
   if (!cfg.launch_with.length) list.append(h("div", { class: "muted small", style: "padding:6px 0" }, "No apps yet. Add Discord, OBS, Spotify, or anything else you always open."));
   cfg.launch_with.forEach((app, i) => list.append(h("div", { class: "list-row app-row", style: `--i:${i}` }, h("div", { class: "gi" }, "🚀"),
@@ -2050,8 +2064,9 @@ async function renderHotkeys() {
   const box = $("#hotkeyCard"), keys = await api.hotkeys(); box.innerHTML = "";
   cfg.hotkeys = cfg.hotkeys || { enabled: true };
   box.append(h("h3", { style: "margin-bottom:4px" }, "Hotkeys"), h("p", { class: "sub" }, "Work anywhere, even while you're in a game, as long as Orbit or its background helper is running."),
-    toggleRow("Global hotkeys", "Turning this on or off takes effect next time Orbit opens.", cfg.hotkeys.enabled !== false, (v) => { cfg.hotkeys.enabled = v; save(); }),
+    toggleRow("Global hotkeys", "Changes apply within 30 seconds.", cfg.hotkeys.enabled !== false, (v) => { cfg.hotkeys.enabled = v; save(); }),
     ...keys.map((k) => h("div", { class: "hk-row" }, h("kbd", {}, k.keys), h("span", { class: "muted" }, k.desc))));
+  lockCard(box, "Hotkeys");
 }
 
 function starBtn(x) {
@@ -2437,6 +2452,7 @@ async function renderJoin() {
     });
     box.append(h("div", { class: "stat-label", style: "margin-top:14px" }, "Recent · tap 🔕 to get friend alerts"), row);
   }
+  lockCard(box, "Join a player");
 }
 function playerCard(u) {
   const cls = { "In a game": "game", "Online": "online", "In Studio": "studio" }[u.status] || "";
@@ -2540,6 +2556,7 @@ async function renderCapture() {
       h("button", { class: "btn", onclick: async () => { const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } }, "Screenshot Roblox"),
       h("span", { class: "muted small" }, "Right-click Orbit on your taskbar for Launch, Rejoin, New server and Copy join link.")));
   if (rs.tool) requestAnimationFrame(() => lenSeg._remeasure());
+  lockCard(box, "Capture");
   clearTimeout(capTimer);
   if (rs.downloading && page === "boost") capTimer = setTimeout(renderCapture, 1500);
 }
@@ -2707,7 +2724,8 @@ const LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const hasPrem = () => !!(S && S.premium && S.premium.active);
 function setPremPill(st) {
   $("#premPill").hidden = !(st && st.active);
-  const b = $('.nav-item[data-page="boost"]');
+  $('.nav-item[data-page="boost"] .nav-lock')?.remove();
+  const b = $('.nav-item[data-page="extensions"]');
   if (b) { let l = $(".nav-lock", b); if (!hasPrem() && !l) b.append(h("span", { class: "nav-lock" }, "🔒")); else if (hasPrem() && l) l.remove(); }
 }
 function premiumNeeded(what) {
@@ -2715,15 +2733,24 @@ function premiumNeeded(what) {
     if (ok) { go("premium"); setTimeout(() => $("#premiumCard input")?.focus(), 500); }
   });
 }
+function lockCard(el, what) {
+  if (!el) return el;
+  $$(":scope > .plock", el).forEach((x) => x.remove());
+  el.classList.toggle("plocked", !hasPrem());
+  if (!hasPrem()) { const b = h("button", { class: "plock", title: "Unlock with Premium", onclick: (e) => { e.stopPropagation(); premiumNeeded(what); } }); b.innerHTML = LOCK_SVG + "<span>Premium</span>"; el.append(b); }
+  return el;
+}
+const lockGroup = (what, ...rows) => lockCard(h("div", { class: "lock-group" }, ...rows), what);
 function applyLocks() {
-  const pg = $("#page-boost"), locked = !hasPrem();
+  $("#page-boost").classList.remove("locked"); $("#page-boost .lock-card")?.remove();
+  const pg = $("#page-extensions"), locked = !hasPrem();
   pg.classList.toggle("locked", locked);
   $(".lock-card", pg)?.remove();
   if (!locked) return;
   const lk = h("div", { class: "lk" }); lk.innerHTML = LOCK_SVG;
   $(".page-head", pg).after(h("div", { class: "lock-card" }, lk,
-    h("div", { style: "flex:1" }, h("h3", {}, "Boost is a Premium feature"), h("p", {}, "FPS Boost, game kits, the frame rate cap and graphics fine-tuning unlock with Orbit Premium. Ask the owner for a key.")),
-    h("button", { class: "btn primary", onclick: () => premiumNeeded("Boost") }, "I have a key")));
+    h("div", { style: "flex:1" }, h("h3", {}, "Extensions are a Premium feature"), h("p", {}, "Orbit Item Preview unlocks with Orbit Premium. Ask the owner for a key.")),
+    h("button", { class: "btn primary", onclick: () => premiumNeeded("Extensions") }, "I have a key")));
 }
 const fmtDay = (ts) => new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 async function unlockOwner() {
@@ -2735,14 +2762,21 @@ function renderPerks() {
   const box = $("#premiumPerks"); if (!box) return; box.innerHTML = "";
   const perk = (ico, t, d) => h("div", { class: "perk" }, h("div", { class: "pi" }, ico), h("div", {}, h("b", {}, t), h("span", {}, d)));
   box.append(h("h3", { style: "margin-bottom:6px" }, "What Premium unlocks"),
-    perk("⚡", "Boost", "One-click FPS Boost, game kits, the frame rate cap (including Unlimited), graphics quality and Windows performance tweaks."),
+    perk("⚡", "FPS Boost and performance tweaks", "One-click FPS Boost, Roblox CPU priority, the high performance power plan, fastest GPU, Game Mode and turning off Xbox recording."),
+    perk("📍", "Server badge and location popup", "See where your server is when you join, plus the in-game badge with live ping and a session timer."),
+    perk("🔁", "Auto-reconnect and alerts", "Get put back in your server after a disconnect, plus game update and lag spike alerts."),
+    perk("👤", "Join a player", "Join anyone's server by username, and get friend alerts when they start playing."),
+    perk("🕘", "Session history", "Every server you've played in, with its location and a Rejoin button."),
+    perk("🎬", "Capture", "FPS tracking, instant replay clips and Roblox screenshots."),
+    perk("⌨", "Hotkeys", "Rejoin, server hop, screenshots, clips and more from anywhere with Ctrl+Alt shortcuts."),
+    perk("🧩", "Extensions", "Orbit Item Preview for trying catalog items on your profile."),
     perk("🥔", "Potato preset", "The lowest-graphics FastFlags preset for the most FPS on any PC."),
     perk("💎", "PREMIUM tag", "A gold tag next to Orbit's name in the title bar."));
 }
 function premChanged(st) {
   if (st && st.settings) syncSettings(st);
   S.premium = st; setPremPill(st); applyLocks();
-  if (page === "boost") renderBoost(); if (page === "flags") renderPresets();
+  ({ boost: renderBoost, flags: renderPresets, session: renderSession, library: renderJoin, extensions: () => {} })[page]?.();
 }
 async function renderPremium(refresh = true) {
   const box = $("#premiumCard"); if (!box) return;
@@ -2768,7 +2802,7 @@ async function renderPremium(refresh = true) {
     if (!inp.value.trim()) return;
     btn.disabled = true; const r = await api.activate_premium(inp.value); btn.disabled = false;
     if (r.error) return toast(r.error, "err");
-    syncSettings(r); premChanged(r.status); sfx("ready"); toast("Premium is on. Boost and the Potato preset are unlocked.", "ok"); renderPremium(false);
+    syncSettings(r); premChanged(r.status); sfx("ready"); toast("Premium is on. Everything is unlocked.", "ok"); renderPremium(false);
   };
   btn.onclick = go_; inp.onkeydown = (e) => { if (e.key === "Enter") go_(); };
   box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem off" }, "💎"),
@@ -2894,10 +2928,10 @@ function palActions() {
   A.push({ ico: "⭐", t: "My Orbit level", k: "You", run: () => go("achievements") });
   A.push({ ico: "🌐", t: "Language", k: "Appearance", run: () => { go("appearance"); setTimeout(() => $("#langCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "🔗", t: "Copy join link", k: "Share", run: async () => { const r = await api.join_link(); r.error ? toast(r.error, "err") : toast("Join link copied.", "ok"); } });
-  A.push({ ico: "👤", t: "Join a player", k: "Library", run: () => { go("library"); setTimeout(() => $("#joinCard input").focus(), 400); } });
+  A.push({ ico: "👤", t: "Join a player", k: hasPrem() ? "Library" : "🔒 Premium", run: () => { if (!hasPrem()) return premiumNeeded("Join a player"); go("library"); setTimeout(() => $("#joinCard input").focus(), 400); } });
   A.push({ ico: "📡", t: "Test regions", k: "Servers", run: () => { go("servers"); setTimeout(() => renderRegion(true), 300); } });
-  A.push({ ico: "🎬", t: "Save instant replay", k: "Capture", run: async () => { const r = await api.save_replay(); r.error ? toast(r.error, "err") : toast("Clip saved.", "ok"); } });
-  A.push({ ico: "📸", t: "Screenshot Roblox", k: "Capture", run: async () => { const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } });
+  A.push({ ico: "🎬", t: "Save instant replay", k: hasPrem() ? "Capture" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("Instant replay"); const r = await api.save_replay(); r.error ? toast(r.error, "err") : toast("Clip saved.", "ok"); } });
+  A.push({ ico: "📸", t: "Screenshot Roblox", k: hasPrem() ? "Capture" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("Screenshots from Orbit"); const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } });
   A.push({ ico: "🕶", t: cfg.session.streamer_mode ? "Turn off streamer mode" : "Turn on streamer mode", k: "Privacy", run: () => { cfg.session.streamer_mode = !cfg.session.streamer_mode; save(); toast(`Streamer mode ${cfg.session.streamer_mode ? "on" : "off"}.`, "ok"); if (page === "home") renderNow(); } });
   A.push({ ico: "🪪", t: "Make my player card", k: "Stats", run: () => { go("session"); setTimeout(() => renderPlayerCard(true), 400); } });
   A.push({ ico: "✛", t: "Crosshair maker", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#xmakerCard").scrollIntoView({ behavior: "smooth" }), 400); } });

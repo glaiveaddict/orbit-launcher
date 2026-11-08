@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.6.1"
+APP_VERSION = "2.7.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -275,7 +275,24 @@ MAX_FPS_CAP = 240
 UNLIMITED_FPS = 9999
 
 
-def load_settings():
+FREE_VIEW = "_free_view"
+PREMIUM_FORCED = {("session", "server_popup"): False, ("session", "server_badge"): False,
+                  ("session", "game_update_alerts"): False, ("session", "auto_reconnect"): False,
+                  ("session", "lag_alerts"): False, ("hotkeys", "enabled"): False, ("fps", "enabled"): False,
+                  ("replay", "enabled"): False}
+
+
+def load_settings(raw=False):
+    settings = _load_raw_settings()
+    if raw or has_premium(settings):
+        return settings
+    for (a, b), v in PREMIUM_FORCED.items():
+        settings.setdefault(a, {})[b] = v
+    settings[FREE_VIEW] = True
+    return settings
+
+
+def _load_raw_settings():
     loaded = load_json(SETTINGS_FILE, {})
     settings = _merge(DEFAULT_SETTINGS, loaded if isinstance(loaded, dict) else {})
     perf = settings.get("performance") or {}
@@ -287,6 +304,12 @@ def load_settings():
 
 
 def save_settings(settings):
+    if settings.get(FREE_VIEW):
+        raw = _load_raw_settings()
+        settings = json.loads(json.dumps({k: v for k, v in settings.items() if k != FREE_VIEW}))
+        for a, b in PREMIUM_FORCED:
+            if b in (raw.get(a) or {}):
+                settings.setdefault(a, {})[b] = raw[a][b]
     save_json(SETTINGS_FILE, settings)
 
 
@@ -2245,6 +2268,8 @@ def run_hotkey(action, force=False):
             BADGE_HIDDEN.unlink(missing_ok=True)
         else:
             BADGE_HIDDEN.write_text("1")
+    elif action in ("screenshot", "clip", "joinfriend") and not has_premium(load_settings(raw=True)):
+        spawn_toast("Premium feature", "Put in a premium key on Orbit's Premium page to use this.")
     elif action == "screenshot":
         r = take_roblox_screenshot()
         spawn_toast("Screenshot saved", "Copied to your clipboard too.") if r else spawn_toast("No Roblox window", "Open Roblox first.")
@@ -2274,8 +2299,10 @@ def run_hotkey(action, force=False):
 
 
 def hotkey_loop(owner):
-    if not IS_WINDOWS or not (load_settings().get("hotkeys") or {}).get("enabled", True):
+    if not IS_WINDOWS:
         return
+    while not (load_settings().get("hotkeys") or {}).get("enabled", True):
+        time.sleep(30)
     from ctypes import wintypes
     u = ctypes.windll.user32
     u.RegisterHotKey.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint, ctypes.c_uint]
@@ -3955,6 +3982,8 @@ def presence_of(ids):
 
 def check_friend_alerts():
     settings = load_settings()
+    if settings.get(FREE_VIEW):
+        return
     watch = [x for x in settings.get("recent_players", []) if x.get("alert")]
     if not watch:
         return
@@ -4522,14 +4551,17 @@ def current_roblox_uid():
         logs = []
     for f in logs:
         try:
-            st = f.stat()
-            sig = (str(f), st.st_size, st.st_mtime)
-            if sig not in _UID_SEEN:
+            size = f.stat().st_size
+            done, uid = _UID_SEEN.get(str(f), (0, None))
+            if size < done:
+                done, uid = 0, None
+            if size > done:
                 with open(f, "rb") as fh:
-                    data = fh.read(6_000_000)
+                    fh.seek(max(0, done - 200))
+                    data = fh.read(8_000_000)
                 found = [next(g for g in m.groups() if g) for m in _UID_RE.finditer(data)]
-                _UID_SEEN[sig] = int(found[-1]) if found else None
-            uid = _UID_SEEN[sig]
+                uid = int(found[-1]) if found else uid
+                _UID_SEEN[str(f)] = (size, uid)
         except OSError:
             continue
         if uid:
@@ -4677,13 +4709,22 @@ def push_revoked(key_id, revoked, token):
     return ids
 
 
-PREMIUM_LOCKED = "Boost is a Premium feature. Put in a premium key on the Premium page to use it."
+PREMIUM_LOCKED = "That's a Premium feature. Put in a premium key on the Premium page to use it."
 PERF_PREMIUM = {"high_priority": False, "power_plan": False, "gpu_high": False, "game_mode": False, "no_dvr": False,
-                "fps_cap": None, "graphics_quality": None}
+                "bg_guard": True}
+_PREM_MEMO = {}
 
 
 def has_premium(settings, fetch=False):
-    return premium_status(settings, fetch=fetch)["active"]
+    code = settings.get("premium_key") or ""
+    if not code:
+        return False
+    hit = _PREM_MEMO.get(code)
+    if hit and not fetch and time.time() - hit[0] < 20:
+        return hit[1]
+    on = premium_status(settings, fetch=fetch)["active"]
+    _PREM_MEMO[code] = (time.time(), on)
+    return on
 
 
 def enforce_premium(settings):
@@ -4738,11 +4779,11 @@ def headless_main(uri):
         return
     updater, token, owns_monitor = None, None, None
     while True:
-        settings = load_settings()
         try:
-            enforce_premium(settings)
+            enforce_premium(load_settings(raw=True))
         except Exception as e:
             log(f"Premium check failed: {e}")
+        settings = load_settings()
         started = start_roblox(settings, uri)
         if not started:
             return
@@ -5983,7 +6024,7 @@ class Api:
 
     def __init__(self, mode="app"):
         ensure_dirs()
-        self._settings = load_settings()
+        self._settings = load_settings(raw=True)
         if mode == "app":
             try:
                 enforce_premium(self._settings)
@@ -6199,6 +6240,8 @@ class Api:
             return self._err(e)
 
     def install_extension(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             return {"path": str(install_extension())}
         except Exception as e:
@@ -6317,6 +6360,8 @@ class Api:
         return out
 
     def sessions(self, offset=0, count=40):
+        if not has_premium(self._settings):
+            return {"items": [], "total": 0, "locked": True}
         data = list(reversed(_sessions()))
         return {"items": data[offset:offset + count], "total": len(data)}
 
@@ -6458,7 +6503,7 @@ class Api:
             if not picked:
                 return None
             import_backup(Path(picked[0] if isinstance(picked, (list, tuple)) else picked))
-            self._settings = load_settings()
+            self._settings = load_settings(raw=True)
             return {"ok": True}
         except Exception as e:
             return self._err(e)
@@ -6534,8 +6579,7 @@ class Api:
 
     def apply_system(self):
         if not has_premium(self._settings):
-            enforce_premium(self._settings)
-            return {"error": PREMIUM_LOCKED, "settings": self._settings}
+            self._settings.setdefault("performance", {}).update(PERF_PREMIUM)
         try:
             save_settings(self._settings)
             apply_system_boost(self._settings, (player_dirs()[:1] or [None])[0])
@@ -6658,8 +6702,6 @@ class Api:
                  "applied": v["place_id"] in self._settings["game_profiles"]} for k, v in GAME_KITS.items()]
 
     def apply_kit(self, kit_id, crosshair=None):
-        if not has_premium(self._settings):
-            return {"error": PREMIUM_LOCKED}
         try:
             if kit_id not in GAME_KITS:
                 return {"error": "Unknown game kit."}
@@ -6755,6 +6797,8 @@ class Api:
         return load_json(DATA_DIR / "region_test.json", None)
 
     def find_player(self, text):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             return find_player(text)
         except urllib.error.HTTPError as e:
@@ -6764,6 +6808,8 @@ class Api:
             return self._err(e)
 
     def join_player(self, user):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             uid = int(user.get("id"))
             rp = [x for x in self._settings.get("recent_players", []) if x.get("id") != uid]
@@ -6844,6 +6890,8 @@ class Api:
                 "pending_signout": bool(info.get("pending_signout")) and not st["group"], "error": info.get("error")}
 
     def fps_setup(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         try:
             r = setup_presentmon()
             self._settings.setdefault("fps", {})["enabled"] = True
@@ -6859,6 +6907,8 @@ class Api:
                 "downloading": st.get("state") == "downloading", "progress": st.get("progress", 0), "error": st.get("error")}
 
     def replay_setup(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         def work():
             try:
                 save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "downloading", "progress": 0})
@@ -6877,14 +6927,20 @@ class Api:
         return True
 
     def save_replay(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         r = Replay.save()
         return {"path": r} if r else {"error": "Nothing to save yet. Instant replay records while Roblox is open and in front."}
 
     def screenshot_now(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         r = take_roblox_screenshot()
         return {"path": r} if r else {"error": "Open Roblox first."}
 
     def toggle_alert(self, uid):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
         for x in self._settings.get("recent_players", []):
             if x.get("id") == uid:
                 x["alert"] = not x.get("alert")
