@@ -55,6 +55,54 @@
         "content/textures/Cursors/KeyboardMouse/ArrowCursor.png": "cursors/heart.png",
         "content/textures/Cursors/KeyboardMouse/ArrowFarCursor.png": "cursors/heart.png"
       }
+    },
+    {
+      "id": "starry-night",
+      "name": "Starry Night",
+      "kind": "sky",
+      "author": "@stabzane",
+      "desc": "A deep blue night sky full of stars, with a soft purple glow at the horizon. Shows in games that use Roblox's default sky.",
+      "preview": "skies/starry-night/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/starry-night/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/starry-night/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/starry-night/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/starry-night/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/starry-night/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/starry-night/sky512_up.tex"
+      }
+    },
+    {
+      "id": "sunset",
+      "name": "Sunset",
+      "kind": "sky",
+      "author": "@stabzane",
+      "desc": "A warm orange and pink sunset fading into a purple evening. Shows in games that use Roblox's default sky.",
+      "preview": "skies/sunset/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/sunset/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/sunset/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/sunset/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/sunset/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/sunset/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/sunset/sky512_up.tex"
+      }
+    },
+    {
+      "id": "clear-day",
+      "name": "Clear Day",
+      "kind": "sky",
+      "author": "@stabzane",
+      "desc": "A clean, bright blue sky with no clouds. Easy on the eyes. Shows in games that use Roblox's default sky.",
+      "preview": "skies/clear-day/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/clear-day/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/clear-day/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/clear-day/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/clear-day/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/clear-day/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/clear-day/sky512_up.tex"
+      }
     }
   ]
 }

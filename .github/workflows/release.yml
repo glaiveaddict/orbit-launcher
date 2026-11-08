@@ -232,6 +232,18 @@ jobs:
           print("CHECK crosshair overlay:", "center", c, "alive", alive, "colors", len(cols), "ready" if "Crosshair overlay ready" in logtxt else "no ready line", "ERROR" if "Crosshair overlay error" in logtxt else "")
           ok &= alive and "Crosshair overlay error" not in logtxt
           ol.kill_tree(cp.pid); fake.destroy()
+          stats = ol.PcStats(); stats.sample(); time.sleep(1.5); pst = stats.sample()
+          print("CHECK pc stats:", pst, ol.PcStats.text(pst)); ok &= pst["cpu"] is not None
+          tf = ol.DATA_DIR / "clipfile.txt"; tf.write_text("x")
+          print("CHECK copy file to clipboard:", ol.copy_files_to_clipboard([tf]))
+          ol.recycle(tf); print("CHECK recycle bin:", not tf.exists()); ok &= not tf.exists()
+          snd = ol.DATA_DIR / "t.mp3"
+          subprocess.run([str(ol.FFMPEG), "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=f=440:d=6", str(snd)])
+          sid = ol.import_death_sound(snd); print("CHECK death sound:", sid, ol.pack_file(sid).stat().st_size); ok &= ol.pack_file(sid).exists()
+          if out:
+              ci = ol.clip_info(ol.Path(out)); print("CHECK clip info:", ci["duration"], bool(ci["thumb"])); ok &= bool(ci["thumb"])
+          from PIL import Image as _Im
+          sky = _Im.open("store/skies/sunset/sky512_up.tex"); print("CHECK sky dds:", sky.size, sky.mode)
           sealed = ol._dpapi(b"github_pat_test")
           print("CHECK token encryption:", sealed != b"github_pat_test", ol._dpapi(sealed, False) == b"github_pat_test")
           ok &= sealed != b"github_pat_test" and ol._dpapi(sealed, False) == b"github_pat_test"

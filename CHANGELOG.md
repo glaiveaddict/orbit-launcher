@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.9.0
+- **Party (Premium):** share your party code (Library > Party). Friends who join your party press Join leader or Ctrl+Alt+P to land in the same server as you.
+- **Auto server hop (Premium):** if your ping stays above 100, 150 or 200 ms for a minute, Orbit asks you or moves you to a better server in the same game (Stats page).
+- **PC stats on the badge (Premium):** CPU and GPU usage next to your ping, plus GPU temperature on NVIDIA cards.
+- **Clip gallery (Premium):** watch your instant replays in Orbit (Screenshots page), save a trimmed copy, copy the file, share it to Discord or delete it.
+- **Premium looks:** Royal Gold, Aurora and Obsidian themes, an animated Aurora background, and a gold frame on your player card.
+- **FPS cap per game:** set a frame rate for each game in your Library, like Unlimited in BedWars and 60 in slower games.
+- **Your own death sound:** pick any MP3, WAV or OGG in Mods > Orbit packs > Death. Orbit cuts it to 4 seconds and makes it Roblox's death sound.
+- **Custom skies:** Starry Night, Sunset and Clear Day in the Pack store. They show in games that use Roblox's default sky. Store items can be removed now too.
+- **Video backgrounds:** Appearance > Background > My picture or video now takes MP4 and WebM.
+- **Premium reminder:** a heads-up 3 days before your premium key ends.
+- **Owner panel:** make keys for a whole list of players at once, and post giveaways, events and updates to Orbit News.
+
 ## v2.8.0
 - **Cursor maker:** design your own mouse cursor in Mods. Pick a style (Arrow, Dot, Ring, Ring + dot, Cross or Diamond), a color, the size, thickness, edge and glow, then save it and equip it in one click. Your cursors show first in the Cursors tab, with a Delete button.
 

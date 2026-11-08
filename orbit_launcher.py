@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.8.0"
+APP_VERSION = "2.9.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -137,6 +137,7 @@ DEFAULT_SETTINGS = {
     "font": "",
     "profile": {"roblox_id": None, "username": "", "display": ""},
     "recent_players": [],
+    "party": {},
     "emoji": "",
     "language": "en",
     "sync": {"folder": ""},
@@ -178,6 +179,9 @@ DEFAULT_SETTINGS = {
         "badge_fps": True,
         "session_report": True,
         "game_update_alerts": True,
+        "auto_hop": "off",
+        "hop_ping": 150,
+        "badge_pc": True,
     },
     "appearance": {
         "mode": "Dark",
@@ -195,7 +199,7 @@ DEFAULT_SETTINGS = {
     "updates": {"auto": True, "roblox_predownload": True},
     "registration": {"registered": False, "backups": {}},
 }
-FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles", "boost_backup", "win_backup", "game_crosshairs"}
+FREEFORM_KEYS = {"custom_flags", "backups", "game_profiles", "boost_backup", "win_backup", "game_crosshairs", "party"}
 
 
 def log(msg):
@@ -279,7 +283,7 @@ FREE_VIEW = "_free_view"
 PREMIUM_FORCED = {("session", "server_popup"): False, ("session", "server_badge"): False,
                   ("session", "game_update_alerts"): False, ("session", "auto_reconnect"): False,
                   ("session", "lag_alerts"): False, ("hotkeys", "enabled"): False, ("fps", "enabled"): False,
-                  ("replay", "enabled"): False}
+                  ("replay", "enabled"): False, ("session", "auto_hop"): "off", ("session", "badge_pc"): False}
 
 
 def load_settings(raw=False):
@@ -794,7 +798,7 @@ def apply_all(settings, version_dir=None, place_id=None):
     for d in dirs:
         write_flags(d, flags)
         try:
-            apply_system_boost(settings, d)
+            apply_system_boost(settings, d, place_id)
         except Exception as e:
             log(f"System boost failed: {e}")
         n = sync_mods(d, folder, mod_overrides(settings, d, place_id))
@@ -917,11 +921,21 @@ def set_gpu_pref(version_dir, on):
         _reg_set(GPU_PREF_KEY, exe, "GpuPreference=2;")
 
 
-def apply_system_boost(settings, version_dir=None):
+def game_fps_cap(settings, place_id):
+    if place_id is None:
+        return None
+    for g in settings.get("library") or []:
+        if str(g.get("pid")) == str(place_id) and g.get("fps_cap"):
+            return int(g["fps_cap"])
+    return None
+
+
+def apply_system_boost(settings, version_dir=None, place_id=None):
     if not IS_WINDOWS:
         return
     perf = settings.setdefault("performance", {})
-    write_gbs(perf)
+    cap = game_fps_cap(settings, place_id)
+    write_gbs({**perf, "fps_cap": cap} if cap else perf)
     before = json.dumps(perf.get("win_backup", {}), sort_keys=True)
     apply_win_tweaks(perf)
     if perf.get("gpu_high") or perf.get("gpu_applied"):
@@ -1633,7 +1647,37 @@ class SessionMonitor:
             if ms is not None:
                 game["ping"] = ms
                 self._publish(game)
+            try:
+                self._check_hop(game)
+            except Exception as e:
+                log(f"Auto hop check failed: {e}")
             time.sleep(10)
+
+    def _check_hop(self, game):
+        mode = self.session.get("auto_hop") or "off"
+        if mode == "off" or not game.get("place_id") or time.time() - game["joined"] < 90:
+            return
+        recent = [p for t, p in game["pings"] if time.time() - t < 65]
+        limit = int(self.session.get("hop_ping") or 150)
+        if len(recent) < 6 or any(p is None for p in recent):
+            return
+        mid = sorted(recent)[len(recent) // 2]
+        if mid <= limit or time.time() - getattr(self, "last_hop", 0) < 600:
+            return
+        self.last_hop = time.time()
+        log(f"High ping for a minute ({mid} ms, limit {limit}); auto hop mode {mode}")
+        if mode == "ask":
+            spawn_toast(f"High ping: {mid} ms", "Press Ctrl+Alt+N to hop to a better server.")
+            return
+        pick, _ = pick_server(game["place_id"], {game.get("job_id")})
+        if not pick:
+            spawn_toast(f"High ping: {mid} ms", "Couldn't find a better server right now.")
+            return
+        if pick.get("ping") is not None and pick["ping"] >= mid:
+            spawn_toast(f"High ping: {mid} ms", "Every other server is just as far, so you're staying put.")
+            return
+        spawn_toast("Moving you to a better server", f"Your ping was {mid} ms." + (f" The new one is about {pick['ping']} ms." if pick.get("ping") else ""))
+        spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], pick["id"]))
 
     def note_problem(self, line):
         m = DISCONNECT_RE.search(line)
@@ -2258,7 +2302,8 @@ HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server
            5: (0x53, "screenshot", "Ctrl+Alt+S", "Screenshot the Roblox window (saved and copied)"),
            6: (0x4A, "joinlink", "Ctrl+Alt+J", "Copy a link friends can use to join your server"),
            7: (0x43, "clip", "Ctrl+Alt+C", "Save an instant replay of the last 30 seconds"),
-           8: (0x46, "joinfriend", "Ctrl+Alt+F", "Join the friend from your last friend alert")}
+           8: (0x46, "joinfriend", "Ctrl+Alt+F", "Join the friend from your last friend alert"),
+           9: (0x50, "party", "Ctrl+Alt+P", "Join your party leader")}
 
 
 def current_game():
@@ -2286,7 +2331,7 @@ def run_hotkey(action, force=False):
             BADGE_HIDDEN.unlink(missing_ok=True)
         else:
             BADGE_HIDDEN.write_text("1")
-    elif action in ("screenshot", "clip", "joinfriend") and not has_premium(load_settings(raw=True)):
+    elif action in ("screenshot", "clip", "joinfriend", "party") and not has_premium(load_settings(raw=True)):
         spawn_toast("Premium feature", "Put in a premium key on Orbit's Premium page to use this.")
     elif action == "screenshot":
         r = take_roblox_screenshot()
@@ -2303,6 +2348,12 @@ def run_hotkey(action, force=False):
         spawn_toast("Replay saved" if r else "Replay isn't running", Path(r).name if r else "Turn on Instant replay in Boost first.")
     elif action == "launch":
         spawn_self(LAUNCH_FLAG, "")
+    elif action == "party":
+        party = load_settings(raw=True).get("party") or {}
+        if party.get("leader"):
+            spawn_self(LAUNCH_FLAG, follow_uri(party["leader"]))
+        else:
+            spawn_toast("No party yet", "Join a party in Orbit's Library first.")
     elif action == "joinfriend":
         fa = load_json(DATA_DIR / "friend_alert.json", None) or {}
         if fa.get("id") and time.time() - fa.get("at", 0) < 3600:
@@ -2405,11 +2456,16 @@ CROSSHAIR_DIR = DATA_DIR / "crosshairs"
 
 CURSOR_DIR = DATA_DIR / "cursors"
 CURSOR_PREFIX = "mycursor:"
+SOUND_DIR = DATA_DIR / "sounds"
+SOUND_PREFIX = "mysound:"
+AUDIO_TYPES = (".ogg", ".mp3", ".wav", ".m4a", ".flac", ".aac", ".wma", ".opus", ".webm", ".mp4")
 
 
 def pack_file(pack_id):
     if str(pack_id).startswith(CURSOR_PREFIX):
         return CURSOR_DIR / (pack_id.split(":", 1)[1] + ".png")
+    if str(pack_id).startswith(SOUND_PREFIX):
+        return SOUND_DIR / (pack_id.split(":", 1)[1] + ".ogg")
     if pack_id in CHARSOUNDS:
         return resource_dir() / "ui" / "packs" / pack_id
     if str(pack_id).startswith("custom:"):
@@ -2488,6 +2544,65 @@ def delete_custom_cursor(cid, settings):
     log(f"Deleted custom cursor {cid}")
 
 
+def custom_sounds():
+    SOUND_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in sorted(SOUND_DIR.glob("*.ogg"), key=lambda x: x.stat().st_mtime, reverse=True):
+        meta = load_json(f.with_suffix(".json"), {}) or {}
+        out.append({"id": SOUND_PREFIX + f.stem, "name": meta.get("name") or f.stem, "kind": "sound", "custom": True,
+                    "desc": "Your own sound.", "data": "data:audio/ogg;base64," + base64.b64encode(f.read_bytes()).decode()})
+    return out
+
+
+def import_death_sound(src):
+    src = Path(src)
+    ext = src.suffix.lower()
+    if ext not in AUDIO_TYPES:
+        raise ValueError("Pick an audio file, like an MP3, WAV or OGG.")
+    if src.stat().st_size > 40 * 1024 * 1024:
+        raise ValueError("That file is too big. Pick a short sound.")
+    clean = re.sub(r"[^A-Za-z0-9 _-]", "", src.stem).strip()[:30] or "My sound"
+    slug = re.sub(r"\s+", "-", clean.lower())
+    SOUND_DIR.mkdir(parents=True, exist_ok=True)
+    dest = SOUND_DIR / f"{slug}.ogg"
+    if FFMPEG.exists():
+        tmp = dest.with_suffix(".tmp.ogg")
+        base = [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vn", "-t", "4", "-ac", "2", "-ar", "44100"]
+        ok = False
+        for codec in (["-c:a", "libvorbis", "-q:a", "5"], ["-c:a", "vorbis", "-strict", "-2"]):
+            r = subprocess.run(base + codec + [str(tmp)], capture_output=True, timeout=60, creationflags=CREATE_NO_WINDOW)
+            if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 100:
+                ok = True
+                break
+        if not ok:
+            tmp.unlink(missing_ok=True)
+            raise ValueError("Orbit couldn't read that sound file. Try a different one.")
+        tmp.replace(dest)
+    elif ext == ".ogg":
+        if src.stat().st_size > 2 * 1024 * 1024:
+            raise ValueError("That OGG is too long. Keep death sounds under a few seconds.")
+        shutil.copy2(src, dest)
+    else:
+        raise LookupError("converter")
+    save_json(SOUND_DIR / f"{slug}.json", {"name": clean, "at": int(time.time())})
+    log(f"Imported death sound '{clean}'")
+    return SOUND_PREFIX + slug
+
+
+def delete_custom_sound(cid, settings):
+    if not str(cid).startswith(SOUND_PREFIX):
+        raise ValueError("Only your own sounds can be deleted.")
+    f = pack_file(cid)
+    if f.exists():
+        body = f.read_bytes()
+        folder = mods_dir(settings)
+        for t in PACK_TARGETS["sound"]:
+            if (folder / t).exists() and (folder / t).read_bytes() == body:
+                (folder / t).unlink(missing_ok=True)
+    f.unlink(missing_ok=True)
+    f.with_suffix(".json").unlink(missing_ok=True)
+
+
 def save_custom_crosshair(name, data_url, design=None):
     m = re.match(r"data:image/png;base64,(.+)$", data_url or "", re.S)
     if not m:
@@ -2520,6 +2635,10 @@ def delete_custom_crosshair(cid, settings):
 def pack_states(settings):
     folder = mods_dir(settings)
     out = []
+    for c in custom_sounds():
+        body = pack_file(c["id"]).read_bytes()
+        c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == body for t in PACK_TARGETS["sound"])
+        out.append(c)
     for c in custom_cursors():
         body = pack_file(c["id"]).read_bytes()
         c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == body for t in PACK_TARGETS["cursor"])
@@ -2568,6 +2687,10 @@ def install_pack(settings, pack_id, on=True):
         if not pack_file(pack_id).exists():
             raise ValueError("That cursor is gone.")
         kind = "cursor"
+    elif str(pack_id).startswith(SOUND_PREFIX):
+        if not pack_file(pack_id).exists():
+            raise ValueError("That sound is gone.")
+        kind = "sound"
     elif pack_id not in PACKS:
         raise ValueError("Unknown pack")
     else:
@@ -3951,6 +4074,14 @@ def player_card(settings):
     d.text((340, 100), name[:22], font=_font(64, True), fill=(245, 240, 255))
     if prof.get("username"):
         d.text((344, 180), "@" + prof["username"], font=_font(30), fill=(190, 180, 220))
+    if has_premium(settings):
+        gold = (245, 180, 40)
+        d.rounded_rectangle([6, 6, W - 7, H - 7], 28, outline=gold, width=6)
+        d.rounded_rectangle([18, 18, W - 19, H - 19], 22, outline=(253, 224, 71), width=2)
+        tag = "PREMIUM"
+        tw = int(_font(22, True).getlength(tag))
+        d.rounded_rectangle([W - 70 - tw - 24, 40, W - 70, 78], 19, fill=gold)
+        d.text((W - 70 - tw - 12, 45), tag, font=_font(22, True), fill=(26, 18, 5))
     lv = orbit_level()
     d.rounded_rectangle([340, 236, 340 + 24 + int(_font(26, True).getlength(f"LEVEL {lv['level']} · {lv['title'].upper()}")), 280], 20, fill=a1)
     d.text((352, 241), f"LEVEL {lv['level']} · {lv['title'].upper()}", font=_font(26, True), fill=(255, 255, 255))
@@ -4290,12 +4421,23 @@ def raw_url(path):
     return f"https://raw.githubusercontent.com/{repo}/main/{path}" if repo else None
 
 
+def fetch_repo_json(path):
+    repo = update_repo()
+    if repo:
+        try:
+            data = fetch_json(f"https://api.github.com/repos/{repo}/contents/{path}?ref=main", timeout=8)
+            return json.loads(base64.b64decode(data["content"]))
+        except Exception as e:
+            log(f"{path} via GitHub API failed, trying raw: {e}")
+    return fetch_json(raw_url(path) + f"?t={int(time.time() // 120)}", timeout=10)
+
+
 def fetch_news():
     url = raw_url("news.json")
     if not url:
         return load_json(NEWS_FILE, {"posts": []})
     try:
-        data = fetch_json(url + f"?t={int(time.time() // 300)}", timeout=10)
+        data = fetch_repo_json("news.json")
         posts = [p for p in (data.get("posts") or []) if isinstance(p, dict) and p.get("id") and p.get("title")][:30]
         save_json(NEWS_FILE, {"posts": posts, "at": int(time.time())})
         return {"posts": posts}
@@ -4304,7 +4446,8 @@ def fetch_news():
         return load_json(NEWS_FILE, {"posts": []})
 
 
-STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font"}
+STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font", "sky"}
+STORE_INSTALLED = DATA_DIR / "store_installed.json"
 STORE_ROOTS = ("content/", "PlatformContent/", "ExtraContent/")
 
 
@@ -4352,10 +4495,31 @@ def install_store_item(settings, item_id):
         else:
             download_file(url, folder / target)
         count += 1
+    if it["kind"] != "font":
+        mine = load_json(STORE_INSTALLED, {}) or {}
+        targets = set(it["files"])
+        mine = {k: v for k, v in mine.items() if not targets & set(v)}
+        mine[item_id] = sorted(targets)
+        save_json(STORE_INSTALLED, mine)
     settings["apply_mods"] = True
     save_settings(settings)
     log(f"Installed store item {item_id} ({count} files)")
     return count
+
+
+def remove_store_item(settings, item_id):
+    mine = load_json(STORE_INSTALLED, {}) or {}
+    folder = mods_dir(settings)
+    for target in mine.pop(item_id, []):
+        if ".." not in target.split("/"):
+            (folder / target).unlink(missing_ok=True)
+    save_json(STORE_INSTALLED, mine)
+    log(f"Removed store item {item_id}")
+
+
+def store_installed(settings):
+    folder = mods_dir(settings)
+    return [k for k, v in (load_json(STORE_INSTALLED, {}) or {}).items() if v and all((folder / t).exists() for t in v)]
 
 
 class OverlayServer:
@@ -4440,7 +4604,8 @@ def share_to_discord(webhook, text=None, file=None):
     parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n{payload}\r\n'.encode())
     if file:
         f = Path(file)
-        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; filename="{f.name}"\r\nContent-Type: image/png\r\n\r\n'.encode()
+        ctype = {".mp4": "video/mp4", ".webm": "video/webm", ".jpg": "image/jpeg"}.get(f.suffix.lower(), "image/png")
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; filename="{f.name}"\r\nContent-Type: {ctype}\r\n\r\n'.encode()
                      + f.read_bytes() + b"\r\n")
     parts.append(f"--{boundary}--\r\n".encode())
     req = urllib.request.Request(webhook, data=b"".join(parts), method="POST",
@@ -4455,6 +4620,7 @@ def periodic_jobs(owner):
     now = time.time()
     st = load_json(DATA_DIR / "periodic_runs.json", {}) or {}
     jobs = [("premium", 3600, lambda: load_settings().get("premium_key") and revoked_premium_ids(True)),
+            ("premium_left", 6 * 3600, premium_reminder),
             ("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
             ("sync", 30 * 60, lambda: run_sync(load_settings())), ("clean", 24 * 3600, auto_clean)]
     for name, every, fn in jobs:
@@ -4465,6 +4631,205 @@ def periodic_jobs(owner):
             except Exception as e:
                 log(f"Background job {name} failed: {e}")
     save_json(DATA_DIR / "periodic_runs.json", st)
+
+
+def party_code(uid):
+    n, digits, out = int(uid), "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ", ""
+    while n:
+        n, r = divmod(n, 34)
+        out = digits[r] + out
+    return "ORBIT-" + (out or "0")
+
+
+def party_uid(code):
+    t = re.sub(r"[\s-]", "", (code or "").upper())
+    t = t[5:] if t.startswith("ORBIT") else t
+    digits = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    if not t or any(ch not in digits for ch in t) or len(t) > 9:
+        raise ValueError("That isn't a party code. It looks like ORBIT-ABC123.")
+    n = 0
+    for ch in t:
+        n = n * 34 + digits.index(ch)
+    return n
+
+
+CLIP_DIR = Path.home() / "Videos" / "Orbit"
+VIDEO_TYPES = (".mp4", ".webm")
+
+
+class MediaServer:
+    port = None
+    token = uuid.uuid4().hex
+
+    @classmethod
+    def start(cls):
+        if cls.port:
+            return cls.port
+        import http.server
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                parts = urllib.parse.urlsplit(self.path)
+                q = urllib.parse.parse_qs(parts.query)
+                if q.get("k", [""])[0] != cls.token:
+                    self.send_response(403)
+                    self.end_headers()
+                    return
+                path = urllib.parse.unquote(parts.path)
+                f = None
+                if path.startswith("/clip/"):
+                    name = Path(path[6:]).name
+                    f = CLIP_DIR / name if name.lower().endswith(VIDEO_TYPES) else None
+                elif path == "/bg":
+                    f = background_file(load_settings(raw=True))
+                if not f or not f.is_file():
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                size = f.stat().st_size
+                start, end = 0, size - 1
+                m = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
+                if m and (m.group(1) or m.group(2)):
+                    if m.group(1):
+                        start = int(m.group(1))
+                        end = int(m.group(2)) if m.group(2) else size - 1
+                    else:
+                        start = max(0, size - int(m.group(2)))
+                    end = min(end, size - 1)
+                    self.send_response(206)
+                    self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+                else:
+                    self.send_response(200)
+                ctype = "video/webm" if f.suffix.lower() == ".webm" else "video/mp4"
+                self.send_header("Content-Type", ctype)
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Content-Length", str(end - start + 1))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                try:
+                    with open(f, "rb") as fh:
+                        fh.seek(start)
+                        left = end - start + 1
+                        while left > 0:
+                            chunk = fh.read(min(262144, left))
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                            left -= len(chunk)
+                except (ConnectionError, OSError):
+                    pass
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.port = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return cls.port
+
+    @classmethod
+    def url(cls, path):
+        cls.start()
+        return f"http://127.0.0.1:{cls.port}{urllib.parse.quote(path)}?k={cls.token}"
+
+
+def _ffmpeg(args, timeout=120):
+    return subprocess.run([str(FFMPEG), "-hide_banner", *args], capture_output=True, text=True, timeout=timeout,
+                          creationflags=CREATE_NO_WINDOW)
+
+
+def clip_info(f):
+    meta_f = THUMBS_DIR / ("clip-" + hashlib.sha1(f"{f.name}|{f.stat().st_mtime}".encode()).hexdigest()[:16] + ".json")
+    meta = load_json(meta_f, None)
+    if meta is None:
+        meta = {"duration": None, "thumb": None}
+        if FFMPEG.exists():
+            THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+            thumb = meta_f.with_suffix(".jpg")
+            try:
+                r = _ffmpeg(["-loglevel", "info", "-y", "-ss", "1", "-i", str(f), "-frames:v", "1", "-vf", "scale=320:-2", str(thumb)], 30)
+                m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", r.stderr or "")
+                if m:
+                    meta["duration"] = round(int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)), 2)
+                if thumb.exists():
+                    meta["thumb"] = thumb.name
+            except Exception as e:
+                log(f"Clip preview failed for {f.name}: {e}")
+        save_json(meta_f, meta)
+    thumb = THUMBS_DIR / meta["thumb"] if meta.get("thumb") else None
+    return {"name": f.name, "size": f.stat().st_size, "at": int(f.stat().st_mtime), "duration": meta.get("duration"),
+            "thumb": data_url(thumb) if thumb and thumb.exists() else None, "url": MediaServer.url("/clip/" + f.name)}
+
+
+def list_clips(limit=60):
+    if not CLIP_DIR.is_dir():
+        return []
+    files = sorted((f for f in CLIP_DIR.iterdir() if f.suffix.lower() in VIDEO_TYPES and f.is_file()),
+                   key=lambda f: f.stat().st_mtime, reverse=True)[:limit]
+    return [clip_info(f) for f in files]
+
+
+def clip_path(name):
+    f = CLIP_DIR / Path(name or "").name
+    if f.suffix.lower() not in VIDEO_TYPES or not f.is_file():
+        raise ValueError("That clip is gone.")
+    return f
+
+
+def trim_clip(name, start, end):
+    src = clip_path(name)
+    start, end = max(0.0, float(start)), float(end)
+    if end - start < 0.5:
+        raise ValueError("Pick at least half a second.")
+    if not FFMPEG.exists():
+        raise ValueError("Trimming needs Orbit's video tool. Get it in Boost > Capture.")
+    dest = src.with_name(f"{src.stem} (trimmed {time.strftime('%H-%M-%S')}){src.suffix}")
+    r = _ffmpeg(["-loglevel", "error", "-y", "-ss", f"{start:.2f}", "-to", f"{end:.2f}", "-i", str(src),
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "copy", str(dest)], 300)
+    if r.returncode != 0 or not dest.exists():
+        dest.unlink(missing_ok=True)
+        raise ValueError("Orbit couldn't trim that clip.")
+    log(f"Trimmed clip {src.name} ({start:.1f}s to {end:.1f}s)")
+    return dest
+
+
+def recycle(path):
+    if not IS_WINDOWS:
+        Path(path).unlink(missing_ok=True)
+        return
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [("hwnd", ctypes.c_void_p), ("wFunc", ctypes.c_uint), ("pFrom", ctypes.c_void_p), ("pTo", ctypes.c_void_p),
+                    ("fFlags", ctypes.c_ushort), ("fAnyOperationsAborted", ctypes.c_int), ("hNameMappings", ctypes.c_void_p),
+                    ("lpszProgressTitle", ctypes.c_wchar_p)]
+    buf = ctypes.create_unicode_buffer(str(Path(path).resolve()) + "\0")
+    op = SHFILEOPSTRUCTW(None, 3, ctypes.cast(buf, ctypes.c_void_p), None, 0x0040 | 0x0010 | 0x0400 | 0x0004, 0, None, None)
+    if ctypes.windll.shell32.SHFileOperationW(ctypes.byref(op)) != 0:
+        Path(path).unlink(missing_ok=True)
+
+
+def copy_files_to_clipboard(paths):
+    if not IS_WINDOWS:
+        return False
+    body = ("\0".join(str(Path(x).resolve()) for x in paths) + "\0\0").encode("utf-16-le")
+    header = struct.pack("<IiiII", 20, 0, 0, 0, 1)
+    return _clipboard_put(15, header + body)
+
+
+def premium_reminder():
+    st = premium_status(load_settings(raw=True), fetch=False)
+    if not st.get("active") or not st.get("exp"):
+        return
+    left = st["exp"] - time.time()
+    if left > 3 * 86400:
+        return
+    today = time.strftime("%Y-%m-%d")
+    seen = load_json(DATA_DIR / "premium_reminder.json", {}) or {}
+    if seen.get("day") == today:
+        return
+    save_json(DATA_DIR / "premium_reminder.json", {"day": today})
+    days = max(1, int(left // 86400) + (1 if left % 86400 else 0))
+    spawn_toast("Premium ends soon", f"Your Orbit Premium ends in {days} day{'s' if days != 1 else ''}. Ask the owner for a new key.")
 
 
 def auto_clean():
@@ -5875,6 +6240,112 @@ def overlay_show(hwnd, on):
         pass
 
 
+class PcStats:
+    def __init__(self):
+        self.prev = None
+        self.query = None
+        self.counter = None
+        self.made = 0
+        self.nv = None
+        self.nv_checked = False
+
+    def cpu(self):
+        class FT(ctypes.Structure):
+            _fields_ = [("lo", ctypes.c_ulong), ("hi", ctypes.c_ulong)]
+        idle, kern, user = FT(), FT(), FT()
+        if not ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kern), ctypes.byref(user)):
+            return None
+        val = [(x.hi << 32) | x.lo for x in (idle, kern, user)]
+        prev, self.prev = self.prev, val
+        if not prev:
+            return None
+        di, dk, du = (a - b for a, b in zip(val, prev))
+        total = dk + du
+        return max(0, min(100, round(100 * (total - di) / total))) if total > 0 else None
+
+    def _nvidia(self):
+        if not self.nv_checked:
+            self.nv_checked = True
+            for cand in (shutil.which("nvidia-smi"), str(Path(os.environ.get("ProgramW6432", r"C:\Program Files")) / "NVIDIA Corporation" / "NVSMI" / "nvidia-smi.exe"),
+                         str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "nvidia-smi.exe")):
+                if cand and Path(cand).exists():
+                    self.nv = cand
+                    break
+        if not self.nv:
+            return None
+        try:
+            out = subprocess.run([self.nv, "--query-gpu=utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"],
+                                 capture_output=True, text=True, timeout=4, creationflags=CREATE_NO_WINDOW).stdout
+            u, t = [int(x.strip()) for x in out.splitlines()[0].split(",")[:2]]
+            return u, t
+        except Exception:
+            return None
+
+    def _pdh(self):
+        pdh = ctypes.WinDLL("pdh")
+        if self.query is None or time.time() - self.made > 30:
+            if self.query:
+                pdh.PdhCloseQuery(self.query)
+            q, c = ctypes.c_void_p(), ctypes.c_void_p()
+            pdh.PdhOpenQueryW.argtypes = [ctypes.c_wchar_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+            pdh.PdhAddEnglishCounterW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)]
+            if pdh.PdhOpenQueryW(None, None, ctypes.byref(q)) != 0:
+                return None
+            if pdh.PdhAddEnglishCounterW(q, "\\GPU Engine(*engtype_3D)\\Utilization Percentage", None, ctypes.byref(c)) != 0:
+                pdh.PdhCloseQuery(q)
+                return None
+            pdh.PdhCollectQueryData(q)
+            self.query, self.counter, self.made = q, c, time.time()
+            return None
+        pdh.PdhCollectQueryData(self.query)
+
+        class VAL(ctypes.Structure):
+            _fields_ = [("status", ctypes.c_ulong), ("value", ctypes.c_double)]
+
+        class ITEM(ctypes.Structure):
+            _fields_ = [("name", ctypes.c_wchar_p), ("val", VAL)]
+        size, count = ctypes.c_ulong(0), ctypes.c_ulong(0)
+        pdh.PdhGetFormattedCounterArrayW.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong),
+                                                     ctypes.POINTER(ctypes.c_ulong), ctypes.c_void_p]
+        pdh.PdhGetFormattedCounterArrayW.restype = ctypes.c_long
+        fmt = 0x00000200 | 0x00008000
+        pdh.PdhGetFormattedCounterArrayW(self.counter, fmt, ctypes.byref(size), ctypes.byref(count), None)
+        if not size.value:
+            return 0
+        buf = ctypes.create_string_buffer(size.value)
+        if pdh.PdhGetFormattedCounterArrayW(self.counter, fmt, ctypes.byref(size), ctypes.byref(count), buf) != 0:
+            return None
+        items = ctypes.cast(buf, ctypes.POINTER(ITEM * count.value)).contents
+        return max(0, min(100, round(sum(i.val.value for i in items if i.val.status in (0, 1)))))
+
+    def sample(self):
+        out = {"cpu": None, "gpu": None, "temp": None}
+        if not IS_WINDOWS:
+            return out
+        try:
+            out["cpu"] = self.cpu()
+        except Exception:
+            pass
+        nv = self._nvidia()
+        if nv:
+            out["gpu"], out["temp"] = nv
+        else:
+            try:
+                out["gpu"] = self._pdh()
+            except Exception:
+                out["gpu"] = None
+        return out
+
+    @staticmethod
+    def text(st):
+        parts = []
+        if st.get("cpu") is not None:
+            parts.append(f"CPU {st['cpu']}%")
+        if st.get("gpu") is not None:
+            parts.append(f"GPU {st['gpu']}%" + (f" {st['temp']}°" if st.get("temp") else ""))
+        return "  ".join(parts) or "CPU ··"
+
+
 def ping_ms(ip):
     if not ip or not IS_WINDOWS:
         return None
@@ -5928,6 +6399,8 @@ def show_badge_window(title, body, ip=None, joined=None):
         layout += [("sep", sep, f_loc, c["muted"]), ("timer", "0:00", f_num, c["muted"], "0:00:00")]
     if sess.get("badge_fps", True) and (settings.get("fps") or {}).get("enabled"):
         layout += [("sep", sep, f_loc, c["muted"]), ("fps", "··· fps", f_num, c["muted"], "000 fps")]
+    if sess.get("badge_pc"):
+        layout += [("sep", sep, f_loc, c["muted"]), ("pc", "CPU ··", f_num, c["muted"], "CPU 100%  GPU 100% 100°")]
     w = x + sum(f.measure(item[4] if len(item) > 4 else item[1]) for item in layout for f in [item[2]]) + 12
     cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
     cv.pack()
@@ -6016,7 +6489,20 @@ def show_badge_window(title, body, ip=None, joined=None):
                 time.sleep(4)
         threading.Thread(target=pinger, daemon=True).start()
 
+    if "pc" in items:
+        def sampler():
+            stats = PcStats()
+            while True:
+                try:
+                    state["pc"] = PcStats.text(stats.sample())
+                except Exception:
+                    state["pc"] = None
+                time.sleep(3)
+        threading.Thread(target=sampler, daemon=True).start()
+
     def refresh_numbers():
+        if "pc" in items and state.get("pc"):
+            cv.itemconfigure(items["pc"], text=state["pc"])
         flashing = time.time() < state["flash"]
         if flashing != state.get("flashing"):
             state["flashing"] = flashing
@@ -6557,13 +7043,22 @@ class Api:
 
     def choose_background(self):
         try:
-            picked = self._dialog("OPEN", file_types=("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)",))
+            picked = self._dialog("OPEN", file_types=("Pictures and videos (*.png;*.jpg;*.jpeg;*.webp;*.gif;*.mp4;*.webm)",))
             if not picked:
                 return None
             src = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            video = src.suffix.lower() in VIDEO_TYPES
+            if video and src.stat().st_size > 150 * 1024 * 1024:
+                return {"error": "That video is over 150 MB. Pick a shorter one."}
             for old in DATA_DIR.glob("background.*"):
                 old.unlink(missing_ok=True)
             dest = DATA_DIR / ("background" + src.suffix.lower())
+            if video:
+                shutil.copy2(src, dest)
+                self._settings["appearance"]["bg_file"] = dest.name
+                self._settings["appearance"]["background"] = "Image"
+                save_settings(self._settings)
+                return {"file": dest.name, "video": MediaServer.url("/bg") + f"&v={int(time.time())}"}
             if has_pillow() and src.suffix.lower() != ".gif":
                 from PIL import Image
                 with Image.open(src) as im:
@@ -6582,7 +7077,7 @@ class Api:
 
     def background_data(self):
         f = background_file(self._settings)
-        return data_url(f) if f else None
+        return data_url(f) if f and f.suffix.lower() not in VIDEO_TYPES else None
 
     def export_backup(self):
         try:
@@ -7115,7 +7610,8 @@ class Api:
         return True
 
     def store(self):
-        return fetch_store()
+        r = fetch_store()
+        return {**r, "installed": store_installed(self._settings)}
 
     def install_store_item(self, item_id):
         try:
@@ -7188,6 +7684,260 @@ class Api:
 
     def last_report(self):
         return load_json(LAST_REPORT_FILE, None)
+
+    def owner_issue_many(self, text, days=0):
+        if not is_owner():
+            return {"error": "Owner only."}
+        names, seen = [], set()
+        for n in re.split(r"[\s,;]+", text or ""):
+            n = n.strip().lstrip("@")
+            if n and n.lower() not in seen and re.fullmatch(r"[A-Za-z0-9_]{3,20}", n):
+                seen.add(n.lower())
+                names.append(n)
+        if not names:
+            return {"error": "Type at least one Roblox username."}
+        if len(names) > 100:
+            return {"error": "That's more than 100 names. Do them in smaller batches."}
+        try:
+            data = post_json("https://users.roblox.com/v1/usernames/users", {"usernames": names, "excludeBannedUsers": True})
+        except urllib.error.URLError:
+            return {"error": "Couldn't reach Roblox to check those usernames. Check your internet and try again."}
+        found = {str(d.get("requestedUsername", "")).lower(): d for d in data.get("data") or []}
+        made, missing = [], []
+        for n in names:
+            d = found.get(n.lower())
+            if not d:
+                missing.append(n)
+                continue
+            payload, code = make_premium_key(d["name"], int(days or 0), int(d["id"]))
+            made.append({"name": d["name"], "code": code, "exp": payload["exp"]})
+        return {"made": made, "missing": missing}
+
+    def owner_news(self):
+        if not is_owner():
+            return {"error": "Owner only."}
+        try:
+            return {"posts": (fetch_repo_json("news.json") or {}).get("posts") or [], "can_post": bool(owner_gh_token())}
+        except Exception as e:
+            return self._err(e)
+
+    def _edit_news(self, fn):
+        token = owner_gh_token()
+        if not token:
+            return {"error": "Connect GitHub on this page first. It's the same one-time setup as turning keys off."}
+        repo = update_repo()
+        path = f"/repos/{repo}/contents/news.json"
+        try:
+            try:
+                cur = gh_api("GET", path, token)
+                sha, data = cur.get("sha"), json.loads(base64.b64decode(cur.get("content") or "e30="))
+            except urllib.error.HTTPError as e:
+                if e.code != 404:
+                    raise
+                sha, data = None, {}
+            posts = fn(list(data.get("posts") or []))
+            text = json.dumps({"posts": posts}, indent=2, ensure_ascii=False) + "\n"
+            body = {"message": "Update news", "content": base64.b64encode(text.encode("utf-8")).decode()}
+            if sha:
+                body["sha"] = sha
+            gh_api("PUT", path, token, body)
+            save_json(NEWS_FILE, {"posts": posts, "at": int(time.time())})
+            return {"posts": posts}
+        except Exception as e:
+            return self._err(e)
+
+    def owner_post_news(self, title, body, kind="update", link="", link_label=""):
+        if not is_owner():
+            return {"error": "Owner only."}
+        title, body = (title or "").strip()[:80], (body or "").strip()[:2000]
+        if not title:
+            return {"error": "Give the post a title."}
+        link = (link or "").strip()
+        if link and not re.match(r"https?://", link):
+            return {"error": "Links have to start with https://"}
+        kind = kind if kind in ("update", "giveaway", "event") else "update"
+        who = (load_json(OWNER_GH_FILE, {}) or {}).get("user")
+        post = {"id": f"{kind}-{int(time.time())}", "title": title, "date": time.strftime("%Y-%m-%d"),
+                "author": "@stabzane" if who else "", "body": body, "link": link, "kind": kind,
+                "link_label": (link_label or "").strip()[:30]}
+        r = self._edit_news(lambda posts: [post] + posts[:29])
+        if not r.get("error"):
+            log(f"Posted {kind} to Orbit News: {title}")
+        return r
+
+    def owner_delete_news(self, post_id):
+        if not is_owner():
+            return {"error": "Owner only."}
+        return self._edit_news(lambda posts: [x for x in posts if x.get("id") != post_id])
+
+    def party(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED, "locked": True}
+        uid = current_roblox_uid()
+        party = self._settings.get("party") or {}
+        status = None
+        if party.get("leader"):
+            try:
+                pres = presence_of([int(party["leader"])]).get(str(party["leader"])) or {}
+                status = {0: "Offline", 1: "Online", 2: "In a game", 3: "In Studio"}.get(pres.get("userPresenceType"), "Unknown")
+            except Exception:
+                status = None
+        return {"code": party_code(uid) if uid else None, "party": party, "leader_status": status}
+
+    def join_party(self, code):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            uid = party_uid(code)
+            if uid == current_roblox_uid():
+                return {"error": "That's your own party code. Send it to your friends instead."}
+            info = fetch_json(f"https://users.roblox.com/v1/users/{uid}")
+            self._settings["party"] = {"leader": uid, "name": info.get("name"), "display": info.get("displayName"), "since": int(time.time())}
+            save_settings(self._settings)
+            log(f"Joined party of {info.get('name')} ({uid})")
+            return {"party": self._settings["party"], "settings": self._settings}
+        except urllib.error.HTTPError:
+            return {"error": "No Roblox player matches that party code."}
+        except Exception as e:
+            return self._err(e)
+
+    def party_go(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        party = self._settings.get("party") or {}
+        if not party.get("leader"):
+            return {"error": "Join a party first."}
+        return self.launch(follow_uri(party["leader"]))
+
+    def leave_party(self):
+        self._settings["party"] = {}
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def set_game_fps(self, pid, cap):
+        for g in self._settings.get("library") or []:
+            if str(g.get("pid")) == str(pid):
+                g["fps_cap"] = int(cap) if cap and int(cap) in (30, 60, 120, 144, 165, 240, UNLIMITED_FPS) else None
+                save_settings(self._settings)
+                return {"settings": self._settings}
+        return {"error": "That game isn't in your Library."}
+
+    def import_sound(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Audio (*.mp3;*.ogg;*.wav;*.m4a;*.flac;*.aac;*.opus)",))
+            if not picked:
+                return None
+            sid = import_death_sound(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            return {"id": sid}
+        except LookupError:
+            return {"need_converter": True}
+        except Exception as e:
+            return self._err(e)
+
+    def delete_sound(self, sid):
+        try:
+            delete_custom_sound(sid, self._settings)
+            push_mods_now(self._settings)
+            return {"packs": pack_states(self._settings)}
+        except Exception as e:
+            return self._err(e)
+
+    def get_converter(self):
+        st = load_json(DATA_DIR / "ffmpeg_setup.json", {}) or {}
+        if FFMPEG.exists() or st.get("state") == "downloading":
+            return {"ok": True}
+
+        def work():
+            try:
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "downloading", "progress": 0})
+                last = {"p": -1}
+
+                def prog(f):
+                    if f - last["p"] >= 0.01:
+                        last["p"] = f
+                        save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "downloading", "progress": round(f, 3)})
+                setup_ffmpeg(prog)
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "done", "progress": 1})
+            except Exception as e:
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "failed", "error": str(e)[:200]})
+                log(f"ffmpeg setup failed: {e}")
+        threading.Thread(target=work, daemon=True).start()
+        return {"ok": True}
+
+    def converter_status(self):
+        st = load_json(DATA_DIR / "ffmpeg_setup.json", {}) or {}
+        return {"ready": FFMPEG.exists(), "downloading": st.get("state") == "downloading", "progress": st.get("progress", 0),
+                "error": st.get("error") if st.get("state") == "failed" else None}
+
+    def remove_store_item(self, item_id):
+        try:
+            remove_store_item(self._settings, item_id)
+            push_mods_now(self._settings)
+            return {"installed": store_installed(self._settings), "running": roblox_running()}
+        except Exception as e:
+            return self._err(e)
+
+    def clips(self):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED, "locked": True, "items": []}
+        try:
+            return {"items": list_clips(), "tool": FFMPEG.exists(), "folder": str(CLIP_DIR)}
+        except Exception as e:
+            return self._err(e)
+
+    def trim_clip(self, name, start, end):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            return {"item": clip_info(trim_clip(name, start, end))}
+        except Exception as e:
+            return self._err(e)
+
+    def delete_clip(self, name):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            recycle(clip_path(name))
+            return {"ok": True}
+        except Exception as e:
+            return self._err(e)
+
+    def copy_clip(self, name):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            return {"ok": bool(copy_files_to_clipboard([clip_path(name)]))}
+        except Exception as e:
+            return self._err(e)
+
+    def share_clip(self, name):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            f = clip_path(name)
+            hook = (self._settings.get("discord") or {}).get("webhook")
+            if not hook:
+                return {"error": "Add a Discord webhook on the Discord page first."}
+            if f.stat().st_size > 10 * 1024 * 1024:
+                return {"error": "Discord only takes files up to 10 MB. Trim the clip shorter first."}
+            share_to_discord(hook, "Clip from Orbit", f)
+            return {"ok": True}
+        except Exception as e:
+            return self._err(e)
+
+    def open_clips_folder(self):
+        CLIP_DIR.mkdir(parents=True, exist_ok=True)
+        if IS_WINDOWS:
+            os.startfile(str(CLIP_DIR))
+        return True
+
+    def background_info(self):
+        f = background_file(self._settings)
+        if not f:
+            return None
+        if f.suffix.lower() in VIDEO_TYPES:
+            return {"kind": "video", "src": MediaServer.url("/bg")}
+        return {"kind": "image", "src": data_url(f)}
 
     def premium(self, refresh=False):
         st = premium_status(self._settings, bool(refresh))
