@@ -451,6 +451,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .pack { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: rgba(255, 255, 255, .02); transition: border-color .3s, transform .35s var(--spring), box-shadow .3s; animation: rise .5s var(--spring) both; animation-delay: calc(var(--i, 0) * 50ms); }
 .pack:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), .5); }
 .pack.on { border-color: var(--accent); box-shadow: 0 0 22px -8px var(--accent); }
+.eq-tag { margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; background: var(--grad); color: #fff; vertical-align: 2px; }
 .pack .pv { height: 70px; border-radius: 10px; display: grid; place-items: center; background: radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), .18), rgba(0, 0, 0, .35)); }
 .pack .pv img { width: 44px; height: 44px; image-rendering: auto; filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), .6)); }
 .pack .pv .wave { display: flex; gap: 3px; align-items: center; height: 36px; }
@@ -1430,7 +1431,9 @@ function renderFlags() {
   gfx.append(h("div", { class: "field", style: "margin:0" }, h("label", {}, "Lighting quality"), h("div", { class: "range-wrap" }, range, valEl)));
 
   const tweaks = h("div", { class: "card rise", style: "--i:3" }, h("h3", { style: "margin-bottom:8px" }, "Tweaks"));
-  FLAG_CHECKS.forEach(([key, title, desc]) => tweaks.append(toggleRow(title, desc, p[key], (v) => { p[key] = v; save(); })));
+  const PREM_FLAGS = ["remove_grass", "gray_sky", "low_poly_meshes"];
+  FLAG_CHECKS.filter(([key]) => !PREM_FLAGS.includes(key)).forEach(([key, title, desc]) => tweaks.append(toggleRow(title, desc, p[key], (v) => { p[key] = v; save(); })));
+  tweaks.append(lockGroup("Grass, sky and mesh tweaks", ...FLAG_CHECKS.filter(([key]) => PREM_FLAGS.includes(key)).map(([key, title, desc]) => toggleRow(title, desc, p[key], (v) => { p[key] = v; save(); }))));
 
   const ta = h("textarea", { class: "input mono", spellcheck: "false", placeholder: '{ "FIntDebugForceMSAASamples": 4 }' });
   ta.value = JSON.stringify(t.custom_flags || {}, null, 2);
@@ -2212,12 +2215,15 @@ async function renderPacks() {
       play.onclick = () => { if (packAudio) packAudio.pause(); packAudio = new Audio(p.data); packAudio.volume = cfg.sounds.volume ?? .6; card.classList.add("playing"); packAudio.onended = () => card.classList.remove("playing"); packAudio.play().catch(() => card.classList.remove("playing")); };
       row.append(play);
     }
-    const btn = h("button", { class: "btn" + (p.installed ? " danger" : " primary") }, p.installed ? "Remove" : "Install");
+    const equip = p.kind === "cursor" || p.kind === "crosshair";
+    if (equip && p.installed) card.querySelector("b").append(h("span", { class: "eq-tag" }, "EQUIPPED"));
+    const btn = h("button", { class: "btn" + (p.installed ? " danger" : " primary") }, p.installed ? (equip ? "Unequip" : "Remove") : (equip ? "Equip" : "Install"));
     btn.onclick = async () => {
-      btn.disabled = true; const r = await api.install_pack(p.id, !p.installed);
+      btn.disabled = true; await saveNow(); const r = await api.install_pack(p.id, !p.installed);
       if (r.error) { btn.disabled = false; return toast(r.error, "err"); }
-      toast(p.installed ? `Removed ${p.name}.` : `${p.name} installed in "${cfg.mod_profile}". It shows up next time Roblox starts through Orbit.`, "ok");
-      if (!p.installed && !cfg.apply_mods) { cfg.apply_mods = true; save(); }
+      syncSettings(r); if (!p.installed) sfx("ready");
+      const where = r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now, however you open it.";
+      toast(p.installed ? `${p.name} ${equip ? "unequipped" : "removed"}. Roblox's own ${PACK_KINDS[p.kind].toLowerCase()} is back.` : `${p.name} ${equip ? "equipped" : "installed"}.` + where, "ok");
       renderMods();
     };
     row.append(btn); card.append(row); grid.append(card);
@@ -2348,7 +2354,7 @@ function renderMaker() {
     crossList = null; sfx("ready"); packKind = "crosshair"; renderPacks();
     const use = await modal({ title: "Crosshair saved", text: "Use it everywhere now? You can also pick it for just one game in your Library.", ok: "Use everywhere" });
     if (use) {
-      const x = await api.install_pack(r.id, true); if (x.error) return toast(x.error, "err");
+      const x = await api.install_pack(r.id, true); if (x.error) return toast(x.error, "err"); syncSettings(x);
       const o = await api.set_overlay_crosshair(r.id); if (!o.error) syncSettings(o);
       toast("Your crosshair is on, as a mod and as the overlay, so it shows in games like BedWars too.", "ok"); renderPacks(); renderCrossOverlay();
     }
@@ -2637,7 +2643,7 @@ async function renderStore(refresh) {
   items.forEach((it, i) => {
     const get = h("button", { class: "btn primary" }, "Get");
     get.onclick = async () => { get.disabled = true; get.textContent = "Getting..."; const r = await api.install_store_item(it.id); get.disabled = false; get.textContent = "Get";
-      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed. It shows next time Roblox starts through Orbit.`, "ok"); renderPacks(); if (it.kind === "font") renderFonts(); };
+      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed.` + (r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok"); renderPacks(); if (it.kind === "font") renderFonts(); };
     grid.append(h("div", { class: "store-item", style: `--i:${i}` }, h("div", { class: "pv" }, it.preview_url ? h("img", { src: it.preview_url, alt: "" }) : h("span", { class: "muted small" }, it.kind)),
       h("div", {}, h("b", {}, it.name), h("div", { class: "muted small" }, (PACK_KINDS[it.kind] || it.kind) + (it.author ? " · " + it.author : ""))),
       h("div", { class: "small muted" }, it.desc || ""), get));
@@ -2770,13 +2776,13 @@ function renderPerks() {
     perk("🎬", "Capture", "FPS tracking, instant replay clips and Roblox screenshots."),
     perk("⌨", "Hotkeys", "Rejoin, server hop, screenshots, clips and more from anywhere with Ctrl+Alt shortcuts."),
     perk("🧩", "Extensions", "Orbit Item Preview for trying catalog items on your profile."),
-    perk("🥔", "Potato preset", "The lowest-graphics FastFlags preset for the most FPS on any PC."),
+    perk("🥔", "Potato preset and graphics tweaks", "The lowest-graphics FastFlags preset, plus Remove grass, Plain gray sky and Low-detail meshes."),
     perk("💎", "PREMIUM tag", "A gold tag next to Orbit's name in the title bar."));
 }
 function premChanged(st) {
   if (st && st.settings) syncSettings(st);
   S.premium = st; setPremPill(st); applyLocks();
-  ({ boost: renderBoost, flags: renderPresets, session: renderSession, library: renderJoin, extensions: () => {} })[page]?.();
+  ({ boost: renderBoost, flags: renderFlags, session: renderSession, library: renderJoin, extensions: () => {} })[page]?.();
 }
 async function renderPremium(refresh = true) {
   const box = $("#premiumCard"); if (!box) return;

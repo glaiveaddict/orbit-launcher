@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.7.2
+- **Cursors and crosshairs fixed:** pressing **Equip** now puts it straight into Roblox. Before, it only changed once Roblox was launched through Orbit, so the game could keep an old cursor. Equipping one replaces the last one, an EQUIPPED tag shows which one is on, and **Unequip** puts Roblox's own back. Equipping also turns mods on if they were off. If Roblox is open, the new one shows after you restart Roblox.
+- **Remove grass, Plain gray sky and Low-detail meshes** in FastFlags are now Premium.
+
 ## v2.7.1
 - **Turning a premium key off works right away now.** Orbit used to read the list of turned-off keys from a copy GitHub caches for a few minutes, so a key you'd just turned off could still count as on. It now reads the live list. On the owner's PC, turning a key off applies instantly.
 

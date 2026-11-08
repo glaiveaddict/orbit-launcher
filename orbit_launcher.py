@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.7.1"
+APP_VERSION = "2.7.2"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -629,12 +629,13 @@ def build_flags(settings, place_id=None):
         flags["DFFlagDisableDPIScale"] = True
     if p.get("exclusive_fullscreen"):
         flags["FFlagHandleAltEnterFullscreenManually"] = False
-    if p.get("gray_sky"):
+    prem = has_premium(settings)
+    if p.get("gray_sky") and prem:
         flags["FFlagDebugSkyGray"] = True
-    if p.get("remove_grass"):
+    if p.get("remove_grass") and prem:
         flags["FIntFRMMinGrassDistance"] = 0
         flags["FIntFRMMaxGrassDistance"] = 0
-    if p.get("low_poly_meshes"):
+    if p.get("low_poly_meshes") and prem:
         for name in ("DFIntCSGLevelOfDetailSwitchingDistance",
                      "DFIntCSGLevelOfDetailSwitchingDistanceL12",
                      "DFIntCSGLevelOfDetailSwitchingDistanceL23",
@@ -754,6 +755,37 @@ def mods_folder_for(settings, place_id=None):
     return mods_dir(settings)
 
 
+def mod_overrides(settings, d, place_id=None):
+    overrides = {}
+    if not settings.get("apply_mods", True):
+        return overrides
+    try:
+        overrides.update(font_overrides(settings, d))
+    except Exception as e:
+        log(f"Font mod failed: {e}")
+    emoji = emoji_source(settings.get("emoji") or "")
+    if emoji:
+        overrides["content/fonts/TwemojiMozilla.ttf"] = emoji
+    cross = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id is not None else None
+    if cross:
+        src = crosshair_source(cross)
+        if src:
+            overrides["content/textures/MouseLockedCursor.png"] = src
+    return overrides
+
+
+def push_mods_now(settings):
+    done = 0
+    for d in player_dirs()[:1]:
+        try:
+            n = sync_mods(d, mods_folder_for(settings), mod_overrides(settings, d))
+            log(f"Updated {n} mod file(s) in {d.name} right away")
+            done += 1
+        except Exception as e:
+            log(f"Couldn't update mods in {d.name}: {e}")
+    return done
+
+
 def apply_all(settings, version_dir=None, place_id=None):
     ensure_dirs()
     dirs = [Path(version_dir)] if version_dir else player_dirs()[:1]
@@ -765,21 +797,7 @@ def apply_all(settings, version_dir=None, place_id=None):
             apply_system_boost(settings, d)
         except Exception as e:
             log(f"System boost failed: {e}")
-        overrides = {}
-        if settings.get("apply_mods", True):
-            try:
-                overrides.update(font_overrides(settings, d))
-            except Exception as e:
-                log(f"Font mod failed: {e}")
-        emoji = emoji_source(settings.get("emoji") or "") if settings.get("apply_mods", True) else None
-        if emoji:
-            overrides["content/fonts/TwemojiMozilla.ttf"] = emoji
-        cross = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id is not None else None
-        if cross and settings.get("apply_mods", True):
-            src = crosshair_source(cross)
-            if src:
-                overrides["content/textures/MouseLockedCursor.png"] = src
-        n = sync_mods(d, folder, overrides)
+        n = sync_mods(d, folder, mod_overrides(settings, d, place_id))
         _, _, prof = profile_for(settings, place_id)
         log(f"Applied {len(flags)} flag(s){' [' + prof + ' profile]' if prof else ''} "
             f"and {n} mod file(s) to {d.name}")
@@ -2461,8 +2479,9 @@ def pack_states(settings):
                     "data": "data:audio/mpeg;base64," + base64.b64encode(jump.read_bytes()).decode() if jump.exists() else ""})
     for pid, (name, kind, desc) in PACKS.items():
         src = pack_file(pid)
-        installed = src.exists() and all((folder / t).exists() and (folder / t).stat().st_size == src.stat().st_size
-                                          for t in PACK_TARGETS[kind])
+        body = src.read_bytes() if src.exists() else None
+        installed = body is not None and all((folder / t).exists() and (folder / t).read_bytes() == body
+                                             for t in PACK_TARGETS[kind])
         mime = "audio/ogg" if kind == "sound" else "image/png"
         data = f"data:{mime};base64," + base64.b64encode(src.read_bytes()).decode() if src.exists() else ""
         out.append({"id": pid, "name": name, "kind": kind, "desc": desc, "installed": installed, "data": data})
@@ -6572,7 +6591,11 @@ class Api:
     def install_pack(self, pack_id, on=True):
         try:
             install_pack(self._settings, pack_id, bool(on))
-            return pack_states(self._settings)
+            if on and not self._settings.get("apply_mods", True):
+                self._settings["apply_mods"] = True
+                save_settings(self._settings)
+            push_mods_now(self._settings)
+            return {"packs": pack_states(self._settings), "settings": self._settings, "running": roblox_running()}
         except Exception as e:
             return self._err(e)
 
@@ -7019,7 +7042,8 @@ class Api:
     def install_store_item(self, item_id):
         try:
             n = install_store_item(self._settings, item_id)
-            return {"count": n, "settings": self._settings}
+            push_mods_now(self._settings)
+            return {"count": n, "settings": self._settings, "running": roblox_running()}
         except Exception as e:
             return self._err(e)
 
