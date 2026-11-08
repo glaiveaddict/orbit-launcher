@@ -516,6 +516,21 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .shot-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .shot .gtag { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(5, 3, 10, .7); color: #fff; }
 .mini-btn svg { width: 15px; height: 15px; }
+
+.avatar.has-img { background-size: cover !important; background-position: center !important; cursor: pointer; }
+.avatar.has-img > span { opacity: 0; }
+.avatar.has-img::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid transparent; background: var(--grad) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.credit:hover .avatar.has-img { transform: scale(1.08) rotate(-4deg); box-shadow: 0 0 26px -4px var(--accent); }
+.pack .pv.cross { background: linear-gradient(180deg, #5aa7e6 0%, #8fc6ef 45%, #3d8a3a 46%, #2f6b2c 100%); }
+.pack .pv.cross img { filter: none; width: 48px; height: 48px; }
+.kit { display: grid; grid-template-columns: 120px 1fr; gap: 16px; align-items: center; }
+.kit .art { height: 92px; border-radius: 14px; background: #120a20 center/cover no-repeat; box-shadow: inset 0 0 0 1px var(--line); }
+.cross-pick { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.cross-pick button { width: 46px; height: 46px; border-radius: 11px; border: 1px solid var(--line); cursor: pointer; display: grid; place-items: center; transition: transform .25s var(--spring), border-color .2s;
+  background: linear-gradient(180deg, #5aa7e6 0%, #8fc6ef 45%, #3d8a3a 46%, #2f6b2c 100%); }
+.cross-pick button:hover { transform: translateY(-2px); }
+.cross-pick button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.cross-pick img { width: 34px; height: 34px; }
 </style>
 </head>
 <body>
@@ -621,6 +636,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     <section class="page" id="page-boost">
       <div class="page-head rise" style="--i:0"><h1>Boost</h1><p>Squeeze out more FPS and open your other apps automatically.</p></div>
       <div class="card boost-hero rise" style="--i:1" id="fpsCard"></div>
+      <div class="card rise" style="--i:1" id="kitCard"></div>
       <div class="card rise" style="--i:1" id="fpsTune"></div>
       <div class="card rise" style="--i:1" id="perfCard"></div>
       <div class="card rise" style="--i:2">
@@ -654,7 +670,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row" id="modChips"></div>
       </div>
       <div class="card rise" style="--i:3">
-        <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original cursors and death sounds made for Orbit. Installs into the selected mod profile.</p></div></div>
+        <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original crosshairs, cursors and death sounds made for Orbit. The crosshair is what you see in shift lock and first person. Installs into the selected mod profile.</p></div><span class="spacer"></span><div id="packTabs"></div></div>
         <div class="packs" id="packGrid" style="margin-top:12px"></div>
       </div>
       <div class="card rise" style="--i:4">
@@ -1426,9 +1442,15 @@ function renderCredits() {
   const list = $("#creditList"); list.innerHTML = "";
   S.credits.forEach((c, i) => list.append(h("div", { class: "card credit tilt rise", style: `--i:${i + 1}` },
     h("div", { class: "ring" }),
-    h("div", { class: "avatar" }, h("span", {}, c.handle.replace("@", "")[0].toUpperCase())),
+    h("div", { class: "avatar", "data-uid": c.roblox_id || "", title: c.roblox_id ? "Open Roblox profile" : "", onclick: () => c.roblox_id && api.open_url(`https://www.roblox.com/users/${c.roblox_id}/profile`) }, h("span", {}, c.handle.replace("@", "")[0].toUpperCase())),
     h("div", {}, h("div", { class: "role" }, c.role), h("div", { class: "handle" }, c.handle)))));
   $("#creditFoot").textContent = `Orbit Launcher v${S.version}` + (S.update_source ? ` · updates from github.com/${S.update_source}` : "");
+  loadAvatars();
+}
+async function loadAvatars() {
+  if (!api.avatars) return;
+  const map = await api.avatars().catch(() => ({}));
+  $$(".avatar[data-uid]").forEach((el) => { const d = map[el.dataset.uid]; if (d) { el.style.background = `url("${d}") center/cover, var(--grad)`; el.classList.add("has-img"); } });
 }
 
 
@@ -1798,8 +1820,32 @@ function renderFpsTune() {
     toggleRow("Boost my game profiles too", "When FPS Boost is on, games with their own FastFlags profile get boosted as well.", p.boost_profiles !== false, (v) => { p.boost_profiles = v; save(); }));
   requestAnimationFrame(() => { capSeg._remeasure(); qSeg._remeasure(); });
 }
+let kitCross = null;
+async function renderKits() {
+  const box = $("#kitCard"), kits = await api.game_kits(), packs = (await api.packs()).filter((p) => p.kind === "crosshair");
+  box.innerHTML = "";
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Game kits"), h("p", { class: "sub" }, "One click sets a game up for competitive play: its own FPS-focused FastFlags profile, a high-visibility crosshair, and a spot in your Library."));
+  await loadGames(kits.map((k) => k.place_id));
+  kits.forEach((k) => {
+    const info = gameCache[k.place_id] || {};
+    kitCross = kitCross || (packs.find((p) => p.installed) || {}).id || k.crosshair;
+    const pick = h("div", { class: "cross-pick" });
+    packs.forEach((p) => { const b = h("button", { class: p.id === kitCross ? "on" : "", title: p.name }, h("img", { src: p.data, alt: "" })); b.onclick = () => { kitCross = p.id; $$("button", pick).forEach((x) => x.classList.remove("on")); b.classList.add("on"); }; pick.append(b); });
+    const go_ = h("button", { class: "btn primary" }, k.applied ? `Update ${k.name} setup` : `Set up ${k.name}`);
+    go_.onclick = async () => {
+      go_.disabled = true; await saveNow(); const r = await api.apply_kit(k.id, kitCross); go_.disabled = false;
+      if (r.error) return toast(r.error, "err");
+      syncSettings(r); sfx("ready"); renderKits();
+      toast(`${k.name} is set up: its own FPS profile, your crosshair, and it's in your Library. Launch it from Orbit to use it.`, "ok");
+    };
+    box.append(h("div", { class: "kit" }, h("div", { class: "art", style: info.thumb || info.icon ? `background-image:url("${info.thumb || info.icon}")` : "" }),
+      h("div", {}, h("b", { style: "font-size:16px" }, k.name + (k.applied ? "  ✓" : "")),
+        h("div", { class: "muted small" }, "Low textures and lighting, no grass, low-detail meshes and Direct3D 11 for steady frames in fights. Pick a crosshair:"),
+        pick, h("div", { class: "row" }, go_, h("button", { class: "btn", onclick: () => { go("servers"); findServers(k.place_id); } }, "Find a low-ping server")))));
+  });
+}
 function renderBoost() {
-  renderFps(); renderFpsTune();
+  renderFps(); renderKits(); renderFpsTune();
   const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
     toggleRow("Priority for Roblox", "Gives Roblox above-normal CPU priority while you play, without starving the rest of your PC.", p.high_priority, (v) => { p.high_priority = v; save(); }),
@@ -1943,14 +1989,19 @@ async function runRepair(kind, btn) {
 }
 
 let packAudio = null;
+let packKind = "crosshair";
+const PACK_KINDS = { crosshair: "Shift-lock crosshair", cursor: "Cursor", sound: "Death sound" };
 async function renderPacks() {
-  const grid = $("#packGrid"), packs = await api.packs(); grid.innerHTML = "";
+  const grid = $("#packGrid"), all = await api.packs(); grid.innerHTML = "";
+  const tabs = $("#packTabs");
+  if (tabs) { tabs.innerHTML = ""; const seg = segmented([["crosshair", "Crosshairs"], ["cursor", "Cursors"], ["sound", "Sounds"]], packKind, (v) => { packKind = v; renderPacks(); }); tabs.append(seg); requestAnimationFrame(() => seg._remeasure()); }
+  const packs = all.filter((p) => p.kind === packKind);
   packs.forEach((p, i) => {
-    const pv = h("div", { class: "pv" });
-    if (p.kind === "cursor") pv.append(h("img", { src: p.data, alt: "" }));
+    const pv = h("div", { class: "pv" + (p.kind === "crosshair" ? " cross" : "") });
+    if (p.kind !== "sound") pv.append(h("img", { src: p.data, alt: "" }));
     else pv.append(h("div", { class: "wave" }, ...Array.from({ length: 9 }, (_, k) => h("i", { style: `--k:${k};height:${[30, 55, 80, 45, 95, 60, 40, 70, 35][k]}%` }))));
     const card = h("div", { class: "pack" + (p.installed ? " on" : ""), style: `--i:${i}` }, pv,
-      h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, p.kind === "cursor" ? "Cursor" : "Death sound")),
+      h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, PACK_KINDS[p.kind])),
       h("div", { class: "small muted" }, p.desc));
     const row = h("div", { class: "row" });
     if (p.kind === "sound") {

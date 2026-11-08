@@ -4,3 +4,5 @@ dist/
 *.spec
 ui/build.json
 .ruff_cache/
+ui/avatars/
+helper.zip

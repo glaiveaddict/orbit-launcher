@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.0
+- **Much faster:** the server location popup, the in-game badge and launching Roblox from the website no longer wait for the whole app to unpack every time. Orbit now keeps a small, always-ready helper for this background work, so they start almost instantly.
+- **Location in about a second:** Orbit looks up the server as soon as Roblox connects instead of waiting, remembers server locations and game names it has seen before, and shows the badge together with the popup instead of 7 seconds later.
+- **Your Roblox avatar in Credits:** @stabzane's credits now show the real Roblox avatar, refreshed with every Orbit update (and every few hours). Click it to open the profile.
+- **Shift-lock crosshairs:** 6 new high-visibility crosshairs (Cyan Cross, Green Plus, Red Dot, Circle Dot, Yellow T, Pink Chevron) with dark outlines so they stay visible on bright skies and wool. They replace the crosshair you see in shift lock and first person.
+- **More cursors:** Neon Arrow, Big Cyan Dot and Green Ring.
+- **BedWars kit:** one click on the Boost page gives BedWars its own FPS-focused profile (low textures and lighting, no grass, low-detail meshes, Direct3D 11), installs the crosshair you pick and adds BedWars to your Library.
+- Packs on the Mods page are now split into Crosshairs, Cursors and Sounds.
+
 ## v1.9.1
 - **Fix:** the server badge and live tracking could stop working with FPS Boost on. With Roblox on high priority and an unlimited frame rate, Windows' own tools slowed down so much that Orbit mistook its tracker for a dead one and replaced it, and the badge never got drawn. Orbit now checks processes directly (instantly, no slow Windows tools) and keeps its own badge and tracker responsive.
 - **Gentler priority:** Roblox now gets above-normal priority instead of high, so your PC, Discord and overlays stay smooth.

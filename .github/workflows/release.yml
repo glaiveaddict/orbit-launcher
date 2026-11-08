@@ -52,9 +52,27 @@ jobs:
           python -m pip install pyinstaller pywebview pystray pillow
           python -m py_compile orbit_launcher.py
           printf '{"repo": "%s", "version": "%s"}\n' "${{ github.repository }}" "${{ steps.ver.outputs.version }}" > ui/build.json
+          mkdir -p ui/avatars
+          python - <<'PY'
+          import json, urllib.request
+          for uid in (9544724076,):
+              try:
+                  url = f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={uid}&size=420x420&format=Png&isCircular=false"
+                  img = json.load(urllib.request.urlopen(url, timeout=20))["data"][0]["imageUrl"]
+                  data = urllib.request.urlopen(img, timeout=20).read()
+                  open(f"ui/avatars/{uid}.png", "wb").write(data)
+                  print(f"Bundled avatar {uid} ({len(data)} bytes)")
+              except Exception as e:
+                  print(f"Avatar {uid} skipped: {e}")
+          PY
+          python -m PyInstaller --noconfirm --onedir --noconsole --name OrbitHelper --icon ui/orbit.ico \
+            --add-data "ui/build.json;ui" --exclude-module webview --exclude-module clr --exclude-module clr_loader \
+            --exclude-module pythonnet --exclude-module PIL --exclude-module pystray orbit_launcher.py
+          python -c "import shutil; shutil.make_archive('helper', 'zip', 'dist/OrbitHelper')"
+          ls -la helper.zip
           python -m PyInstaller --noconfirm --onefile --noconsole --name OrbitLauncher --icon ui/orbit.ico \
             --add-data "ui;ui" --add-data "orbit_preview;orbit_preview" --add-data "CHANGELOG.md;." \
-            --hidden-import pystray._win32 orbit_launcher.py
+            --add-data "helper.zip;." --hidden-import pystray._win32 orbit_launcher.py
           cp dist/OrbitLauncher.exe dist/OrbitSetup.exe
           (cd dist && sha256sum OrbitLauncher.exe | cut -d' ' -f1 > OrbitLauncher.exe.sha256)
           ls -la dist
@@ -103,14 +121,38 @@ jobs:
           buf = io.BytesIO(); small.save(buf, "PNG")
           print(f"IMG {name} " + base64.b64encode(buf.getvalue()).decode())
           PY
-          dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" &
+          dist/OrbitLauncher.exe --prepare
+          HELPER="$LOCALAPPDATA/Programs/Orbit/helper-${{ steps.ver.outputs.version }}/OrbitHelper.exe"
+          echo "== helper =="; ls -la "$(dirname "$HELPER")" || echo "(no helper folder)"
+          python - "$HELPER" <<'PY'
+          import os, pathlib, subprocess, sys, time
+          log = pathlib.Path(os.environ["LOCALAPPDATA"]) / "OrbitLauncher" / "launcher.log"
+          def timed(label, exe):
+              before = log.read_text(errors="ignore").count("Badge placed") if log.exists() else 0
+              t = time.time()
+              p = subprocess.Popen([exe, "--orbit-toast", "BedWars", "Ashburn, Virginia, US", "--badge"],
+                                   env={**os.environ, "ORBIT_BADGE_ALWAYS": "1"})
+              while time.time() - t < 60:
+                  if log.exists() and log.read_text(errors="ignore").count("Badge placed") > before:
+                      break
+                  time.sleep(0.05)
+              dt = time.time() - t
+              subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True)
+              print(f"SPEED {label}: badge on screen after {dt:.2f}s")
+              time.sleep(1)
+          for i in range(2):
+              timed(f"old way (one big exe), run {i + 1}", "dist/OrbitLauncher.exe")
+              timed(f"fast helper, run {i + 1}", sys.argv[1])
+          PY
+          "$HELPER" --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" &
           sleep 3
           python render_check.py banner
           wait
-          ORBIT_BADGE_ALWAYS=1 dist/OrbitLauncher.exe --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge --ip 8.8.8.8 --joined $(( $(date +%s) - 754 )) &
+          ORBIT_BADGE_ALWAYS=1 "$HELPER" --orbit-toast "Grow a Garden" "Atlanta, Georgia, US" --badge --ip 8.8.8.8 --joined $(( $(date +%s) - 754 )) &
           sleep 4
           python render_check.py badge
           taskkill //IM OrbitLauncher.exe //F > /dev/null 2>&1
+          taskkill //IM OrbitHelper.exe //F > /dev/null 2>&1
           echo "== launcher.log =="
           cat "$LOCALAPPDATA/OrbitLauncher/launcher.log" 2>/dev/null
           python - <<'PY'

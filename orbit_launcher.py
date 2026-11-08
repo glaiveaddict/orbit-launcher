@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "1.9.1"
+APP_VERSION = "2.0.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -70,10 +70,10 @@ UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\OrbitLaunc
 PUBLISHER = "@stabzane"
 
 CREDITS = [
-    ("Founder/Owner", "@stabzane"),
-    ("Lead Developer", "@stabzane"),
-    ("Sounds/UI Designer", "@stabzane"),
-    ("Scripter", "@stabzane"),
+    ("Founder/Owner", "@stabzane", 9544724076),
+    ("Lead Developer", "@stabzane", 9544724076),
+    ("Sounds/UI Designer", "@stabzane", 9544724076),
+    ("Scripter", "@stabzane", 9544724076),
 ]
 
 ACCENTS = {
@@ -204,13 +204,25 @@ def load_json(path, default):
         return default
 
 
+_SAVE_LOCK = threading.Lock()
+
+
 def save_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    with _SAVE_LOCK:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        for attempt in range(8):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == 7:
+                    tmp.unlink(missing_ok=True)
+                    raise
+                time.sleep(0.05 * (attempt + 1))
 
 
 def _merge(defaults, loaded):
@@ -299,6 +311,65 @@ def fmt_ago(ts):
     return time.strftime("%b %d", time.localtime(ts))
 
 
+HELPER_NAME = "OrbitHelper.exe"
+PREPARE_FLAG = "--prepare"
+
+
+def is_helper():
+    return is_frozen() and Path(sys.executable).name.lower() == HELPER_NAME.lower()
+
+
+def helper_exe(version=APP_VERSION):
+    return INSTALL_DIR / f"helper-{version}" / HELPER_NAME
+
+
+def helper_ready():
+    exe = helper_exe()
+    return exe if exe.exists() and (exe.parent / "ready.txt").exists() else None
+
+
+def ensure_helper():
+    if not IS_WINDOWS or not is_frozen():
+        return None
+    if is_helper():
+        return Path(sys.executable)
+    exe = helper_ready()
+    if not exe:
+        src = resource_dir() / "helper.zip"
+        if not src.exists():
+            return None
+        import zipfile
+        final = helper_exe().parent
+        tmp = final.with_name(final.name + ".tmp")
+        shutil.rmtree(tmp, ignore_errors=True)
+        started = time.time()
+        with zipfile.ZipFile(src) as z:
+            z.extractall(tmp)
+        shutil.rmtree(final, ignore_errors=True)
+        tmp.rename(final)
+        (final / "ready.txt").write_text(APP_VERSION)
+        exe = helper_exe()
+        log(f"Unpacked the fast helper ({time.time() - started:.1f}s)")
+    if not pids_named(HELPER_NAME):
+        for old in INSTALL_DIR.glob("helper-*"):
+            if old.is_dir() and old != exe.parent:
+                shutil.rmtree(old, ignore_errors=True)
+    return exe
+
+
+def main_command(*args):
+    if is_helper() and INSTALLED_EXE.exists():
+        return [str(INSTALLED_EXE), *args]
+    return self_command(*args)
+
+
+def fast_command(*args):
+    if is_helper() or not IS_WINDOWS or not is_frozen():
+        return self_command(*args)
+    exe = helper_ready()
+    return [str(exe), *args] if exe else self_command(*args)
+
+
 def self_command(*args):
     if getattr(sys, "frozen", False):
         return [sys.executable, *args]
@@ -308,20 +379,35 @@ def self_command(*args):
 
 
 def spawn_self(*args):
+    fast = bool(args) and args[0] in (TOAST_FLAG, LAUNCH_FLAG, ATTACH_FLAG, BACKGROUND_FLAG)
     try:
-        return subprocess.Popen(self_command(*args), creationflags=CREATE_NO_WINDOW, env=child_env())
+        return subprocess.Popen(fast_command(*args) if fast else main_command(*args), creationflags=CREATE_NO_WINDOW,
+                                env=child_env())
     except OSError as e:
         log(f"Could not start {args[:1]}: {e}")
         return None
 
 
 _GAME_CACHE = {}
+GAME_CACHE_FILE = DATA_DIR / "game_cache.json"
+LOCATION_CACHE_FILE = DATA_DIR / "ip_locations.json"
+
+
+def cached_game(place_id):
+    entry = (load_json(GAME_CACHE_FILE, {}) or {}).get(str(place_id))
+    if entry and time.time() - entry.get("at", 0) < 3 * 86400:
+        return {k: v for k, v in entry.items() if k != "at"}
+    return None
 
 
 def game_info(place_id):
     place_id = str(place_id)
     if place_id in _GAME_CACHE:
         return _GAME_CACHE[place_id]
+    disk = cached_game(place_id)
+    if disk:
+        _GAME_CACHE[place_id] = disk
+        return disk
     info = {"name": f"Place {place_id}", "creator": None, "icon": None}
     try:
         universe = fetch_json(f"https://apis.roblox.com/universes/v1/places/{place_id}/universe")["universeId"]
@@ -339,6 +425,14 @@ def game_info(place_id):
         except Exception:
             info["thumb"] = None
         _GAME_CACHE[place_id] = info
+        try:
+            cache = load_json(GAME_CACHE_FILE, {}) or {}
+            cache[place_id] = {**info, "at": int(time.time())}
+            if len(cache) > 300:
+                cache = dict(sorted(cache.items(), key=lambda kv: kv[1].get("at", 0))[-300:])
+            save_json(GAME_CACHE_FILE, cache)
+        except Exception:
+            pass
     except Exception as e:
         log(f"Game lookup failed for {place_id}: {e}")
     return info
@@ -377,16 +471,26 @@ def is_public_ip(ip):
 def server_location(ip):
     if not is_public_ip(ip):
         return None
+    cache = load_json(LOCATION_CACHE_FILE, {}) or {}
+    hit = cache.get(ip)
+    if hit and time.time() - hit[1] < 30 * 86400:
+        return hit[0]
     try:
-        d = fetch_json(f"https://ipinfo.io/{ip}/json")
+        d = fetch_json(f"https://ipinfo.io/{ip}/json", timeout=6)
     except Exception as e:
         log(f"Location lookup failed: {e}")
-        return None
+        return hit[0] if hit else None
     parts = []
     for part in (d.get("city"), d.get("region"), d.get("country")):
         if part and part not in parts:
             parts.append(part)
-    return ", ".join(parts) or None
+    location = ", ".join(parts) or None
+    if location:
+        cache[ip] = [location, int(time.time())]
+        if len(cache) > 800:
+            cache = dict(sorted(cache.items(), key=lambda kv: kv[1][1])[-800:])
+        save_json(LOCATION_CACHE_FILE, cache)
+    return location
 
 
 def latest_roblox_version():
@@ -903,8 +1007,23 @@ def roblox_running():
 def our_command(exe=None):
     if exe:
         return f'"{exe}" {LAUNCH_FLAG} "%1"'
-    cmd = self_command(LAUNCH_FLAG)
+    cmd = fast_command(LAUNCH_FLAG)
     return " ".join(f'"{part}"' for part in cmd[:-1]) + f' {LAUNCH_FLAG} "%1"'
+
+
+def should_claim_links(current):
+    if current == our_command():
+        return False
+    low = (current or "").lower()
+    if "orbithelper" in low or "orbitlauncher" in low:
+        m = re.search(r"helper-(\d+(?:\.\d+)*)", low)
+        path = re.match(r'\s*"([^"]+)"', current or "")
+        if path and not Path(path.group(1)).exists():
+            return True
+        if m and parse_version(m.group(1)) > parse_version(APP_VERSION):
+            return False
+        return True
+    return True
 
 
 def _cmd_key(proto):
@@ -1301,11 +1420,20 @@ class SessionMonitor:
             threading.Thread(target=self._ping_loop, args=(game,), daemon=True).start()
         if not getattr(self, "play_start", None):
             self.play_start = joined
+        game["udmux"] = threading.Event()
+        cached = game_info(place_id) if place_id in _GAME_CACHE or cached_game(place_id) else None
+        if cached:
+            game["name"], game["icon"] = cached["name"], cached.get("icon")
         self.game = game
         self._publish(game)
         log(f"Joined place {place_id}" + (" (already in progress)" if quiet else ""))
-        save_json(LAST_SERVER_FILE, {"place_id": place_id, "job_id": job_id, "name": None, "time": int(joined)})
+        save_json(LAST_SERVER_FILE, {"place_id": place_id, "job_id": job_id, "name": game["name"], "time": int(joined)})
         threading.Thread(target=self._join_details, args=(game,), daemon=True).start()
+        threading.Thread(target=self._locate_soon, args=(game,), daemon=True).start()
+
+    def _locate_soon(self, game):
+        game["udmux"].wait(2.5)
+        self._locate(game)
 
     def _publish(self, game):
         if game is not None and self.game is game:
@@ -1324,8 +1452,6 @@ class SessionMonitor:
             save_json(LAST_SERVER_FILE, last)
         if self.game is game:
             self._discord(build_activity(self.discord, game["place_id"], game["job_id"], info, game["joined"]))
-        time.sleep(1.5)
-        self._locate(game)
 
     def _ping_loop(self, game):
         time.sleep(4)
@@ -1352,25 +1478,29 @@ class SessionMonitor:
         game = self.game
         if game and not game["located"]:
             game["ip"] = ip
+        if game and game.get("udmux"):
+            game["udmux"].set()
 
     def _locate(self, game):
         with self.lock:
             if game["located"]:
                 return
             game["located"] = True
+        started = time.time()
         location = server_location(game["ip"])
         game["location"] = location
         self._publish(game)
-        log(f"Server location: {location or 'unknown'} ({game['ip']})")
+        log(f"Server location: {location or 'unknown'} ({game['ip']}, {time.time() - game['joined']:.1f}s after join,"
+            f" lookup {time.time() - started:.1f}s)")
         if not location or self.game is not game:
             return
-        for _ in range(10):
+        for _ in range(15):
             if game["name"]:
                 break
-            time.sleep(0.5)
+            time.sleep(0.2)
         if self.session.get("server_popup") and not game.get("quiet"):
             spawn_toast(game["name"] or "Joined a game", location)
-            time.sleep(7)
+            time.sleep(6.8 if (self.session.get("badge_pos") or "Top right") == "Top center" else 0.4)
         if self.session.get("server_badge", True) and self.game is game:
             show_badge(game["name"] or "Roblox", location, game.get("ip"), game.get("joined"))
 
@@ -1644,11 +1774,15 @@ def acquire_monitor_lock(wait=0.0):
 
 
 def orbit_pids():
-    names = {Path(sys.executable).name.lower(), "orbitlauncher.exe"} if is_frozen() else {"orbitlauncher.exe"}
-    pids = set()
-    for name in names:
-        pids |= set(pids_named(name))
-    return pids
+    table = process_table()
+    if table is None:
+        return set(pids_named("OrbitLauncher.exe")) | set(pids_named(HELPER_NAME))
+    out = set()
+    for pid, _, name in table:
+        n = name.lower()
+        if n.endswith(".exe") and n.startswith("orbit") and ("launcher" in n or "helper" in n):
+            out.add(pid)
+    return out
 
 
 def window_pids():
@@ -1659,29 +1793,10 @@ def window_pids():
     return pids
 
 
-def stop_legacy_trackers(keep):
-    keep_list = ",".join(str(x) for x in keep)
-    script = (f"$keep=@({keep_list}); "
-              "Get-CimInstance Win32_Process -Filter \"CommandLine LIKE '%--orbit-launch%'\" | "
-              "Where-Object { $keep -notcontains $_.ProcessId -and $keep -notcontains $_.ParentProcessId } | "
-              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; "
-              "\"$($_.ProcessId) $($_.Name)\" }")
-    try:
-        r = subprocess.run([sys_tool("powershell"), "-NoProfile", "-Command", script], capture_output=True, text=True,
-                           timeout=40, creationflags=CREATE_NO_WINDOW)
-        if r.stdout.strip():
-            log("Stopped legacy Orbit trackers: " + "; ".join(r.stdout.split("\n")).strip("; "))
-        if r.stderr.strip():
-            log("Legacy tracker check: " + r.stderr.strip()[:300])
-    except Exception as e:
-        log(f"Legacy tracker check failed: {e}")
-
-
 def stop_stale_copies():
     if not IS_WINDOWS or not is_frozen():
         return
     keep = {os.getpid(), os.getppid()}
-    threading.Thread(target=stop_legacy_trackers, args=(keep,), daemon=True).start()
     gui = window_pids()
     if not gui:
         log("Orbit's window isn't registered yet; leaving other Orbit processes alone")
@@ -1763,10 +1878,12 @@ class AutoAttach:
     def guard_links(self):
         try:
             settings = load_settings()
-            if is_frozen() and settings["registration"].get("registered") and \
-                    read_protocol_command(PROTOCOLS[0]) != our_command():
+            current = read_protocol_command(PROTOCOLS[0])
+            if is_frozen() and settings["registration"].get("registered") and should_claim_links(current):
                 register_protocols(settings)
-                log("Another app had taken over Roblox links; switched them back to Orbit")
+                low = (current or "").lower()
+                log("Pointed Roblox links at this Orbit version" if "orbit" in low
+                    else "Another app had taken over Roblox links; switched them back to Orbit")
         except Exception as e:
             log(f"Link check failed: {e}")
 
@@ -1826,7 +1943,8 @@ def set_start_with_windows(on):
         raise OSError("Start with Windows only works in the installed app.")
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
         if on:
-            winreg.SetValueEx(k, APP_NAME, 0, winreg.REG_SZ, f'"{sys.executable}" {BACKGROUND_FLAG}')
+            cmd = fast_command(BACKGROUND_FLAG)
+            winreg.SetValueEx(k, APP_NAME, 0, winreg.REG_SZ, " ".join(f'"{x}"' for x in cmd[:-1]) + f" {BACKGROUND_FLAG}")
         else:
             try:
                 winreg.DeleteValue(k, APP_NAME)
@@ -1937,14 +2055,24 @@ def game_stats(pid):
 
 
 PACKS = {
+    "crosshair_cyan_cross": ("Cyan Cross", "crosshair", "Bright cyan with a dark outline. Easy to see on any map. Great for BedWars."),
+    "crosshair_green_plus": ("Green Plus", "crosshair", "A small, tight green plus for precise hits."),
+    "crosshair_red_dot": ("Red Dot", "crosshair", "Just a dot. Keeps the middle of the screen clear."),
+    "crosshair_white_circle": ("Circle Dot", "crosshair", "A ring with a center dot, good for bow and fireball aim."),
+    "crosshair_yellow_t": ("Yellow T", "crosshair", "A T-shape with no top line, so you can see what's above you."),
+    "crosshair_pink_chevron": ("Pink Chevron", "crosshair", "A small arrowhead that points at your target."),
     "cursor_void_ring": ("Void Ring", "cursor", "A glowing purple ring with a white center dot."),
     "cursor_dot": ("Dot", "cursor", "A tiny clean dot. Minimal and precise."),
     "cursor_crosshair": ("Crosshair", "cursor", "A thin crosshair for aiming games."),
+    "cursor_neon_arrow": ("Neon Arrow", "cursor", "A purple arrow with a white edge. Easy to find on screen."),
+    "cursor_big_cyan_dot": ("Big Cyan Dot", "cursor", "A larger dot that never gets lost in busy menus."),
+    "cursor_green_ring": ("Green Ring", "cursor", "A green ring and dot, matching the Green Plus crosshair."),
     "death_soft_pop": ("Soft Pop", "sound", "A short, soft pop when you reset or die."),
     "death_warp": ("Warp Out", "sound", "A sci-fi warp swoosh."),
     "death_retro": ("Retro Blip", "sound", "A quick three-note retro blip."),
 }
 PACK_TARGETS = {
+    "crosshair": ["content/textures/MouseLockedCursor.png"],
     "cursor": ["content/textures/Cursors/KeyboardMouse/ArrowFarCursor.png",
                "content/textures/Cursors/KeyboardMouse/ArrowCursor.png"],
     "sound": ["content/sounds/ouch.ogg"],
@@ -1952,7 +2080,7 @@ PACK_TARGETS = {
 
 
 def pack_file(pack_id):
-    ext = ".png" if PACKS[pack_id][1] == "cursor" else ".ogg"
+    ext = ".ogg" if PACKS[pack_id][1] == "sound" else ".png"
     return resource_dir() / "ui" / "packs" / (pack_id + ext)
 
 
@@ -1963,7 +2091,7 @@ def pack_states(settings):
         src = pack_file(pid)
         installed = src.exists() and all((folder / t).exists() and (folder / t).stat().st_size == src.stat().st_size
                                           for t in PACK_TARGETS[kind])
-        mime = "image/png" if kind == "cursor" else "audio/ogg"
+        mime = "audio/ogg" if kind == "sound" else "image/png"
         data = f"data:{mime};base64," + base64.b64encode(src.read_bytes()).decode() if src.exists() else ""
         out.append({"id": pid, "name": name, "kind": kind, "desc": desc, "installed": installed, "data": data})
     return out
@@ -2443,6 +2571,70 @@ class MiniApi:
         if self._window:
             self._window.destroy()
         return True
+
+
+AVATAR_DIR = DATA_DIR / "avatars"
+
+
+def avatar_url(user_id, size="420x420"):
+    data = fetch_json(f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={int(user_id)}"
+                      f"&size={size}&format=Png&isCircular=false", timeout=8)
+    item = (data.get("data") or [{}])[0]
+    return item.get("imageUrl") if item.get("state") == "Completed" else None
+
+
+def avatar_file(user_id, refresh=False):
+    AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    f, meta_f = AVATAR_DIR / f"{int(user_id)}.png", AVATAR_DIR / f"{int(user_id)}.json"
+    meta = load_json(meta_f, {}) or {}
+    stale = refresh or meta.get("version") != APP_VERSION or time.time() - meta.get("at", 0) > 6 * 3600
+    if f.exists() and not stale:
+        return f
+    try:
+        url = avatar_url(user_id)
+        if url:
+            req = urllib.request.Request(url, headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = r.read(4_000_000)
+            if data[:8] == b"\x89PNG\r\n\x1a\n":
+                f.write_bytes(data)
+                save_json(meta_f, {"at": int(time.time()), "version": APP_VERSION, "url": url})
+                return f
+    except Exception as e:
+        log(f"Avatar refresh failed for {user_id}: {e}")
+    if f.exists():
+        return f
+    bundled = resource_dir() / "ui" / "avatars" / f"{int(user_id)}.png"
+    return bundled if bundled.exists() else None
+
+
+GAME_KITS = {
+    "bedwars": {
+        "name": "BedWars", "place_id": "6872265039",
+        "preset": {"graphics_api": "Direct3D 11", "msaa": "1x", "texture_quality": "1", "lighting_quality": "1",
+                   "remove_grass": True, "low_poly_meshes": True},
+        "crosshair": "crosshair_cyan_cross",
+    },
+}
+
+
+def apply_game_kit(settings, kit_id, crosshair=None):
+    kit = GAME_KITS[kit_id]
+    pid = kit["place_id"]
+    prof = settings["game_profiles"].setdefault(pid, {"name": kit["name"], "presets": dict(settings["presets"]),
+                                                       "custom_flags": dict(settings["custom_flags"])})
+    prof["name"] = kit["name"]
+    prof.setdefault("presets", {}).update(kit["preset"])
+    if not any(str(g.get("pid")) == pid for g in settings["library"]):
+        settings["library"].append({"pid": pid, "name": kit["name"], "mod_profile": None})
+    save_settings(settings)
+    if crosshair:
+        install_pack(settings, crosshair, True)
+        if not settings.get("apply_mods"):
+            settings["apply_mods"] = True
+            save_settings(settings)
+    log(f"Applied the {kit['name']} kit")
+    return pid
 
 
 def claim_monitor():
@@ -3031,11 +3223,33 @@ def startup_maintenance(settings):
     try:
         if running_installed_copy():
             write_uninstall_entry(sys.executable)
-        if settings["registration"].get("registered") and \
-                read_protocol_command(PROTOCOLS[0]) != our_command():
-            register_protocols(settings)
     except Exception as e:
         log(f"Startup maintenance: {e}")
+    threading.Thread(target=prepare_fast_paths, args=(settings,), daemon=True).start()
+
+
+def prepare_fast_paths(settings):
+    try:
+        ensure_helper()
+    except Exception as e:
+        log(f"Couldn't unpack the fast helper: {e}")
+    try:
+        if settings["registration"].get("registered") and should_claim_links(read_protocol_command(PROTOCOLS[0])):
+            register_protocols(settings)
+            log("Roblox links now go through the fast helper")
+        if settings["session"].get("start_with_windows"):
+            bg = load_json(BACKGROUND_FILE, {}) or {}
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+                winreg.SetValueEx(k, APP_NAME, 0, winreg.REG_SZ, " ".join(f'"{x}"' for x in fast_command(BACKGROUND_FLAG)[:-1]) + f" {BACKGROUND_FLAG}")
+            if bg.get("version") != APP_VERSION or not pid_alive((bg.get("pids") or [0])[0]):
+                for pid in bg.get("pids", []):
+                    if pid not in (os.getpid(), os.getppid()):
+                        kill_tree(pid)
+                BACKGROUND_FILE.unlink(missing_ok=True)
+                spawn_self(BACKGROUND_FLAG)
+                log("Restarted the background helper on the new version")
+    except Exception as e:
+        log(f"Fast path setup: {e}")
 
 
 def run_install(options, progress):
@@ -3072,6 +3286,12 @@ def run_install(options, progress):
         except Exception as e:
             warnings.append("Couldn't register with Windows Settings > Apps")
             log(f"Registration failed: {e}")
+        progress(.96, "Setting up the fast helper...")
+        try:
+            subprocess.run([str(INSTALLED_EXE), PREPARE_FLAG], timeout=120, env=child_env(),
+                           creationflags=CREATE_NO_WINDOW)
+        except Exception as e:
+            log(f"Helper setup during install failed: {e}")
     progress(1, "Done")
     log(f"Installed {version} to {INSTALL_DIR}")
     return {"version": version, "path": str(INSTALLED_EXE), "warnings": warnings}
@@ -3503,7 +3723,7 @@ class Api:
             "quick_presets": QUICK_PRESETS,
             "regions": list(REGIONS),
             "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
-            "credits": [{"role": r, "handle": h} for r, h in CREDITS],
+            "credits": [{"role": r, "handle": h, "roblox_id": uid} for r, h, uid in CREDITS],
             "ext_path": str(EXTENSIONS_DIR / EXTENSION_NAME),
             "mode": self._mode,
             "update_source": update_repo(),
@@ -3534,6 +3754,8 @@ class Api:
         try:
             if not player_dirs():
                 return {"error": "Roblox isn't installed yet. Get it from roblox.com/download."}
+            if IS_WINDOWS and is_frozen() and not helper_ready():
+                ensure_helper()
             spawn_self(LAUNCH_FLAG, uri or "")
             return True
         except Exception as e:
@@ -4085,6 +4307,32 @@ class Api:
         except Exception as e:
             return self._err(e)
 
+    def avatars(self, refresh=False):
+        out = {}
+        for uid in {c[2] for c in CREDITS if len(c) > 2 and c[2]}:
+            try:
+                f = avatar_file(uid, refresh=bool(refresh))
+                out[str(uid)] = data_url(f) if f else None
+            except Exception as e:
+                log(f"Avatar failed: {e}")
+                out[str(uid)] = None
+        return out
+
+    def game_kits(self):
+        return [{"id": k, "name": v["name"], "place_id": v["place_id"], "crosshair": v["crosshair"],
+                 "applied": v["place_id"] in self._settings["game_profiles"]} for k, v in GAME_KITS.items()]
+
+    def apply_kit(self, kit_id, crosshair=None):
+        try:
+            if kit_id not in GAME_KITS:
+                return {"error": "Unknown game kit."}
+            if crosshair and crosshair not in PACKS:
+                crosshair = None
+            apply_game_kit(self._settings, kit_id, crosshair)
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -4205,7 +4453,8 @@ def _run_gui(mode, after_update, selftest):
                 checks = {"table": len(table) > 10 and any(pid == me for pid, _, _ in table),
                           "alive_self": pid_alive(me), "alive_bogus": not pid_alive(4_000_000_001 % 4_000_000),
                           "named": me in pids_named(Path(sys.executable).name) or not is_frozen(),
-                          "priority": set_priority(pid=me) == 1, "roblox": roblox_running() is False}
+                          "priority": set_priority(pid=me) == 1, "roblox": roblox_running() is False,
+                          "helper_zip": (resource_dir() / "helper.zip").exists() or not is_frozen()}
                 log(f"Process checks: {checks}")
                 api._ui_errors += [f"process check failed: {k}" for k, v in checks.items() if not v]
                 r = api.toggle_mini()
@@ -4269,6 +4518,15 @@ def main():
             background_main()
         except Exception:
             log("Background mode failed:\n" + traceback.format_exc())
+        return
+    if is_helper() and not any(f in args for f in (TOAST_FLAG, LAUNCH_FLAG)):
+        if INSTALLED_EXE.exists():
+            subprocess.Popen([str(INSTALLED_EXE), *args], env=child_env())
+        return
+    if PREPARE_FLAG in args:
+        ensure_dirs()
+        prepare_fast_paths(load_settings())
+        log(f"Prepared v{APP_VERSION} (helper: {helper_ready() or 'none'})")
         return
     if "--selftest-spawn" in args:
         subprocess.Popen([sys.executable, "--selftest"], env=child_env())
