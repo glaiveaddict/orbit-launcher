@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.9.0"
+APP_VERSION = "2.10.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -128,7 +128,7 @@ DEFAULT_SETTINGS = {
     "launch_with": [],
     "performance": {"high_priority": False, "power_plan": False, "boost": False, "boost_level": "Max",
                     "boost_profiles": True, "fps_cap": None, "graphics_quality": None, "gpu_high": False,
-                    "game_mode": False, "no_dvr": False, "gpu_applied": False, "bg_guard": True, "boost_backup": {}, "win_backup": {}},
+                    "game_mode": False, "no_dvr": False, "gpu_applied": False, "bg_guard": True, "battery_mode": False, "boost_backup": {}, "win_backup": {}},
     "smart_join": False,
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
@@ -138,6 +138,7 @@ DEFAULT_SETTINGS = {
     "profile": {"roblox_id": None, "username": "", "display": ""},
     "recent_players": [],
     "party": {},
+    "setups": [],
     "emoji": "",
     "language": "en",
     "sync": {"folder": ""},
@@ -148,7 +149,7 @@ DEFAULT_SETTINGS = {
     "fps": {"enabled": False},
     "replay": {"enabled": False, "seconds": 30, "fps": 30},
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True, "crosshair": "",
-                "crosshair_mode": "locked", "crosshair_size": 100},
+                "crosshair_mode": "locked", "crosshair_size": 100, "stats_fps": False, "stats_ping": False, "stats_pos": "Top left", "stats_tilt": True},
     "hotkeys": {"enabled": True},
     "mod_profile": "Default",
     "discord": {
@@ -180,6 +181,11 @@ DEFAULT_SETTINGS = {
         "session_report": True,
         "game_update_alerts": True,
         "auto_hop": "off",
+        "mute_tabbed": False,
+        "dnd": False,
+        "pause_music": False,
+        "auto_shot": 0,
+        "net_check": False,
         "hop_ping": 150,
         "badge_pc": True,
     },
@@ -283,7 +289,9 @@ FREE_VIEW = "_free_view"
 PREMIUM_FORCED = {("session", "server_popup"): False, ("session", "server_badge"): False,
                   ("session", "game_update_alerts"): False, ("session", "auto_reconnect"): False,
                   ("session", "lag_alerts"): False, ("hotkeys", "enabled"): False, ("fps", "enabled"): False,
-                  ("replay", "enabled"): False, ("session", "auto_hop"): "off", ("session", "badge_pc"): False}
+                  ("replay", "enabled"): False, ("session", "auto_hop"): "off", ("session", "badge_pc"): False,
+                  ("session", "mute_tabbed"): False, ("session", "dnd"): False, ("overlay", "stats_fps"): False,
+                  ("overlay", "stats_ping"): False}
 
 
 def load_settings(raw=False):
@@ -549,6 +557,14 @@ def server_location(ip):
         if part and part not in parts:
             parts.append(part)
     location = ", ".join(parts) or None
+    if location and d.get("loc"):
+        try:
+            lat, lon = (float(v) for v in d["loc"].split(","))
+            coords = load_json(COORDS_FILE, {}) or {}
+            coords[location] = [round(lat, 2), round(lon, 2)]
+            save_json(COORDS_FILE, coords)
+        except (ValueError, TypeError):
+            pass
     if location:
         cache[ip] = [location, int(time.time())]
         if len(cache) > 800:
@@ -606,6 +622,8 @@ def _flag_value(value):
 
 def build_flags(settings, place_id=None):
     p, custom, _ = profile_for(settings, place_id)
+    if (settings.get("performance") or {}).get("battery_mode") and on_battery():
+        p = {**p, **{k: v for k, v in QUICK_PRESETS["Balanced"].items() if k not in ("remove_grass",)}}
     flags = {}
 
     api = p.get("graphics_api", "Automatic")
@@ -935,6 +953,9 @@ def apply_system_boost(settings, version_dir=None, place_id=None):
         return
     perf = settings.setdefault("performance", {})
     cap = game_fps_cap(settings, place_id)
+    if perf.get("battery_mode") and on_battery():
+        cap = 60
+        log("On battery: using lighter graphics and 60 FPS")
     write_gbs({**perf, "fps_cap": cap} if cap else perf)
     before = json.dumps(perf.get("win_backup", {}), sort_keys=True)
     apply_win_tweaks(perf)
@@ -1125,8 +1146,10 @@ def set_power_throttle(pid, on):
 
 
 class BackgroundGuard:
-    def __init__(self, perf):
+    def __init__(self, perf, mute=False):
         self.perf = perf or {}
+        self.prio = self.perf.get("bg_guard", True)
+        self.mute = mute
         self.dimmed = False
         self.stop_event = threading.Event()
         self.pids = []
@@ -1139,9 +1162,17 @@ class BackgroundGuard:
 
     def apply(self, dim):
         normal = 0x00008000 if self.perf.get("high_priority") else 0x00000020
-        for pid in self._pids():
-            set_priority(pid=pid, cls=0x00004000 if dim else normal)
-            set_power_throttle(pid, dim)
+        if self.prio:
+            for pid in self._pids():
+                set_priority(pid=pid, cls=0x00004000 if dim else normal)
+                set_power_throttle(pid, dim)
+        if self.mute:
+            try:
+                n = set_process_mute(self._pids(), dim)
+                if n:
+                    log(f"Roblox {'muted' if dim else 'unmuted'} ({n} audio session{'s' if n != 1 else ''})")
+            except Exception as e:
+                log(f"Mute failed: {e}")
         self.dimmed = dim
 
     def run(self):
@@ -1653,6 +1684,21 @@ class SessionMonitor:
                 log(f"Auto hop check failed: {e}")
             time.sleep(10)
 
+    def _auto_shots(self, minutes):
+        taken = 0
+        while not getattr(self, "finished", False) and roblox_running():
+            time.sleep(minutes * 60)
+            if getattr(self, "finished", False) or not roblox_running():
+                break
+            if self.game and roblox_in_front():
+                try:
+                    if take_roblox_screenshot(copy=False):
+                        taken += 1
+                except Exception as e:
+                    log(f"Auto screenshot failed: {e}")
+        if taken:
+            log(f"Took {taken} auto screenshot(s)")
+
     def _check_hop(self, game):
         mode = self.session.get("auto_hop") or "off"
         if mode == "off" or not game.get("place_id") or time.time() - game["joined"] < 90:
@@ -1929,7 +1975,19 @@ class SessionMonitor:
         if (self.settings.get("overlay") or {}).get("crosshair"):
             start_crosshair_overlay()
         perf = self.settings.get("performance") or {}
-        self.guard = BackgroundGuard(perf).start() if IS_WINDOWS and perf.get("bg_guard", True) else None
+        mute = bool(self.session.get("mute_tabbed"))
+        self.guard = BackgroundGuard(perf, mute).start() if IS_WINDOWS and (perf.get("bg_guard", True) or mute) else None
+        ov = self.settings.get("overlay") or {}
+        if ov.get("stats_fps") or ov.get("stats_ping"):
+            start_stats_overlay()
+        if self.session.get("dnd"):
+            threading.Thread(target=set_dnd, args=(True,), daemon=True).start()
+        if self.session.get("pause_music"):
+            threading.Thread(target=pause_media, daemon=True).start()
+        if int(self.session.get("auto_shot") or 0) > 0:
+            threading.Thread(target=self._auto_shots, args=(int(self.session["auto_shot"]),), daemon=True).start()
+        if self.session.get("net_check"):
+            threading.Thread(target=launch_net_check, daemon=True).start()
         if (self.settings.get("fps") or {}).get("enabled"):
             try:
                 self.fps = FpsTracker()
@@ -1997,7 +2055,12 @@ class SessionMonitor:
             if not handed:
                 close_keys()
                 close_crosshair_overlay()
+                close_stats_overlay()
                 Replay.stop()
+                if self.session.get("dnd"):
+                    set_dnd(False)
+                if self.session.get("pause_music"):
+                    resume_media()
             if getattr(self, "fps", None):
                 self.fps.stop()
             if getattr(self, "guard", None):
@@ -2303,7 +2366,10 @@ HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server
            6: (0x4A, "joinlink", "Ctrl+Alt+J", "Copy a link friends can use to join your server"),
            7: (0x43, "clip", "Ctrl+Alt+C", "Save an instant replay of the last 30 seconds"),
            8: (0x46, "joinfriend", "Ctrl+Alt+F", "Join the friend from your last friend alert"),
-           9: (0x50, "party", "Ctrl+Alt+P", "Join your party leader")}
+           9: (0x50, "party", "Ctrl+Alt+P", "Join your party leader"),
+           10: (0x31, "setup1", "Ctrl+Alt+1", "Switch to your first saved setup"),
+           11: (0x32, "setup2", "Ctrl+Alt+2", "Switch to your second saved setup"),
+           12: (0x33, "setup3", "Ctrl+Alt+3", "Switch to your third saved setup")}
 
 
 def current_game():
@@ -2331,7 +2397,7 @@ def run_hotkey(action, force=False):
             BADGE_HIDDEN.unlink(missing_ok=True)
         else:
             BADGE_HIDDEN.write_text("1")
-    elif action in ("screenshot", "clip", "joinfriend", "party") and not has_premium(load_settings(raw=True)):
+    elif action in ("screenshot", "clip", "joinfriend", "party", "setup1", "setup2", "setup3") and not has_premium(load_settings(raw=True)):
         spawn_toast("Premium feature", "Put in a premium key on Orbit's Premium page to use this.")
     elif action == "screenshot":
         r = take_roblox_screenshot()
@@ -2348,6 +2414,15 @@ def run_hotkey(action, force=False):
         spawn_toast("Replay saved" if r else "Replay isn't running", Path(r).name if r else "Turn on Instant replay in Boost first.")
     elif action == "launch":
         spawn_self(LAUNCH_FLAG, "")
+    elif action in ("setup1", "setup2", "setup3"):
+        raw = load_settings(raw=True)
+        setups = raw.get("setups") or []
+        i = int(action[-1]) - 1
+        if i < len(setups):
+            apply_setup(raw, setups[i].get("data") or {})
+            spawn_toast(f"{setups[i].get('name')} setup on", "Graphics changes apply the next time Roblox starts.")
+        else:
+            spawn_toast("No setup there yet", "Save setups on Orbit's Home page.")
     elif action == "party":
         party = load_settings(raw=True).get("party") or {}
         if party.get("leader"):
@@ -3647,7 +3722,7 @@ def capture_rect(rect):
     return w, h, buf.raw
 
 
-def take_roblox_screenshot(rect=None):
+def take_roblox_screenshot(rect=None, copy=True):
     if not IS_WINDOWS:
         return None
     rect = rect or roblox_rect()
@@ -3665,6 +3740,9 @@ def take_roblox_screenshot(rect=None):
     dest = base / name / f"Orbit_{time.strftime('%Y%m%d_%H%M%S')}.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(png)
+    if not copy:
+        log(f"Auto screenshot saved: {dest}")
+        return str(dest)
     try:
         bottom_up = b"".join(data[i * stride:(i + 1) * stride] for i in range(h - 1, -1, -1))
         dib = struct.pack("<IiiHHIIiiII", 40, w, h, 1, 32, 0, len(bottom_up), 0, 0, 0, 0) + bottom_up
@@ -4292,7 +4370,8 @@ def orbit_level():
     minutes = sum(e.get("seconds", 0) for e in play.values()) // 60
     ach = sum(1 for x in achievements_state()["list"] if x["unlocked"])
     days = len(calendar_data())
-    xp = int(minutes + ach * 100 + days * 25)
+    bonus = int((load_json(CHALLENGES_FILE, {}) or {}).get("xp") or 0)
+    xp = int(minutes + ach * 100 + days * 25 + bonus)
     level = 1
     while xp >= 60 * level * level:
         level += 1
@@ -4300,7 +4379,7 @@ def orbit_level():
     titles = [(1, "Stargazer"), (5, "Comet"), (10, "Orbiter"), (15, "Nova"), (20, "Pulsar"), (30, "Quasar"), (40, "Black Hole")]
     title = [t for lv, t in titles if level >= lv][-1]
     return {"xp": xp, "level": level, "title": title, "progress": round((xp - floor) / max(1, ceil - floor), 3),
-            "next": ceil - xp, "parts": {"minutes": minutes, "achievements": ach, "days": days}}
+            "next": ceil - xp, "parts": {"minutes": minutes, "achievements": ach, "days": days, "challenges": bonus}}
 
 
 def dir_size(p):
@@ -4620,7 +4699,8 @@ def periodic_jobs(owner):
     now = time.time()
     st = load_json(DATA_DIR / "periodic_runs.json", {}) or {}
     jobs = [("premium", 3600, lambda: load_settings().get("premium_key") and revoked_premium_ids(True)),
-            ("premium_left", 6 * 3600, premium_reminder),
+            ("premium_left", 6 * 3600, premium_reminder), ("challenges", 600, check_challenges),
+            ("leftovers", 300, cleanup_leftovers),
             ("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
             ("sync", 30 * 60, lambda: run_sync(load_settings())), ("clean", 24 * 3600, auto_clean)]
     for name, every, fn in jobs:
@@ -4814,6 +4894,552 @@ def copy_files_to_clipboard(paths):
     body = ("\0".join(str(Path(x).resolve()) for x in paths) + "\0\0").encode("utf-16-le")
     header = struct.pack("<IiiII", 20, 0, 0, 0, 1)
     return _clipboard_put(15, header + body)
+
+
+def _guid(text):
+    import uuid as _u
+    return (ctypes.c_byte * 16).from_buffer_copy(_u.UUID(text).bytes_le)
+
+
+def _vcall(ptr, index, restype, *types):
+    vtbl = ctypes.cast(ctypes.cast(ptr, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+    return ctypes.WINFUNCTYPE(restype, ctypes.c_void_p, *types)(vtbl[index])
+
+
+def _release(ptr):
+    if ptr:
+        _vcall(ptr, 2, ctypes.c_ulong)(ptr)
+
+
+def set_process_mute(pids, mute):
+    if not IS_WINDOWS or not pids:
+        return 0
+    pids = {int(x) for x in pids}
+    ole = ctypes.windll.ole32
+    ole.CoInitialize(None)
+    HR, VP = ctypes.c_long, ctypes.c_void_p
+    enum, dev, mgr, sessions = VP(), VP(), VP(), VP()
+    ole.CoCreateInstance.argtypes = [VP, VP, ctypes.c_ulong, VP, ctypes.POINTER(VP)]
+    if ole.CoCreateInstance(ctypes.byref(_guid("BCDE0395-E52F-467C-8E3D-C4579291692E")), None, 23,
+                            ctypes.byref(_guid("A95664D2-9614-4F35-A746-DE8DB63617E6")), ctypes.byref(enum)) != 0:
+        return 0
+    done = 0
+    try:
+        if _vcall(enum, 4, HR, ctypes.c_int, ctypes.c_int, ctypes.POINTER(VP))(enum, 0, 1, ctypes.byref(dev)) != 0:
+            return 0
+        if _vcall(dev, 3, HR, VP, ctypes.c_ulong, VP, ctypes.POINTER(VP))(dev, ctypes.byref(_guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F")), 23, None, ctypes.byref(mgr)) != 0:
+            return 0
+        if _vcall(mgr, 5, HR, ctypes.POINTER(VP))(mgr, ctypes.byref(sessions)) != 0:
+            return 0
+        count = ctypes.c_int(0)
+        _vcall(sessions, 3, HR, ctypes.POINTER(ctypes.c_int))(sessions, ctypes.byref(count))
+        for i in range(count.value):
+            ctl, ctl2, vol = VP(), VP(), VP()
+            try:
+                if _vcall(sessions, 4, HR, ctypes.c_int, ctypes.POINTER(VP))(sessions, i, ctypes.byref(ctl)) != 0:
+                    continue
+                if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d")), ctypes.byref(ctl2)) != 0:
+                    continue
+                pid = ctypes.c_ulong(0)
+                _vcall(ctl2, 14, HR, ctypes.POINTER(ctypes.c_ulong))(ctl2, ctypes.byref(pid))
+                if pid.value not in pids:
+                    continue
+                if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("87CE5498-68D6-44E5-9215-6DA47EF883D8")), ctypes.byref(vol)) != 0:
+                    continue
+                if _vcall(vol, 5, HR, ctypes.c_int, VP)(vol, 1 if mute else 0, None) == 0:
+                    done += 1
+            finally:
+                for x in (vol, ctl2, ctl):
+                    _release(x)
+    finally:
+        for x in (sessions, mgr, dev, enum):
+            _release(x)
+    return done
+
+
+DND_FILE = DATA_DIR / "dnd.json"
+
+
+def set_dnd(on):
+    if not IS_WINDOWS:
+        return False
+    try:
+        nt = ctypes.windll.ntdll
+        state = ctypes.c_ulonglong(0x0D83063EA3BF1C75)
+        value = ctypes.c_ulong(1 if on else 0)
+        nt.NtUpdateWnfStateData.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p,
+                                            ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong]
+        r = nt.NtUpdateWnfStateData(ctypes.byref(state), ctypes.byref(value), 4, None, None, 0, 0)
+        if on:
+            save_json(DND_FILE, {"on": True, "at": int(time.time())})
+        else:
+            DND_FILE.unlink(missing_ok=True)
+        log(f"Do Not Disturb {'on' if on else 'off'} ({'ok' if r == 0 else hex(r & 0xFFFFFFFF)})")
+        return r == 0
+    except Exception as e:
+        log(f"Do Not Disturb failed: {e}")
+        return False
+
+
+MEDIA_FILE = DATA_DIR / "paused_media.json"
+MEDIA_PS = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
+function Await($op, $type) { $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op)); $t.Wait(5000) | Out-Null; $t.Result }
+$null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+$m = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+$want = @($env:ORBIT_MEDIA_IDS -split '\|' | Where-Object { $_ })
+foreach ($s in $m.GetSessions()) {
+  $id = $s.SourceAppUserModelId
+  $st = $s.GetPlaybackInfo().PlaybackStatus.ToString()
+  if ($env:ORBIT_MEDIA_MODE -eq 'pause' -and $st -eq 'Playing') { $null = Await ($s.TryPauseAsync()) ([bool]); Write-Output $id }
+  if ($env:ORBIT_MEDIA_MODE -eq 'play' -and $want -contains $id -and $st -ne 'Playing') { $null = Await ($s.TryPlayAsync()) ([bool]); Write-Output $id }
+}
+"""
+
+
+def _media(mode, ids=()):
+    env = dict(os.environ, ORBIT_MEDIA_MODE=mode, ORBIT_MEDIA_IDS="|".join(ids))
+    r = subprocess.run([sys_tool("powershell"), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", MEDIA_PS],
+                       capture_output=True, text=True, timeout=25, env=env, creationflags=CREATE_NO_WINDOW)
+    if r.returncode != 0 and r.stderr.strip():
+        log("Media control: " + r.stderr.strip().splitlines()[-1][:200])
+    return [x.strip() for x in r.stdout.splitlines() if x.strip()]
+
+
+def pause_media():
+    if not IS_WINDOWS:
+        return []
+    try:
+        ids = _media("pause")
+        save_json(MEDIA_FILE, {"ids": ids, "at": int(time.time())})
+        if ids:
+            log("Paused music: " + ", ".join(ids))
+        return ids
+    except Exception as e:
+        log(f"Pausing music failed: {e}")
+        return []
+
+
+def resume_media():
+    data = load_json(MEDIA_FILE, {}) or {}
+    MEDIA_FILE.unlink(missing_ok=True)
+    if not IS_WINDOWS or not data.get("ids"):
+        return []
+    try:
+        ids = _media("play", data["ids"])
+        log("Resumed music: " + ", ".join(ids or ["nothing"]))
+        return ids
+    except Exception as e:
+        log(f"Resuming music failed: {e}")
+        return []
+
+
+def on_battery():
+    if not IS_WINDOWS:
+        return False
+    try:
+        class SPS(ctypes.Structure):
+            _fields_ = [("ac", ctypes.c_ubyte), ("flag", ctypes.c_ubyte), ("pct", ctypes.c_ubyte), ("saver", ctypes.c_ubyte),
+                        ("life", ctypes.c_ulong), ("full", ctypes.c_ulong)]
+        st = SPS()
+        if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(st)):
+            return False
+        return st.ac == 0 and st.flag != 128
+    except Exception:
+        return False
+
+
+ROBLOX_CHECKS = [("Website and accounts", "https://users.roblox.com/v1/users/1"),
+                 ("Games", "https://games.roblox.com/v1/games?universeIds=2619619496"),
+                 ("Pictures and avatars", "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=1&size=48x48&format=Png"),
+                 ("Roblox updates", "https://clientsettingscdn.roblox.com/v2/client-version/WindowsPlayer"),
+                 ("Places", "https://apis.roblox.com/universes/v1/places/6872265039/universe")]
+STATUS_CACHE = DATA_DIR / "roblox_status.json"
+
+
+def roblox_status(refresh=False):
+    cache = load_json(STATUS_CACHE, None)
+    if cache and not refresh and time.time() - cache.get("at", 0) < 300:
+        return cache
+    results = [None] * len(ROBLOX_CHECKS)
+
+    def probe(i, name, url):
+        t = time.time()
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": APP_ID + "/" + APP_VERSION})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                code = r.status
+        except urllib.error.HTTPError as e:
+            code = e.code
+        except Exception:
+            code = 0
+        ms = int((time.time() - t) * 1000)
+        state = "down" if code == 0 or code >= 500 else "slow" if ms > 3000 else "ok"
+        results[i] = {"name": name, "state": state, "ms": ms}
+    threads = [threading.Thread(target=probe, args=(i, n, u), daemon=True) for i, (n, u) in enumerate(ROBLOX_CHECKS)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(10)
+    results = [r or {"name": ROBLOX_CHECKS[i][0], "state": "down", "ms": None} for i, r in enumerate(results)]
+    bad = [r for r in results if r["state"] != "ok"]
+    overall = "ok" if not bad else "down" if len([r for r in bad if r["state"] == "down"]) >= 2 else "slow"
+    out = {"overall": overall, "checks": results, "at": int(time.time())}
+    save_json(STATUS_CACHE, out)
+    return out
+
+
+def ping_stats(host, count=10):
+    if not IS_WINDOWS:
+        return None
+    try:
+        out = subprocess.run([sys_tool("ping"), "-n", str(count), "-w", "1000", host], capture_output=True, text=True,
+                             timeout=count * 2 + 5, creationflags=CREATE_NO_WINDOW).stdout
+    except Exception:
+        return None
+    times = [int(x) for x in re.findall(r"[=<]\s?(\d+)\s?ms\s+TTL", out, re.I)]
+    lost = count - len(times)
+    if not times:
+        return {"avg": None, "loss": 100, "jitter": None}
+    avg = sum(times) / len(times)
+    jitter = sum(abs(a - b) for a, b in zip(times, times[1:])) / max(1, len(times) - 1)
+    return {"avg": round(avg), "loss": round(100 * lost / count), "jitter": round(jitter), "max": max(times)}
+
+
+def connection_test():
+    t = time.time()
+    try:
+        import socket
+        with socket.create_connection(("clientsettingscdn.roblox.com", 443), timeout=5):
+            tcp = int((time.time() - t) * 1000)
+    except Exception:
+        tcp = None
+    p = ping_stats("1.1.1.1", 10) or {}
+    tips = []
+    if tcp is None:
+        tips.append("Orbit couldn't reach Roblox at all. Check that you're online.")
+    if (p.get("loss") or 0) >= 5:
+        tips.append(f"{p['loss']}% of packets were lost. That causes rubber-banding. Try moving closer to your router or using a cable.")
+    if (p.get("jitter") or 0) >= 30:
+        tips.append("Your ping jumps around a lot. Something else on your network may be downloading or streaming.")
+    if (p.get("avg") or 0) >= 100:
+        tips.append("Your internet's base ping is high. Games will feel laggy no matter which server you join.")
+    grade = "bad" if tcp is None or (p.get("loss") or 0) >= 10 else "warn" if tips else "good"
+    return {"grade": grade, "tcp_ms": tcp, "ping": p.get("avg"), "loss": p.get("loss"), "jitter": p.get("jitter"), "tips": tips, "at": int(time.time())}
+
+
+def launch_net_check():
+    r = connection_test()
+    save_json(DATA_DIR / "net_check.json", r)
+    if r["grade"] != "good":
+        spawn_toast("Your connection looks shaky", r["tips"][0] if r["tips"] else "You might see some lag this session.")
+
+
+SETUP_PARTS = {"presets": None, "custom_flags": None, "mod_profile": None, "apply_mods": None, "overlay": None,
+               "game_crosshairs": None, "session": ("server_badge", "badge_pos", "badge_size", "badge_ping", "badge_timer",
+                                                    "badge_pc", "streamer_mode", "server_popup", "lag_alerts", "auto_hop",
+                                                    "mute_tabbed", "dnd", "pause_music", "auto_shot"),
+               "performance": ("fps_cap", "graphics_quality", "high_priority", "power_plan", "game_mode", "no_dvr")}
+
+
+def snapshot_setup(settings):
+    snap = {}
+    for key, sub in SETUP_PARTS.items():
+        if sub is None:
+            snap[key] = json.loads(json.dumps(settings.get(key)))
+        else:
+            snap[key] = {k: (settings.get(key) or {}).get(k) for k in sub}
+    return snap
+
+
+def apply_setup(settings, snap):
+    for key, val in snap.items():
+        if key not in SETUP_PARTS:
+            continue
+        if SETUP_PARTS[key] is None:
+            settings[key] = json.loads(json.dumps(val))
+        else:
+            settings.setdefault(key, {}).update({k: v for k, v in (val or {}).items() if k in SETUP_PARTS[key]})
+    save_settings(settings)
+
+
+CITY_COORDS = {"Ashburn": (39.04, -77.49), "Chicago": (41.88, -87.63), "Dallas": (32.78, -96.8), "Los Angeles": (34.05, -118.24),
+               "Miami": (25.76, -80.19), "Atlanta": (33.75, -84.39), "Seattle": (47.61, -122.33), "New York City": (40.71, -74.01),
+               "New York": (40.71, -74.01), "San Jose": (37.34, -121.89), "Secaucus": (40.79, -74.06), "Elk Grove Village": (42.0, -87.97),
+               "Amsterdam": (52.37, 4.9), "Frankfurt am Main": (50.11, 8.68), "Frankfurt": (50.11, 8.68), "London": (51.51, -0.13),
+               "Paris": (48.86, 2.35), "Warsaw": (52.23, 21.01), "Tokyo": (35.68, 139.69), "Singapore": (1.35, 103.82),
+               "Hong Kong": (22.32, 114.17), "Mumbai": (19.08, 72.88), "Sydney": (-33.87, 151.21), "São Paulo": (-23.55, -46.63),
+               "Sao Paulo": (-23.55, -46.63), "Toronto": (43.65, -79.38), "Montreal": (45.5, -73.57), "Denver": (39.74, -104.99),
+               "Phoenix": (33.45, -112.07), "Madrid": (40.42, -3.7), "Stockholm": (59.33, 18.07), "Seoul": (37.57, 126.98),
+               "Johannesburg": (-26.2, 28.05), "Dubai": (25.2, 55.27), "Kansas City": (39.1, -94.58), "Reston": (38.96, -77.36),
+               "Santa Clara": (37.35, -121.96), "Piscataway": (40.55, -74.46), "Clifton": (40.86, -74.16)}
+COORDS_FILE = DATA_DIR / "location_coords.json"
+
+
+def location_coords(location):
+    if not location:
+        return None
+    hit = (load_json(COORDS_FILE, {}) or {}).get(location)
+    if hit:
+        return hit
+    city = location.split(",")[0].strip()
+    return list(CITY_COORDS[city]) if city in CITY_COORDS else None
+
+
+def world_map():
+    places = {}
+    for x in _sessions():
+        loc = x.get("location")
+        c = location_coords(loc)
+        if not c:
+            continue
+        e = places.setdefault(loc, {"location": loc, "lat": c[0], "lon": c[1], "sessions": 0, "seconds": 0, "pings": []})
+        e["sessions"] += 1
+        e["seconds"] += int(x.get("seconds") or 0)
+        if (x.get("ping") or {}).get("avg"):
+            e["pings"].append(x["ping"]["avg"])
+    out = []
+    for e in places.values():
+        pings = e.pop("pings")
+        e["ping"] = round(sum(pings) / len(pings)) if pings else None
+        out.append(e)
+    return sorted(out, key=lambda e: -e["sessions"])
+
+
+def best_times(place_id=None):
+    hours = [{"hour": h, "sessions": 0, "pings": []} for h in range(24)]
+    for x in _sessions():
+        if place_id and str(x.get("place_id")) != str(place_id):
+            continue
+        hr = time.localtime(x.get("start", 0)).tm_hour
+        hours[hr]["sessions"] += 1
+        if (x.get("ping") or {}).get("avg"):
+            hours[hr]["pings"].append(x["ping"]["avg"])
+    for e in hours:
+        p = e.pop("pings")
+        e["ping"] = round(sum(p) / len(p)) if p else None
+        e["samples"] = len(p)
+    ranked = sorted((e for e in hours if e["samples"] >= 2), key=lambda e: e["ping"])
+    return {"hours": hours, "best": [e["hour"] for e in ranked[:3]], "worst": [e["hour"] for e in ranked[-2:]] if len(ranked) > 4 else []}
+
+
+CHALLENGES_FILE = DATA_DIR / "challenges.json"
+CHALLENGE_POOL = [("hours", "Play {n} hours this week", (3, 5, 8), 200), ("games", "Play {n} different games", (3, 4, 5), 150),
+                  ("days", "Play on {n} different days", (3, 4, 5), 175), ("long", "Play one session of {n} hours", (1, 2), 150),
+                  ("regions", "Play in {n} different server regions", (2, 3), 150), ("new", "Try {n} game you've never played", (1,), 100),
+                  ("sessions", "Join {n} servers", (10, 20, 30), 125)]
+
+
+def week_key(t=None):
+    import datetime as _d
+    y, w, _ = _d.date.fromtimestamp(t or time.time()).isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def week_start(t=None):
+    import datetime as _d
+    d = _d.date.fromtimestamp(t or time.time())
+    monday = d - _d.timedelta(days=d.weekday())
+    return time.mktime(monday.timetuple())
+
+
+def weekly_challenges():
+    import random as _r
+    key = week_key()
+    rng = _r.Random(key + "orbit")
+    picks = rng.sample(CHALLENGE_POOL, 3)
+    start = week_start()
+    sess = _sessions()
+    week = [x for x in sess if x.get("start", 0) >= start]
+    before = {str(x.get("place_id")) for x in sess if x.get("start", 0) < start}
+    regions = set()
+    for x in week:
+        for r in REGIONS:
+            if in_region(x.get("location"), r):
+                regions.add(r)
+    have = {"hours": sum(int(x.get("seconds") or 0) for x in week) / 3600,
+            "games": len({str(x.get("place_id")) for x in week}),
+            "days": len({time.strftime("%Y-%m-%d", time.localtime(x.get("start", 0))) for x in week}),
+            "long": max([int(x.get("seconds") or 0) for x in week] or [0]) / 3600,
+            "regions": len(regions),
+            "new": len({str(x.get("place_id")) for x in week} - before),
+            "sessions": len(week)}
+    data = load_json(CHALLENGES_FILE, {}) or {}
+    done = data.setdefault("done", {}).setdefault(key, {})
+    out, newly = [], []
+    for cid, text, levels, xp in picks:
+        n = rng.choice(levels)
+        prog = have[cid]
+        complete = prog >= n
+        if complete and cid not in done:
+            done[cid] = {"at": int(time.time()), "xp": xp}
+            newly.append(text.format(n=n).replace("1 hours", "1 hour"))
+        out.append({"id": cid, "text": text.format(n=n).replace("1 hours", "1 hour"), "goal": n, "have": round(min(prog, n), 1),
+                    "xp": xp, "done": cid in done})
+    if newly:
+        data["xp"] = sum(v.get("xp", 0) for wk in data["done"].values() for v in wk.values())
+        save_json(CHALLENGES_FILE, data)
+    ends = int(start + 7 * 86400)
+    return {"week": key, "items": out, "new": newly, "ends": ends, "bonus_xp": int(data.get("xp") or 0)}
+
+
+def check_challenges():
+    if not has_premium(load_settings(raw=True)):
+        return
+    r = weekly_challenges()
+    for text in r["new"]:
+        spawn_toast("Challenge complete!", f"{text}. Bonus XP added to your Orbit level.")
+
+
+STATS_FLAG = "--stats"
+STATS_FILE = DATA_DIR / "stats_overlay.json"
+
+
+def start_stats_overlay():
+    close_stats_overlay()
+    proc = spawn_self(TOAST_FLAG, "stats", "", STATS_FLAG)
+    if proc:
+        save_json(STATS_FILE, {"pid": proc.pid})
+
+
+def close_stats_overlay():
+    data = load_json(STATS_FILE, {}) or {}
+    if data.get("pid") and IS_WINDOWS:
+        kill_tree(data["pid"])
+    STATS_FILE.unlink(missing_ok=True)
+
+
+def show_stats_window():
+    import math
+    import tkinter as tk
+    import tkinter.font as tkfont
+    settings = load_settings()
+    ov = settings.get("overlay") or {}
+    show_fps, show_ping = bool(ov.get("stats_fps")), bool(ov.get("stats_ping"))
+    if os.environ.get("ORBIT_BADGE_ALWAYS"):
+        show_fps = show_ping = True
+    pos, tilt = ov.get("stats_pos") or "Top left", -9 if ov.get("stats_tilt", True) else 0
+    c = theme_colors(settings["appearance"])
+    a1, a2 = accent_pair(settings["appearance"])
+    key = "#010203"
+    W, H = 230, 120
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.configure(bg=key)
+    try:
+        root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
+    except tk.TclError:
+        pass
+    cv = tk.Canvas(root, width=W, height=H, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+    f_big = tkfont.Font(family="Segoe UI Black", size=26)
+    f_small = tkfont.Font(family="Segoe UI Semibold", size=9)
+    cx, cy = W // 2, H // 2
+    ang = math.radians(tilt)
+
+    def rot(x, y):
+        dx, dy = x - cx, y - cy
+        return cx + dx * math.cos(ang) + dy * math.sin(ang), cy - dx * math.sin(ang) + dy * math.cos(ang)
+    state = {"pings": [], "fps": None, "shown": False, "xy": None}
+    ip = (load_json(CURRENT_FILE, None) or {}).get("ip")
+
+    def pinger():
+        nonlocal ip
+        while True:
+            cur = load_json(CURRENT_FILE, None) or {}
+            if cur.get("ip") != ip:
+                ip, state["pings"] = cur.get("ip"), []
+            p = ping_ms(ip) if ip else None
+            state["pings"] = (state["pings"] + [p])[-30:]
+            time.sleep(2)
+    if show_ping:
+        threading.Thread(target=pinger, daemon=True).start()
+
+    def draw():
+        cv.delete("all")
+        y_fps = 34 if show_ping else cy
+        if show_fps:
+            live = load_json(FPS_LIVE_FILE, None) or {}
+            f = live.get("fps") if time.time() - live.get("at", 0) < 5 else None
+            txt = f"{f} FPS" if f is not None else "-- FPS"
+            col = a2 if f is None or f >= 60 else "#fbbf24" if f >= 30 else "#fb7185"
+            x, y = rot(cx, y_fps)
+            cv.create_text(x + 2, y + 2, text=txt, font=f_big, fill="#05030a", angle=tilt)
+            cv.create_text(x, y, text=txt, font=f_big, fill=col, angle=tilt)
+        if show_ping:
+            vals = [p for p in state["pings"] if p is not None]
+            top = max([150] + vals) * 1.1
+            gx0, gx1, gy0, gy1 = 22, W - 22, 66 if show_fps else 30, H - 18
+            pts = []
+            for i, p in enumerate(state["pings"]):
+                if p is None:
+                    continue
+                x = gx0 + (gx1 - gx0) * i / 29
+                y = gy1 - (gy1 - gy0) * min(1, p / top)
+                pts += list(rot(x, y))
+            base = [*rot(gx0, gy1), *rot(gx1, gy1)]
+            cv.create_line(*base, fill=c["muted"], width=1)
+            if len(pts) >= 4:
+                cv.create_line(*pts, fill="#05030a", width=5, smooth=True)
+                cv.create_line(*pts, fill=a1, width=3, smooth=True)
+            last = vals[-1] if vals else None
+            lx, ly = rot(gx1, gy0 - 4)
+            colr = c["muted"] if last is None else "#4ade80" if last < 80 else "#fbbf24" if last < 150 else "#fb7185"
+            cv.create_text(lx, ly, text="··· ms" if last is None else f"{last} ms", font=f_small, fill=colr, anchor="e", angle=tilt)
+
+    root.geometry(f"{W}x{H}+-400+-400")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    if hwnd and IS_WINDOWS:
+        try:
+            u = ctypes.windll.user32
+            u.SetWindowLongW(hwnd, -20, u.GetWindowLongW(hwnd, -20) | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+    overlay_show(hwnd, False)
+    log(f"Stats overlay ready (fps={show_fps}, ping={show_ping}, {pos}, tilt {tilt})")
+
+    def tick():
+        try:
+            front = roblox_in_front()
+            rect = roblox_rect() if front else None
+            if rect:
+                L, T, R, B = rect
+                xy = {"Top left": (L + 16, T + 40), "Top right": (R - W - 16, T + 40), "Bottom left": (L + 16, B - H - 16),
+                      "Bottom right": (R - W - 16, B - H - 16)}.get(pos, (L + 16, T + 40))
+                if xy != state["xy"]:
+                    state["xy"] = xy
+                    root.geometry(f"+{xy[0]}+{xy[1]}")
+                draw()
+                if not state["shown"]:
+                    overlay_show(hwnd, True)
+                    state["shown"] = True
+            elif state["shown"]:
+                overlay_show(hwnd, False)
+                state["shown"] = False
+        except tk.TclError:
+            return
+        except Exception:
+            if not state.get("logged"):
+                state["logged"] = True
+                log("Stats overlay error:\n" + traceback.format_exc())
+        root.after(500, tick)
+
+    tick()
+    root.mainloop()
+
+
+def cleanup_leftovers():
+    if roblox_running():
+        return
+    if DND_FILE.exists():
+        set_dnd(False)
+    MEDIA_FILE.unlink(missing_ok=True)
 
 
 def premium_reminder():
@@ -7685,6 +8311,83 @@ class Api:
     def last_report(self):
         return load_json(LAST_REPORT_FILE, None)
 
+    def roblox_status(self, refresh=False):
+        try:
+            return roblox_status(bool(refresh))
+        except Exception as e:
+            return self._err(e)
+
+    def connection_test(self):
+        try:
+            r = connection_test()
+            save_json(DATA_DIR / "net_check.json", r)
+            return r
+        except Exception as e:
+            return self._err(e)
+
+    def last_connection_test(self):
+        return load_json(DATA_DIR / "net_check.json", None)
+
+    def power(self):
+        return {"battery": on_battery()}
+
+    def setups(self):
+        return {"items": [{"name": x.get("name"), "at": x.get("at")} for x in self._settings.get("setups") or []],
+                "locked": not has_premium(self._settings)}
+
+    def save_setup(self, name, index=None):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        name = re.sub(r"\s+", " ", (name or "").strip())[:24]
+        if not name:
+            return {"error": "Give the setup a name, like Competitive."}
+        items = self._settings.setdefault("setups", [])
+        entry = {"name": name, "at": int(time.time()), "data": snapshot_setup(self._settings)}
+        if index is not None and 0 <= int(index) < len(items):
+            items[int(index)] = entry
+        else:
+            if len(items) >= 6:
+                return {"error": "You can keep 6 setups. Delete one first."}
+            items.append(entry)
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def use_setup(self, index):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        items = self._settings.get("setups") or []
+        if not 0 <= int(index) < len(items):
+            return {"error": "That setup is gone."}
+        apply_setup(self._settings, items[int(index)].get("data") or {})
+        log(f"Switched to setup {items[int(index)].get('name')}")
+        return {"settings": self._settings, "running": roblox_running()}
+
+    def delete_setup(self, index):
+        items = self._settings.get("setups") or []
+        if 0 <= int(index) < len(items):
+            items.pop(int(index))
+            save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def world_map(self):
+        try:
+            return {"places": world_map()}
+        except Exception as e:
+            return self._err(e)
+
+    def best_times(self, pid=None):
+        try:
+            return best_times(pid)
+        except Exception as e:
+            return self._err(e)
+
+    def challenges(self):
+        try:
+            r = weekly_challenges() if has_premium(self._settings) else {"items": [], "locked": True}
+            return r
+        except Exception as e:
+            return self._err(e)
+
     def owner_issue_many(self, text, days=0):
         if not is_owner():
             return {"error": "Owner only."}
@@ -8312,6 +9015,8 @@ def main():
                 show_keys_window()
             elif CROSS_FLAG in args:
                 show_crosshair_window()
+            elif STATS_FLAG in args:
+                show_stats_window()
             elif "--badge" in args:
                 def opt(flag):
                     return args[args.index(flag) + 1] if flag in args and len(args) > args.index(flag) + 1 else None

@@ -651,6 +651,33 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .bulk-out { margin-top: 12px; max-height: 260px; overflow: auto; font-family: "DejaVu Mono", monospace; font-size: 11.5px; }
 .bulk-out div { padding: 6px 0; border-top: 1px solid var(--line); word-break: break-all; }
 .soon { color: #fbbf24 !important; }
+.rstat { display: flex; align-items: center; gap: 10px; }
+.rstat i { width: 10px; height: 10px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 10px #4ade80; flex: none; }
+.rstat.slow i { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; } .rstat.down i { background: #fb7185; box-shadow: 0 0 10px #fb7185; }
+.rstat-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rstat-list span { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.05); }
+.rstat-list span.slow { color: #fbbf24; } .rstat-list span.down { color: #fb7185; }
+.setup-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.setup-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+.setup-chip b { font-size: 13px; } .setup-chip kbd { font-size: 10.5px; opacity: .7; }
+.setup-chip .btn { padding: 4px 9px; font-size: 12px; }
+.wmap { position: relative; margin-top: 8px; }
+.wmap svg { width: 100%; height: auto; display: block; }
+.wmap .tip { position: absolute; pointer-events: none; font-size: 12px; padding: 4px 9px; border-radius: 8px; background: var(--panel-solid); border: 1px solid var(--line2); white-space: nowrap; transform: translate(-50%, -130%); opacity: 0; transition: opacity .15s; }
+.hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; align-items: end; height: 90px; margin-top: 10px; }
+.hours i { display: block; border-radius: 4px 4px 2px 2px; background: rgba(255,255,255,.06); min-height: 4px; position: relative; }
+.hours-x { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; font-size: 10px; color: var(--muted); text-align: center; margin-top: 4px; }
+.chal { padding: 12px 0; border-top: 1px solid var(--line); }
+.chal:first-of-type { border-top: 0; }
+.chal .row { align-items: center; } .chal b { flex: 1; }
+.chal .xp { font-size: 11.5px; font-weight: 750; padding: 2px 8px; border-radius: 99px; background: rgba(245,158,11,.15); color: #fbbf24; }
+.chal.done .xp { background: rgba(74,222,128,.15); color: #4ade80; }
+.chal .bar2 { height: 8px; border-radius: 99px; background: var(--panel3); overflow: hidden; margin-top: 8px; }
+.chal .bar2 i { display: block; height: 100%; background: var(--grad); transition: width 1s var(--ease); }
+.ov-prev { height: 120px; border-radius: 14px; position: relative; overflow: hidden; background: linear-gradient(180deg, #5aa7e6 0 55%, #3d8a3a 55%); }
+.ov-prev .box { position: absolute; padding: 6px 10px; transform-origin: center; }
+.ov-prev .fpsbig { font-family: "Segoe UI Black", Inter, sans-serif; font-weight: 900; font-size: 26px; color: var(--accent2); text-shadow: 2px 2px 0 #05030a; }
+.ov-prev svg { display: block; }
 .plocked > :not(.plock) { filter: blur(4px) saturate(.5); opacity: .4; pointer-events: none; user-select: none; }
 .plock { position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 99px; border: 0; cursor: pointer;
   background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; font: inherit; font-size: 13px; font-weight: 750; box-shadow: 0 10px 30px -10px #f59e0b; white-space: nowrap; transition: transform .25s var(--spring); }
@@ -719,8 +746,10 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           </div>
         </div>
       </div>
+      <div class="card rise" style="--i:1" id="rbxStatusCard"></div>
       <div class="card now rise" style="--i:1;display:none" id="nowCard"></div>
       <div class="card warn-card rise" style="--i:1;display:none" id="fsWarn"></div>
+      <div class="card rise" style="--i:1" id="setupsCard"></div>
       <div class="card rise" style="--i:1;display:none" id="reportCard"></div>
       <div class="grid2">
         <div class="card tilt rise" style="--i:1">
@@ -777,6 +806,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <text x="50" y="56" text-anchor="middle" font-size="20" font-weight="800" fill="currentColor" id="achPct">0%</text></svg>
         <div><div class="big-num" id="achCount">0 / 15</div><div class="muted" id="achNext">Play a game to start unlocking.</div></div></div></div>
       <div class="card rise" style="--i:1" id="levelCard"></div>
+      <div class="card rise" style="--i:1" id="challengeCard"></div>
       <div class="ach-grid rise" style="--i:2" id="achGrid"></div>
     </section>
 
@@ -800,6 +830,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div id="appList"></div>
       </div>
       <div class="card rise" style="--i:3" id="captureCard"></div>
+      <div class="card rise" style="--i:3" id="statsOvCard"></div>
       <div class="card rise" style="--i:3" id="hotkeyCard"></div>
     </section>
 
@@ -853,6 +884,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="card tilt"><div class="stat-label">Sessions</div><div class="big-num" id="statSessions">0</div></div>
       </div>
       <div class="card rise" style="--i:3" id="calCard"></div>
+      <div class="grid2"><div class="card rise" style="--i:3;margin:0" id="mapCard"></div><div class="card rise" style="--i:3;margin:0" id="bestCard"></div></div>
       <div class="card recap rise" style="--i:3" id="recapCard"></div>
       <div class="card rise" style="--i:4">
         <div class="row" style="margin-bottom:12px"><h3 style="margin:0">Most played</h3><span class="spacer"></span><button class="btn danger" id="resetStats">Reset</button></div>
@@ -942,6 +974,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <button class="btn" id="healthRun">Run checks again</button></div>
       <div class="card rise" style="--i:1"><div class="health-score"><div class="big-num" id="healthScore">–</div><div><b id="healthTitle">Checking...</b><div class="muted small" id="healthSub"></div></div></div></div>
       <div class="card rise" style="--i:2" id="healthList"></div>
+      <div class="card rise" style="--i:2" id="netCard"></div>
       <div class="card rise" style="--i:2" id="probCard"></div>
       <div class="card rise" style="--i:2" id="rbxUpdCard"></div>
       <div class="card rise" style="--i:2" id="storageCard"></div>
@@ -1386,7 +1419,7 @@ function renderFsWarn() {
     h("button", { class: "btn primary", onclick: () => { cfg.presets.exclusive_fullscreen = false; save(); renderFsWarn(); toast("Exclusive fullscreen is off. It applies next time Roblox starts.", "ok"); } }, "Turn it off"));
 }
 function renderHome() {
-  renderReport();
+  renderReport(); renderRbxStatus(); renderSetups();
   renderNow(); renderFsWarn();
   $("#installText").textContent = S.install ? `Roblox found · ${S.install}` : "Roblox isn't installed yet. Get it from roblox.com/download.";
   $("#sideStatus").textContent = S.install ? "Roblox ready" : "Roblox not found";
@@ -1527,6 +1560,117 @@ async function renderMods() {
 }
 
 
+const LANDMASK = "AAAGBvH//4AAAAEADAAAAAAACAAAD/+AAAAIAf4AAAAAABuu/A//AAAAMP///DgAA/759ycD/gAD8Ab/////9+P////jx/AAB/5///////8h////64fA4A/////////+B////hwDgAA8/////////AOD//wOAAAAPH//////+kABAH//B8AAAhz//////4DAAAA//+/wAAUT//////+BgAAAH//v8AALf///////4AAAAB///1AAAf///////8AAAAAP//+AAAH/+/////+gAAAAD///AAAA98P/////IAAAAA///gAAB4nJ/////AAAAAAP//wAAAcBf////9AAAAAAB//4AAAGMD/////0QAAAAAf/+AAAA/AH////4YAAAAAD/+AAAAf5D////+IAAAAAAP8gAAAP//+////gAAAAAAF4AAAAH//33///4AAAAAAAuAAAAB//99D//8AAAAAAADgQAAA///v4f38AAAAAAAAcggAAP//7+Dx8AAAAAAAAD4AAAD///fA4PBAAAAAAAAHAAAA////AMB4AAAAAAAAAQgAAP//+ABAeCAAAAAAAACXAAB///8AYBAAAAAAAAAAP4AAP///ACBAYAAAAAAAAB/gABD//gAAoQAAAAAAAAA/8AAAf/wAAGMAAAAAAAAAf/AAAH/4AABnEAAAAAAAAD/+AAB/8AAANocAAAAAAAB//4AAP/AAABDBwAAAAAAAP//AAB/wAAAMAcIAAAAAAD//gAAf8AAAAAAAAAAAAAAf/wAAH/EAAAAOgAAAAAAAH/8AAD/xAAAAPMAAAAAAAAf/AAA/4wAAAH/ABAAAAAAH/wAAH8IAAAD/4AAAAAAAB/4AAB/mAAAD/+AAAAAAAAf4AAAfwgAAA//wAAAAAAAH+AAAH8AAAAH/8AAAAAAAB/AAAA+AAAAB//AAAAAAAAfgAAAPAAAAAePwAAAAAAAPgAAAAAAAAAEB8BAAAAAAD8AAAAAAAAAAAOAIAAAAAA8AAAAAAAAAAAAACAAAAAAOAAAAAAAAAAAAIBAAAAAADgAAAAAAAAAAAAAgAAAAAB4AAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAA";
+function autoShotRow(s) {
+  const seg = segmented([["0", "Off"], ["5", "Every 5 min"], ["10", "10 min"], ["15", "15 min"]], String(s.auto_shot || 0), (v) => { s.auto_shot = +v; save(); });
+  requestAnimationFrame(() => seg._remeasure());
+  return h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Auto-screenshots"), h("span", {}, "Takes a screenshot of the game every few minutes while Roblox is in front. They go in your screenshots folder, sorted by game.")), seg);
+}
+async function renderRbxStatus(refresh) {
+  const box = $("#rbxStatusCard"); if (!box) return;
+  const r = await api.roblox_status(!!refresh); box.innerHTML = "";
+  if (!r || r.error) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const text = { ok: "Roblox is running normally.", slow: "Some Roblox services are slow right now.", down: "Roblox is having problems right now." }[r.overall];
+  box.append(h("div", { class: "rstat " + r.overall }, h("i"), h("b", { style: "flex:1" }, text), h("span", { class: "muted small" }, "checked " + fmtAgo(r.at)),
+    h("button", { class: "btn ghost", onclick: () => renderRbxStatus(true) }, "Check again"), h("button", { class: "btn ghost", onclick: () => api.open_url("https://status.roblox.com") }, "Status page")));
+  if (r.overall !== "ok") box.append(h("p", { class: "sub", style: "margin:8px 0 0" }, "If games won't load or you keep getting kicked, it's probably Roblox, not your internet or Orbit."),
+    h("div", { class: "rstat-list" }, ...r.checks.map((c) => h("span", { class: c.state }, `${c.name}: ${c.state === "ok" ? "OK" : c.state === "slow" ? "slow" : "down"}`))));
+}
+async function renderNet(run) {
+  const box = $("#netCard"); if (!box) return;
+  const btn = h("button", { class: "btn primary" }, "Test my connection");
+  box.innerHTML = "";
+  box.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Connection test"), h("p", { class: "sub", style: "margin:4px 0 0" }, "Checks your ping, lost packets and how steady your connection is. Takes about 10 seconds.")), btn));
+  btn.onclick = () => renderNet(true);
+  let r = await api.last_connection_test();
+  if (run) { btn.disabled = true; btn.textContent = "Testing..."; r = await api.connection_test(); btn.disabled = false; btn.textContent = "Test again"; }
+  if (!r || r.error) return;
+  const grade = { good: ["ok", "Your connection looks good."], warn: ["warn", "Your connection is a bit shaky."], bad: ["", "Your connection has problems."] }[r.grade];
+  box.append(h("div", { class: "tool-status " + grade[0], style: "margin-top:12px" }, h("i"), h("b", {}, grade[1]), h("span", { class: "muted small", style: "margin-left:6px" }, fmtAgo(r.at))),
+    h("div", { class: "report" }, h("span", {}, `Ping ${r.ping ?? "?"} ms`), h("span", {}, `Lost ${r.loss ?? "?"}%`), h("span", {}, `Jitter ${r.jitter ?? "?"} ms`), h("span", {}, r.tcp_ms != null ? `Roblox reached in ${r.tcp_ms} ms` : "Couldn't reach Roblox")),
+    ...(r.tips || []).map((t) => h("p", { class: "sub", style: "margin:8px 0 0" }, "• " + t)));
+}
+async function renderSetups() {
+  const box = $("#setupsCard"); if (!box) return;
+  const r = await api.setups(); box.innerHTML = "";
+  const name = h("input", { class: "input", placeholder: "Name it, like Competitive or Streaming", maxlength: 24, style: "flex:1" });
+  const saveB = h("button", { class: "btn primary" }, "Save current setup");
+  saveB.onclick = async () => { const x = await api.save_setup(name.value); if (x.error) return toast(x.error, "err"); syncSettings(x); sfx("ready"); toast(`Saved "${name.value.trim()}".`, "ok"); renderSetups(); };
+  name.onkeydown = (e) => { if (e.key === "Enter") saveB.click(); };
+  const chips = h("div", { class: "setup-chips" });
+  r.items.forEach((it, i) => chips.append(h("div", { class: "setup-chip" }, h("b", {}, it.name), i < 3 ? h("kbd", {}, `Ctrl+Alt+${i + 1}`) : h("span"),
+    h("button", { class: "btn primary", onclick: async () => { const x = await api.use_setup(i); if (x.error) return toast(x.error, "err"); syncSettings(x); applyTheme(); sfx("ready"); toast(`${it.name} is on.` + (x.running ? " Graphics changes apply the next time Roblox starts." : ""), "ok"); } }, "Use"),
+    h("button", { class: "btn", title: "Replace it with your current settings", onclick: async () => { const x = await api.save_setup(it.name, i); if (x.error) return toast(x.error, "err"); syncSettings(x); toast(`${it.name} updated.`, "ok"); renderSetups(); } }, "Update"),
+    h("button", { class: "btn ghost", title: "Delete", onclick: async () => { if (!await modal({ title: `Delete ${it.name}?`, ok: "Delete", danger: true })) return; const x = await api.delete_setup(i); syncSettings(x); renderSetups(); } }, "✕"))));
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Setups"), h("p", { class: "sub" }, "Save your whole setup (graphics, mods, crosshair, badge, overlays) and switch in one click. Your first three also work with Ctrl+Alt+1, 2 and 3."),
+    h("div", { class: "row" }, name, saveB), ...(r.items.length ? [chips] : []));
+  lockCard(box, "Setups");
+}
+async function renderStatsOverlay() {
+  const box = $("#statsOvCard"); if (!box) return; box.innerHTML = "";
+  const ov = cfg.overlay || (cfg.overlay = {});
+  const prev = h("div", { class: "ov-prev" });
+  const draw = () => {
+    prev.innerHTML = "";
+    const b = h("div", { class: "box" });
+    const corner = { "Top left": "left:10px;top:8px", "Top right": "right:10px;top:8px", "Bottom left": "left:10px;bottom:8px", "Bottom right": "right:10px;bottom:8px" }[ov.stats_pos || "Top left"];
+    b.style.cssText = corner + `;transform:rotate(${ov.stats_tilt !== false ? -9 : 0}deg)`;
+    if (ov.stats_fps) b.append(h("div", { class: "fpsbig" }, "144 FPS"));
+    if (ov.stats_ping) { const g = h("div"); g.innerHTML = '<svg width="150" height="34" viewBox="0 0 150 34"><path d="M0 26 L15 24 L30 25 L45 20 L60 22 L75 12 L90 18 L105 21 L120 19 L135 22 L150 20" fill="none" stroke="#05030a" stroke-width="5"/><path d="M0 26 L15 24 L30 25 L45 20 L60 22 L75 12 L90 18 L105 21 L120 19 L135 22 L150 20" fill="none" stroke="var(--accent)" stroke-width="3"/></svg>'; b.append(g.firstChild); }
+    if (!ov.stats_fps && !ov.stats_ping) b.append(h("span", { class: "muted small" }, "Turn something on below"));
+    prev.append(b);
+  };
+  const pos = segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"]], ov.stats_pos || "Top left", (v) => { ov.stats_pos = v; save(); draw(); });
+  const tilt = segmented([["tilt", "Tilted"], ["flat", "Straight"]], ov.stats_tilt !== false ? "tilt" : "flat", (v) => { ov.stats_tilt = v === "tilt"; save(); draw(); });
+  box.append(h("h3", { style: "margin-bottom:4px" }, "FPS and ping overlay"), h("p", { class: "sub" }, "Shows your FPS in big tilted numbers and a live ping graph in a corner of the game. Clicks go through it, and it hides when you tab out. FPS needs FPS tracking (Capture, above)."),
+    h("div", { class: "grid2", style: "gap:14px;align-items:start" }, prev, h("div", {},
+      toggleRow("Show FPS", "Big numbers: purple when smooth, yellow under 60, red under 30.", !!ov.stats_fps, (v) => { ov.stats_fps = v; save(); draw(); }),
+      toggleRow("Show ping graph", "The last minute of ping, so you can see lag building up.", !!ov.stats_ping, (v) => { ov.stats_ping = v; save(); draw(); }))),
+    h("div", { class: "row", style: "margin-top:10px;flex-wrap:wrap" }, pos, tilt), h("p", { class: "muted small", style: "margin:8px 0 0" }, "Starts with your next Roblox session."));
+  draw(); requestAnimationFrame(() => { pos._remeasure(); tilt._remeasure(); });
+  lockCard(box, "The FPS and ping overlay");
+}
+async function renderMap() {
+  const box = $("#mapCard"); if (!box) return;
+  const r = await api.world_map(); box.innerHTML = "";
+  const W = 128, H = 54, raw = atob(LANDMASK), places = r.places || [];
+  let dots = "";
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (raw.charCodeAt(i >> 3) & (128 >> (i & 7))) dots += `<circle cx="${x * 4 + 2}" cy="${y * 4 + 2}" r="1.45"/>`; }
+  const px = (lon) => (lon + 180) / 360 * W * 4, py = (lat) => (78 - lat) / 134 * H * 4;
+  const top = Math.max(1, ...places.map((p) => p.sessions));
+  const marks = places.map((p, i) => `<circle class="pt" data-i="${i}" cx="${px(p.lon).toFixed(1)}" cy="${py(p.lat).toFixed(1)}" r="${(2.6 + 4 * Math.sqrt(p.sessions / top)).toFixed(1)}" fill="var(--accent2)" fill-opacity=".85" stroke="#fff" stroke-width=".8"/>`).join("");
+  const wrap = h("div", { class: "wmap" }), tip = h("div", { class: "tip" });
+  wrap.innerHTML = `<svg viewBox="0 0 ${W * 4} ${H * 4}"><g fill="rgba(255,255,255,.3)">${dots}</g>${marks}</svg>`; wrap.append(tip);
+  wrap.onmousemove = (e) => { const t = e.target.closest(".pt"); if (!t) { tip.style.opacity = 0; return; } const p = places[+t.dataset.i], rr = wrap.getBoundingClientRect(); tip.textContent = `${p.location.split(",").slice(0, 2).join(",")} · ${p.sessions} session${p.sessions === 1 ? "" : "s"}${p.ping ? " · " + p.ping + " ms" : ""}`; tip.style.left = (e.clientX - rr.left) + "px"; tip.style.top = (e.clientY - rr.top) + "px"; tip.style.opacity = 1; };
+  wrap.onmouseleave = () => (tip.style.opacity = 0);
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Where you've played"), h("p", { class: "sub", style: "margin:0" }, places.length ? `${places.length} server location${places.length === 1 ? "" : "s"}. Bigger dots mean more sessions.` : "Server locations show up here after you play through Orbit."), wrap);
+}
+async function renderBest() {
+  const box = $("#bestCard"); if (!box) return;
+  const r = await api.best_times(); box.innerHTML = "";
+  const hrs = r.hours || [], pings = hrs.filter((x) => x.ping).map((x) => x.ping), top = Math.max(100, ...pings);
+  const lbl = (hh) => new Date(2000, 0, 1, hh).toLocaleTimeString(undefined, { hour: "numeric" });
+  const bars = h("div", { class: "hours" }, ...hrs.map((x) => h("i", { title: `${lbl(x.hour)}: ${x.ping ? x.ping + " ms average" : "no data"} · ${x.sessions} session${x.sessions === 1 ? "" : "s"}`,
+    style: `height:${x.ping ? Math.max(8, x.ping / top * 100) : 4}%;background:${x.ping == null ? "rgba(255,255,255,.06)" : x.ping < 80 ? "#4ade80" : x.ping < 150 ? "#fbbf24" : "#fb7185"};opacity:${x.ping ? .5 + Math.min(.5, x.samples / 8) : 1}` })));
+  const axis = h("div", { class: "hours-x" }, ...hrs.map((x) => h("span", {}, x.hour % 6 === 0 ? lbl(x.hour).replace(/\s/g, "") : "")));
+  const best = (r.best || []).map(lbl);
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Best time to play"), h("p", { class: "sub", style: "margin:0" }, best.length ? `Your ping is usually lowest around ${best.join(", ")}.` : "Play at a few different times of day and Orbit shows when your ping is lowest."),
+    bars, axis, h("p", { class: "muted small", style: "margin:8px 0 0" }, "Shorter bars mean lower ping. Based on your own sessions."));
+}
+async function renderChallenges() {
+  const box = $("#challengeCard"); if (!box) return;
+  const r = await api.challenges(); box.innerHTML = "";
+  const items = r.locked ? [{ text: "Play 5 hours this week", goal: 5, have: 2, xp: 200 }, { text: "Play 4 different games", goal: 4, have: 1, xp: 150 }, { text: "Play on 3 different days", goal: 3, have: 1, xp: 175 }] : r.items || [];
+  const days = r.ends ? Math.max(1, Math.ceil((r.ends - Date.now() / 1000) / 86400)) : 7;
+  box.append(h("div", { class: "row" }, h("h3", { style: "margin:0;flex:1" }, "Weekly challenges"), h("span", { class: "muted small" }, `New ones in ${days} day${days === 1 ? "" : "s"}`)),
+    h("p", { class: "sub", style: "margin:4px 0 6px" }, "Finish them for bonus XP toward your Orbit level." + (r.bonus_xp ? ` You've earned ${r.bonus_xp} XP from challenges so far.` : "")),
+    ...items.map((c) => h("div", { class: "chal" + (c.done ? " done" : "") }, h("div", { class: "row" }, h("b", {}, (c.done ? "✓ " : "") + c.text), h("span", { class: "xp" }, `+${c.xp} XP`)),
+      h("div", { class: "bar2" }, h("i", { style: `width:${Math.round(Math.min(1, c.have / c.goal) * 100)}%` })),
+      h("div", { class: "muted small", style: "margin-top:4px" }, `${c.have} / ${c.goal}`))));
+  lockCard(box, "Weekly challenges");
+  if (r.new && r.new.length) { sfx("ready"); r.new.forEach((t) => toast(`Challenge complete: ${t}! Bonus XP added.`, "ok")); const rr = box.getBoundingClientRect(); burst(rr.left + rr.width / 2, rr.top + 30, 70); renderLevel(); }
+}
 function hopRow(s) {
   const mode = segmented([["off", "Off"], ["ask", "Ask me"], ["auto", "Automatic"]], s.auto_hop || "off", (v) => { s.auto_hop = v; save(); });
   const lim = segmented([["100", "100 ms"], ["150", "150 ms"], ["200", "200 ms"]], String(s.hop_ping || 150), (v) => { s.hop_ping = +v; save(); });
@@ -1610,6 +1754,11 @@ function renderSession() {
     toggleRow("Auto-reconnect", "If Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone. Stops after 3 tries in 10 minutes.", s.auto_reconnect !== false, (v) => { s.auto_reconnect = v; save(); }),
     toggleRow("Lag spike alerts", "The badge flashes red when your ping suddenly jumps, so you know it was lag.", s.lag_alerts !== false, (v) => { s.lag_alerts = v; save(); }),
     hopRow(s)),
+    lockGroup("Muting and Do Not Disturb", toggleRow("Mute Roblox when you tab out", "Roblox goes quiet when you switch to another window and its sound comes back when you click in.", !!s.mute_tabbed, (v) => { s.mute_tabbed = v; save(); }),
+      toggleRow("Do Not Disturb while playing", "Turns on Windows Do Not Disturb when a game starts so notifications don't pop up, and turns it off when you leave.", !!s.dnd, (v) => { s.dnd = v; save(); })),
+    toggleRow("Pause music when a game starts", "Pauses Spotify, YouTube or whatever's playing when you join, and starts it again when you leave.", !!s.pause_music, (v) => { s.pause_music = v; save(); }),
+    autoShotRow(s),
+    toggleRow("Check my connection when a game starts", "Runs a quick test for lost packets and lag spikes and warns you if your Wi-Fi is struggling.", !!s.net_check, (v) => { s.net_check = v; save(); }),
     toggleRow("Streamer mode", "Hides your server location and join buttons from the badge, popups, Home and Discord, so you can stream safely.", !!s.streamer_mode, (v) => { s.streamer_mode = v; save(); }),
     bedtimeRow(s),
     toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
@@ -1621,7 +1770,7 @@ function renderSession() {
     toggleRow("Start with Windows", "Runs a tiny background helper (no window) so the badge, banner and stats work even when Orbit's window is closed, no matter how you open Roblox.", !!s.start_with_windows, async (v) => { const r = await api.set_startup(v); if (r && r.error) toast(r.error, "err"); else { s.start_with_windows = v; toast(v ? "Orbit now tracks Roblox in the background." : "Background tracking is off.", "ok"); } }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
-  renderToday(); renderPlayerCard(); renderStats(); renderCalendar(); renderRecap(); renderTimeline();
+  renderToday(); renderPlayerCard(); renderStats(); renderCalendar(); renderMap(); renderBest(); renderRecap(); renderTimeline();
 }
 async function renderStats() {
   const data = S.playtime || {};
@@ -2025,7 +2174,7 @@ async function renderTimeline(more) {
 }
 
 async function renderAchievements() {
-  renderLevel();
+  renderLevel(); renderChallenges();
   const r = await api.achievements(), grid = $("#achGrid"); grid.innerHTML = "";
   const done = r.list.filter((a) => a.unlocked).length, total = r.list.length;
   $("#achCount").textContent = `${done} / ${total}`;
@@ -2130,6 +2279,7 @@ function renderFpsTune() {
     h("div", { class: "field" }, h("label", {}, "Frame rate cap"), capSeg),
     ...(p.fps_cap >= 9999 ? [h("div", { class: "vstatus", style: "margin:-6px 0 12px" }, "Unlimited lets Roblox draw as many frames as your PC can, which keeps your graphics card at 100%. Orbit's tab-out guard below keeps the rest of your PC responsive when you switch away from Roblox.")] : []),
     h("div", { class: "field" }, h("label", {}, "Roblox graphics quality"), qSeg),
+    toggleRow("Lighter graphics on battery", "On a laptop running on battery, Roblox starts with lighter graphics and 60 FPS to save power. Plugged in, your normal settings come back. Checked each time Roblox starts.", !!p.battery_mode, (v) => { p.battery_mode = v; save(); }),
     lockGroup("Performance tweaks", toggleRow("Let other apps go first when you tab out", "When Roblox isn't the window in front, Orbit drops it to low priority and Windows' power-saving mode, so Discord, your browser and the desktop stay smooth. Full speed comes back the moment you click into Roblox.", p.bg_guard !== false, (v) => { p.bg_guard = v; save(); toast(v ? "Tab-out guard is on from your next Roblox session." : "Tab-out guard is off.", "ok"); }),
     toggleRow("Use my fastest graphics card", "On laptops with two GPUs, makes Windows run Roblox on the powerful one.", p.gpu_high, (v) => { p.gpu_high = v; applySystem(v ? "Roblox will use your high performance GPU." : "GPU choice is back to Windows' default."); renderFps(); }),
     toggleRow("Windows Game Mode", "Tells Windows to prioritize the game you're playing.", p.game_mode, (v) => { p.game_mode = v; applySystem(v ? "Game Mode is on." : "Game Mode is back to how it was."); renderFps(); }),
@@ -2163,7 +2313,7 @@ async function renderKits() {
   });
 }
 function renderBoost() {
-  renderFps(); renderKits(); renderFpsTune(); renderCapture();
+  renderFps(); renderKits(); renderFpsTune(); renderCapture(); renderStatsOverlay();
   const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
     toggleRow("Priority for Roblox", "Gives Roblox above-normal CPU priority while you play, without starving the rest of your PC.", p.high_priority, (v) => { p.high_priority = v; save(); }),
@@ -2271,7 +2421,7 @@ async function resync() {
   const st = await api.get_state(); Object.assign(cfg, st.settings); S.registered = st.registered;
 }
 async function renderHealth() {
-  renderProblems(); renderRobloxUpdates(); renderStorage();
+  renderProblems(); renderRobloxUpdates(); renderStorage(); renderNet();
   const list = $("#healthList"); list.innerHTML = "";
   list.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Running checks...")));
   const checks = await api.health(); list.innerHTML = "";
@@ -2981,6 +3131,10 @@ function renderPerks() {
     perk("🔁", "Auto-reconnect and alerts", "Get put back in your server after a disconnect, plus game update and lag spike alerts."),
     perk("👤", "Join a player and Party", "Join anyone's server by username, get friend alerts, and play together with a party code."),
     perk("📈", "PC stats and auto server hop", "CPU and GPU usage on the badge, and a move to a better server when your ping stays high."),
+    perk("🎯", "FPS and ping overlay", "Big tilted FPS numbers and a live ping graph in a corner of the game."),
+    perk("🔇", "Mute on tab out and Do Not Disturb", "Roblox goes quiet when you switch away, and Windows notifications stay off while you play."),
+    perk("🗂", "Setups", "Save whole setups like Competitive or Streaming and switch with one click or Ctrl+Alt+1, 2, 3."),
+    perk("🏆", "Weekly challenges", "Three new goals every week for bonus XP toward your Orbit level."),
     perk("🌌", "Premium looks", "Royal Gold, Aurora and Obsidian themes, the animated Aurora background, and a gold frame on your player card."),
     perk("🕘", "Session history", "Every server you've played in, with its location and a Rejoin button."),
     perk("🎬", "Capture and clips", "FPS tracking, instant replay, Roblox screenshots and the clip gallery to watch, trim and share."),
@@ -2992,7 +3146,7 @@ function renderPerks() {
 function premChanged(st) {
   if (st && st.settings) syncSettings(st);
   S.premium = st; setPremPill(st); applyLocks();
-  ({ boost: renderBoost, flags: renderFlags, session: renderSession, library: () => { renderJoin(); renderParty(); }, screens: renderClips, appearance: renderAppearance, extensions: () => {} })[page]?.();
+  ({ home: () => renderSetups(), achievements: renderChallenges, boost: renderBoost, flags: renderFlags, session: renderSession, library: () => { renderJoin(); renderParty(); }, screens: renderClips, appearance: renderAppearance, extensions: () => {} })[page]?.();
   applyBackground();
 }
 async function renderPremium(refresh = true) {
@@ -3189,6 +3343,13 @@ function palActions() {
   A.push({ ico: "📸", t: "Screenshot Roblox", k: hasPrem() ? "Capture" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("Screenshots from Orbit"); const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } });
   A.push({ ico: "🕶", t: cfg.session.streamer_mode ? "Turn off streamer mode" : "Turn on streamer mode", k: "Privacy", run: () => { cfg.session.streamer_mode = !cfg.session.streamer_mode; save(); toast(`Streamer mode ${cfg.session.streamer_mode ? "on" : "off"}.`, "ok"); if (page === "home") renderNow(); } });
   A.push({ ico: "🪪", t: "Make my player card", k: "Stats", run: () => { go("session"); setTimeout(() => renderPlayerCard(true), 400); } });
+  A.push({ ico: "🌐", t: "Roblox status", k: "Home", run: () => { go("home"); setTimeout(() => renderRbxStatus(true), 300); } });
+  A.push({ ico: "📶", t: "Test my connection", k: "Health", run: () => { go("health"); setTimeout(() => { $("#netCard").scrollIntoView({ behavior: "smooth" }); renderNet(true); }, 400); } });
+  A.push({ ico: "🗺", t: "Where I've played", k: "Stats", run: () => { go("session"); setTimeout(() => $("#mapCard").scrollIntoView({ behavior: "smooth" }), 500); } });
+  A.push({ ico: "🕐", t: "Best time to play", k: "Stats", run: () => { go("session"); setTimeout(() => $("#bestCard").scrollIntoView({ behavior: "smooth" }), 500); } });
+  A.push({ ico: "🏆", t: "Weekly challenges", k: hasPrem() ? "Achievements" : "🔒 Premium", run: () => go("achievements") });
+  A.push({ ico: "🎯", t: "FPS overlay", k: hasPrem() ? "Boost" : "🔒 Premium", run: () => { go("boost"); setTimeout(() => $("#statsOvCard").scrollIntoView({ behavior: "smooth" }), 500); } });
+  (cfg.setups || []).forEach((st, i) => A.push({ ico: "🗂", t: `Use setup: ${st.name}`, k: hasPrem() ? "Setups" : "🔒 Premium", run: async () => { if (!hasPrem()) return premiumNeeded("Setups"); const x = await api.use_setup(i); if (x.error) return toast(x.error, "err"); syncSettings(x); toast(`${st.name} is on.`, "ok"); } }));
   A.push({ ico: "🎉", t: "Party", k: hasPrem() ? "Library" : "🔒 Premium", run: () => { go("library"); setTimeout(() => $("#partyCard").scrollIntoView({ behavior: "smooth" }), 500); } });
   A.push({ ico: "🎞", t: "Clip gallery", k: hasPrem() ? "Screenshots" : "🔒 Premium", run: () => go("screens") });
   A.push({ ico: "🌌", t: "Custom skies", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#storeCard").scrollIntoView({ behavior: "smooth" }), 400); } });

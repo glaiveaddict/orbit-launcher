@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.10.0
+- **FPS and ping overlay (Premium):** your FPS in big tilted numbers and a live ping graph in a corner of the game (Boost page). Pick the corner, and tilted or straight.
+- **Mute Roblox when you tab out (Premium):** Roblox goes quiet when you switch windows, and the sound comes back when you click in.
+- **Do Not Disturb while playing (Premium):** Windows notifications stay off during a game.
+- **Setups (Premium):** save whole setups like Competitive or Streaming on Home and switch in one click, or with Ctrl+Alt+1, 2 and 3.
+- **Weekly challenges (Premium):** three new goals every week on Achievements, with bonus XP toward your Orbit level.
+- **Pause music when a game starts:** Spotify, YouTube and other players pause when you join and start again when you leave.
+- **Roblox status:** Home shows whether Roblox itself is having problems.
+- **Connection test:** checks ping, lost packets and jitter (Health page), and can warn you at the start of each game.
+- **Lighter graphics on battery:** laptops on battery start Roblox with lighter graphics and 60 FPS.
+- **Auto-screenshots:** a screenshot every 5, 10 or 15 minutes while you play.
+- **Where you've played:** a world map of every server location you've been in (Stats page).
+- **Best time to play:** which hours of the day give you the lowest ping (Stats page).
+
 ## v2.9.0
 - **Party (Premium):** share your party code (Library > Party). Friends who join your party press Join leader or Ctrl+Alt+P to land in the same server as you.
 - **Auto server hop (Premium):** if your ping stays above 100, 150 or 200 ms for a minute, Orbit asks you or moves you to a better server in the same game (Stats page).

@@ -244,6 +244,20 @@ jobs:
               ci = ol.clip_info(ol.Path(out)); print("CHECK clip info:", ci["duration"], bool(ci["thumb"])); ok &= bool(ci["thumb"])
           from PIL import Image as _Im
           sky = _Im.open("store/skies/sunset/sky512_up.tex"); print("CHECK sky dds:", sky.size, sky.mode)
+          print("CHECK mute sessions:", ol.set_process_mute([os.getpid()], True))
+          print("CHECK do not disturb:", ol.set_dnd(True), ol.set_dnd(False))
+          print("CHECK media pause:", ol.pause_media(), ol.resume_media())
+          print("CHECK battery:", ol.on_battery())
+          rs = ol.roblox_status(True); print("CHECK roblox status:", rs["overall"], [(c["name"], c["state"], c["ms"]) for c in rs["checks"]]); ok &= len(rs["checks"]) == 5
+          print("CHECK connection test:", ol.connection_test())
+          fake2 = tk.Tk(); fake2.title("Roblox"); fake2.geometry("900x600+80+80")
+          for _ in range(20): fake2.update(); time.sleep(0.05)
+          sp = subprocess.Popen([sys.executable, "orbit_launcher.py", ol.TOAST_FLAG, "stats", "", ol.STATS_FLAG], env=dict(os.environ, ORBIT_BADGE_ALWAYS="1"))
+          for _ in range(80): fake2.update(); time.sleep(0.05)
+          lt = ol.LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+          print("CHECK stats overlay:", "alive", sp.poll() is None, "ready" if "Stats overlay ready" in lt else "no ready line", "ERROR" if "Stats overlay error" in lt else "")
+          ok &= sp.poll() is None and "Stats overlay error" not in lt
+          ol.kill_tree(sp.pid); fake2.destroy()
           sealed = ol._dpapi(b"github_pat_test")
           print("CHECK token encryption:", sealed != b"github_pat_test", ol._dpapi(sealed, False) == b"github_pat_test")
           ok &= sealed != b"github_pat_test" and ol._dpapi(sealed, False) == b"github_pat_test"
