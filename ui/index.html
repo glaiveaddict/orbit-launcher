@@ -1588,7 +1588,7 @@ async function renderNet(run) {
   if (!r || r.error) return;
   const grade = { good: ["ok", "Your connection looks good."], warn: ["warn", "Your connection is a bit shaky."], bad: ["", "Your connection has problems."] }[r.grade];
   box.append(h("div", { class: "tool-status " + grade[0], style: "margin-top:12px" }, h("i"), h("b", {}, grade[1]), h("span", { class: "muted small", style: "margin-left:6px" }, fmtAgo(r.at))),
-    h("div", { class: "report" }, h("span", {}, `Ping ${r.ping ?? "?"} ms`), h("span", {}, `Lost ${r.loss ?? "?"}%`), h("span", {}, `Jitter ${r.jitter ?? "?"} ms`), h("span", {}, r.tcp_ms != null ? `Roblox reached in ${r.tcp_ms} ms` : "Couldn't reach Roblox")),
+    h("div", { class: "report" }, h("span", {}, `Ping ${r.ping ?? "?"} ms`), h("span", {}, r.loss == null ? "Lost packets: not measured" : `Lost ${r.loss}%`), h("span", {}, `Jitter ${r.jitter ?? "?"} ms`), h("span", {}, r.tcp_ms != null ? `Roblox reached in ${r.tcp_ms} ms` : "Couldn't reach Roblox")),
     ...(r.tips || []).map((t) => h("p", { class: "sub", style: "margin:8px 0 0" }, "• " + t)));
 }
 async function renderSetups() {

@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.10.0"
+APP_VERSION = "2.10.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -5117,6 +5117,19 @@ def connection_test():
     except Exception:
         tcp = None
     p = ping_stats("1.1.1.1", 10) or {}
+    if p.get("avg") is None and tcp is not None:
+        import socket
+        times = []
+        for _ in range(8):
+            t0 = time.time()
+            try:
+                with socket.create_connection(("clientsettingscdn.roblox.com", 443), timeout=3):
+                    times.append((time.time() - t0) * 1000)
+            except OSError:
+                pass
+            time.sleep(0.15)
+        p = {"avg": round(sum(times) / len(times)) if times else None, "loss": None,
+             "jitter": round(sum(abs(a - b) for a, b in zip(times, times[1:])) / max(1, len(times) - 1)) if len(times) > 1 else None}
     tips = []
     if tcp is None:
         tips.append("Orbit couldn't reach Roblox at all. Check that you're online.")

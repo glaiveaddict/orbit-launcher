@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.10.1
+- The connection test works on networks that block ping. Orbit measures your connection a different way there instead of reporting 100% lost packets.
+
 ## v2.10.0
 - **FPS and ping overlay (Premium):** your FPS in big tilted numbers and a live ping graph in a corner of the game (Boost page). Pick the corner, and tilted or straight.
 - **Mute Roblox when you tab out (Premium):** Roblox goes quiet when you switch windows, and the sound comes back when you click in.
