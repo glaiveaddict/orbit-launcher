@@ -628,6 +628,12 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .key-row b { display: block; } .key-row span { color: var(--muted); font-size: 12.5px; }
 .key-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: rgba(74,222,128,.12); color: #4ade80; }
 .key-tag.off { background: rgba(251,113,133,.12); color: #fb7185; } .key-tag.wait { background: rgba(251,191,36,.12); color: #fbbf24; } .key-tag.old { background: rgba(255,255,255,.06); color: var(--muted); }
+.perk { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); }
+.perk:first-of-type { border-top: 0; }
+.perk .pi { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgba(245,158,11,.14); font-size: 17px; }
+.perk b { display: block; } .perk span { color: var(--muted); font-size: 12.5px; }
+.prem-left { font-size: 30px; font-weight: 850; letter-spacing: -.02em; background: linear-gradient(90deg, #f59e0b, #fde047); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gh-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--line); margin-top: 12px; }
 .prem-head { display: flex; align-items: center; gap: 14px; }
 .prem-gem { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(135deg, #f59e0b, #fde047); color: #1a1205; font-size: 22px; flex: none; box-shadow: 0 8px 24px -10px #f59e0b; }
 .prem-gem.off { background: var(--panel3); color: var(--muted); box-shadow: none; }
@@ -910,6 +916,11 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="rise" style="--i:0;margin-bottom:12px"><button class="btn ghost" id="gameBack">← Back</button></div>
       <div id="gameBody"></div>
     </section>
+    <section class="page" id="page-premium">
+      <div class="page-head rise" style="--i:0"><h1>Premium</h1><p>Got a premium key? Put it in here to unlock everything.</p></div>
+      <div class="card rise" style="--i:1" id="premiumCard"></div>
+      <div class="card rise" style="--i:2" id="premiumPerks"></div>
+    </section>
     <section class="page" id="page-owner">
       <div class="page-head rise" style="--i:0"><h1>Owner panel</h1><p>Only you can see this. Give players premium access with a key.</p></div>
       <div class="card rise" style="--i:1" id="ownerIssue"></div>
@@ -919,7 +930,6 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     <section class="page" id="page-credits">
       <div class="page-head rise" style="--i:0"><h1>Credits</h1><p>The people behind Orbit.</p></div>
       <div class="grid2" id="creditList"></div>
-      <div class="card rise" style="--i:5" id="premiumCard"></div>
       <div class="card rise" style="--i:6">
         <div class="row"><div><h3>About &amp; updates</h3><p class="sub" style="margin:0" id="creditFoot"></p></div><span class="spacer"></span>
           <button class="btn" id="checkUpd">Check for updates</button></div>
@@ -995,6 +1005,7 @@ const ICONS = {
   file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
   box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
   news: '<path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2M8 9h6M8 13h6M8 17h4"/>',
+  premium: '<path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M12 21 9 9M12 21l3-12"/>',
   owner: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 21h14"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
@@ -1002,7 +1013,7 @@ const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["servers", "Servers"],
                ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
-               ["#Orbit"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
+               ["#Orbit"], ["premium", "Premium"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
 
 let api = null, S = null, cfg = null, page = "home";
 const iconCache = {};
@@ -1291,7 +1302,7 @@ function go(id) {
   $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + id));
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
-     appearance: renderAppearance, extensions: () => {}, credits: renderPremium, owner: renderOwner, library: renderLibrary, servers: renderServers,
+     appearance: renderAppearance, extensions: () => {}, credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
      achievements: renderAchievements, screens: renderScreens, boost: () => { applyLocks(); renderBoost(); }, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
@@ -2700,8 +2711,8 @@ function setPremPill(st) {
   if (b) { let l = $(".nav-lock", b); if (!hasPrem() && !l) b.append(h("span", { class: "nav-lock" }, "🔒")); else if (hasPrem() && l) l.remove(); }
 }
 function premiumNeeded(what) {
-  modal({ title: `${what} is Premium`, text: "Ask the owner for a premium key, then paste it in Credits > Orbit Premium.", ok: "Enter a key" }).then((ok) => {
-    if (ok) { go("credits"); setTimeout(() => { $("#premiumCard").scrollIntoView({ behavior: "smooth" }); $("#premiumCard input")?.focus(); }, 400); }
+  modal({ title: `${what} is Premium`, text: "Ask the owner for a premium key, then put it in on the Premium page.", ok: "Enter a key" }).then((ok) => {
+    if (ok) { go("premium"); setTimeout(() => $("#premiumCard input")?.focus(), 500); }
   });
 }
 function applyLocks() {
@@ -2720,6 +2731,14 @@ async function unlockOwner() {
   if (r.error) return toast(r.error, "err");
   S.owner = true; $('.nav-item[data-page="owner"]').hidden = false; go("owner"); sfx("ready"); toast("Owner panel unlocked on this PC.", "ok");
 }
+function renderPerks() {
+  const box = $("#premiumPerks"); if (!box) return; box.innerHTML = "";
+  const perk = (ico, t, d) => h("div", { class: "perk" }, h("div", { class: "pi" }, ico), h("div", {}, h("b", {}, t), h("span", {}, d)));
+  box.append(h("h3", { style: "margin-bottom:6px" }, "What Premium unlocks"),
+    perk("⚡", "Boost", "One-click FPS Boost, game kits, the frame rate cap (including Unlimited), graphics quality and Windows performance tweaks."),
+    perk("🥔", "Potato preset", "The lowest-graphics FastFlags preset for the most FPS on any PC."),
+    perk("💎", "PREMIUM tag", "A gold tag next to Orbit's name in the title bar."));
+}
 function premChanged(st) {
   if (st && st.settings) syncSettings(st);
   S.premium = st; setPremPill(st); applyLocks();
@@ -2735,16 +2754,19 @@ async function renderPremium(refresh = true) {
     return;
   }
   if (st.active) {
+    const left = st.exp ? Math.max(0, st.exp - Date.now() / 1000) : 0, days = Math.ceil(left / 86400);
     box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem" }, "💎"),
-      h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Orbit Premium"),
-        h("p", { class: "sub", style: "margin:4px 0 0" }, (st.for ? `Given to ${st.for}. ` : "") + (st.exp ? `Active until ${fmtDay(st.exp)}.` : "Active forever."))),
+      h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Premium is active"),
+        h("div", { class: "prem-left" }, st.exp ? (days > 1 ? `${days} days left` : left > 3600 ? `${Math.ceil(left / 3600)} hours left` : "Ends soon") : "Forever"),
+        h("p", { class: "sub", style: "margin:2px 0 0" }, (st.for ? `On ${st.for}'s Roblox account. ` : "") + (st.exp ? `Ends ${fmtDay(st.exp)}.` : "It never ends."))),
       h("button", { class: "btn danger", onclick: async () => {
         if (!await modal({ title: "Remove premium?", text: "You'll need the key again to turn it back on.", ok: "Remove", danger: true })) return;
         const r = await api.remove_premium(); syncSettings(r); premChanged(r.status); renderPremium(false); toast("Premium removed.", "ok");
       } }, "Remove")));
     return;
   }
-  const why = { expired: "Your premium key has expired.", revoked: "Your premium key was turned off by the owner.", invalid: "Your saved premium key isn't valid anymore." }[st.reason];
+  const why = { expired: "Your premium key has expired.", revoked: "Your premium key was turned off by the owner.", invalid: "Your saved premium key isn't valid anymore.",
+    account: `Your key belongs to ${st.for || "another player"}, so it only works while their Roblox account is the one playing.` }[st.reason];
   const inp = h("input", { class: "input mono", placeholder: "ORBIT-PREMIUM-...", style: "flex:1" });
   const btn = h("button", { class: "btn primary" }, "Activate");
   const go_ = async () => {
@@ -2755,30 +2777,31 @@ async function renderPremium(refresh = true) {
   };
   btn.onclick = go_; inp.onkeydown = (e) => { if (e.key === "Enter") go_(); };
   box.append(h("div", { class: "prem-head" }, h("div", { class: "prem-gem off" }, "💎"),
-    h("div", {}, h("h3", { style: "margin:0" }, "Orbit Premium"), h("p", { class: "sub", style: "margin:4px 0 0" }, why || "Got a premium key from the owner? Paste it here."))),
+    h("div", {}, h("h3", { style: "margin:0" }, "Activate a premium key"), h("p", { class: "sub", style: "margin:4px 0 0" }, why || "Paste the key you got from the owner. Each key is made for one Roblox account and only works on that account."))),
     h("div", { class: "row", style: "margin-top:12px" }, inp, btn));
 }
 async function renderOwner() {
   if (!S.owner) return go("home");
   const iss = $("#ownerIssue"); iss.innerHTML = "";
   let days = "0";
-  const name = h("input", { class: "input", placeholder: "Player's Roblox username", style: "flex:1", maxlength: 40 });
+  const name = h("input", { class: "input", placeholder: "Player's Roblox username", style: "flex:1", maxlength: 20 });
   const dur = segmented([["0", "Forever"], ["30", "30 days"], ["7", "7 days"]], days, (v) => { days = v; });
   const make = h("button", { class: "btn primary" }, "Create premium key");
   const out = h("div");
   make.onclick = async () => {
-    make.disabled = true; const r = await api.owner_issue(name.value.trim(), +days); make.disabled = false;
+    if (!name.value.trim()) return toast("Type the player's Roblox username first.", "err");
+    make.disabled = true; make.textContent = "Checking player..."; const r = await api.owner_issue(name.value.trim(), +days); make.disabled = false; make.textContent = "Create premium key";
     if (r.error) return toast(r.error, "err");
     await api.copy_text(r.code); sfx("ready"); toast("Key created and copied.", "ok");
     out.innerHTML = "";
     out.append(h("div", { class: "stat-label", style: "margin-top:14px" }, `Key for ${r.key.for || "a player"}` + (r.key.exp ? ` · ends ${fmtDay(r.key.exp)}` : " · never ends")),
       h("div", { class: "row", style: "margin-top:6px;align-items:stretch" }, h("div", { class: "code-box" }, r.code),
         h("button", { class: "btn", onclick: async () => { await api.copy_text(r.code); toast("Key copied.", "ok"); } }, "Copy")),
-      h("p", { class: "sub", style: "margin:8px 0 0" }, "Send this to the player. They paste it in Credits > Orbit Premium."));
+      h("p", { class: "sub", style: "margin:8px 0 0" }, `Send this to ${r.key.for}. It only works on their Roblox account, so passing it to someone else does nothing. They put it in on the Premium page.`));
     name.value = ""; renderOwnerKeys();
   };
   name.onkeydown = (e) => { if (e.key === "Enter") make.click(); };
-  iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Creates a key signed with your owner key. Nobody else can make one, and changing anything in a key breaks it."),
+  iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
   renderOwnerKeys();
@@ -2787,14 +2810,26 @@ async function renderOwner() {
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
     h("button", { class: "btn", onclick: async () => { const r = await api.owner_backup_key(); if (!r) return; r.error ? toast(r.error, "err") : toast("Owner key backed up.", "ok"); } }, "Back up owner key")));
 }
+function ghRow(gh) {
+  if (gh.connected) return h("div", { class: "gh-row" }, h("span", { class: "key-tag" }, "GitHub connected"), h("span", { class: "muted small", style: "flex:1" }, `Changes are saved as ${gh.user}.`),
+    h("button", { class: "btn ghost", onclick: async () => { await api.owner_disconnect_github(); toast("GitHub disconnected.", "ok"); renderOwnerKeys(); } }, "Disconnect"));
+  const inp = h("input", { class: "input mono", placeholder: "github_pat_...", style: "flex:1", type: "password" });
+  const con = h("button", { class: "btn primary" }, "Connect");
+  con.onclick = async () => { con.disabled = true; const r = await api.owner_connect_github(inp.value); con.disabled = false; if (r.error) return toast(r.error, "err"); sfx("ready"); toast(`Connected as ${r.user}. Turning keys off is one click now.`, "ok"); renderOwnerKeys(); };
+  return h("div", { class: "gh-row", style: "flex-direction:column;align-items:stretch" },
+    h("div", { class: "small", style: "line-height:1.55" }, h("b", {}, "One-time setup: "), "press Get a token, set Repository access to ", h("b", {}, "Only select repositories > orbit-launcher"), ", press Generate token, then paste it here. It's saved encrypted on this PC only."),
+    h("div", { class: "row" }, h("button", { class: "btn", onclick: () => api.open_url(gh.token_url) }, "Get a token"), inp, con));
+}
 async function renderOwnerKeys() {
   const box = $("#ownerKeys"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:4px" }, "Keys you've given out"), h("div", { class: "row", style: "margin:10px 0" }, h("span", { class: "spinner", style: "color:var(--accent)" })));
   const r = await api.owner_keys();
   box.innerHTML = "";
   if (r.error) return box.append(h("p", { class: "sub" }, r.error));
+  const gh = await api.owner_github();
   box.append(h("h3", { style: "margin-bottom:4px" }, "Keys you've given out"),
-    h("p", { class: "sub" }, "Turning a key off copies the updated list and opens premium_revoked.json on GitHub. Select everything there, paste, and press Commit changes. Players lose premium within an hour."));
+    h("p", { class: "sub" }, gh.connected ? "Turn a key off and that player loses premium within an hour. Turn it back on any time." : "Connect GitHub below once and turning keys off becomes one click."));
+  box.append(ghRow(gh));
   if (!r.issued.length) return box.append(h("p", { class: "muted small" }, "No keys yet."));
   const live = new Set(r.revoked_live || []), now = Date.now() / 1000;
   const list = h("div");
@@ -2806,10 +2841,12 @@ async function renderOwnerKeys() {
       h("span", { class: "key-tag " + tag[0] }, tag[1]),
       h("div", { class: "row" },
         h("button", { class: "btn ghost", onclick: async () => { await api.copy_text(k.code); toast("Key copied.", "ok"); } }, "Copy"),
-        h("button", { class: "btn" + (k.revoked ? "" : " danger"), onclick: async () => {
-          if (!k.revoked && !await modal({ title: `Turn off ${k.for || "this"} key?`, text: "GitHub opens next. Paste the copied list into premium_revoked.json and commit it.", ok: "Turn off", danger: true })) return;
-          const x = await api.owner_revoke(k.id, !k.revoked); if (x.error) return toast(x.error, "err");
-          toast("List copied. Paste it on GitHub and commit.", "ok"); renderOwnerKeys();
+        h("button", { class: "btn" + (k.revoked ? "" : " danger"), onclick: async (ev) => {
+          const btn = ev.currentTarget, off = !k.revoked;
+          if (off && !await modal({ title: `Turn off ${k.for || "this"} key?`, text: gh.connected ? "They lose premium within an hour." : "GitHub opens next. Paste the copied list into premium_revoked.json and commit it.", ok: "Turn off", danger: true })) return;
+          btn.disabled = true;
+          const x = await api.owner_revoke(k.id, off); btn.disabled = false; if (x.error) return toast(x.error, "err");
+          toast(x.pushed ? (off ? `${k.for || "That"} key is off.` : `${k.for || "That"} key is back on.`) : "List copied. Paste it on GitHub and commit.", "ok"); renderOwnerKeys();
         } }, k.revoked ? "Turn on" : "Turn off"))));
   });
   box.append(list);
@@ -2879,7 +2916,7 @@ function palActions() {
   A.push({ ico: "📁", t: "Open Roblox folder", k: "Folders", run: () => api.open_roblox_folder() });
   A.push({ ico: "🖼", t: "Open screenshots folder", k: "Folders", run: () => api.open_screenshots_folder() });
   A.push({ ico: "💾", t: "Export backup", k: "Orbit", run: () => $("#bkExport").click() });
-  A.push({ ico: "💎", t: S.premium && S.premium.active ? "My premium" : "Activate premium", k: "Orbit", run: () => { go("credits"); setTimeout(() => $("#premiumCard").scrollIntoView({ behavior: "smooth" }), 400); } });
+  A.push({ ico: "💎", t: S.premium && S.premium.active ? "My premium" : "Activate premium", k: "Orbit", run: () => go("premium") });
   if (S.owner) A.push({ ico: "👑", t: "Create premium key", k: "Owner", run: () => { go("owner"); setTimeout(() => $("#ownerIssue input")?.focus(), 400); } });
   else A.push({ ico: "🔑", t: "Unlock owner panel", k: "Orbit", secret: true, run: unlockOwner });
   A.push({ ico: "✛", t: "Crosshair overlay", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#crossOvCard").scrollIntoView({ behavior: "smooth" }), 400); } });

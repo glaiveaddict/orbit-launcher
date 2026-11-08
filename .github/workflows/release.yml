@@ -232,6 +232,9 @@ jobs:
           print("CHECK crosshair overlay:", "center", c, "alive", alive, "colors", len(cols), "ready" if "Crosshair overlay ready" in logtxt else "no ready line", "ERROR" if "Crosshair overlay error" in logtxt else "")
           ok &= alive and "Crosshair overlay error" not in logtxt
           ol.kill_tree(cp.pid); fake.destroy()
+          sealed = ol._dpapi(b"github_pat_test")
+          print("CHECK token encryption:", sealed != b"github_pat_test", ol._dpapi(sealed, False) == b"github_pat_test")
+          ok &= sealed != b"github_pat_test" and ol._dpapi(sealed, False) == b"github_pat_test"
           sys.exit(0 if ok else 1)
           PY
 

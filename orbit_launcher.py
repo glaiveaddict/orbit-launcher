@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.5.0"
+APP_VERSION = "2.6.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -4499,13 +4499,55 @@ def is_owner():
     return owner_seed() is not None
 
 
-def make_premium_key(name, days=0):
+def roblox_user_by_name(name):
+    name = (name or "").strip().lstrip("@")
+    if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", name):
+        raise ValueError("Type the player's Roblox username.")
+    data = post_json("https://users.roblox.com/v1/usernames/users", {"usernames": [name], "excludeBannedUsers": True})
+    if not data.get("data"):
+        raise ValueError(f'No Roblox player named "{name}".')
+    return {"id": int(data["data"][0]["id"]), "name": data["data"][0]["name"]}
+
+
+ROBLOX_ACCOUNT_FILE = DATA_DIR / "roblox_account.json"
+_UID_RE = re.compile(rb"rbxuid=(\d+)|userid:(\d+)|\"UserId\"%3a(\d+)", re.I)
+_UID_SEEN = {}
+
+
+def current_roblox_uid():
+    try:
+        logs = sorted((f for f in ROBLOX_LOGS.glob("*Player*.log") if "CrashHandler" not in f.name),
+                      key=lambda f: f.stat().st_mtime, reverse=True)[:6]
+    except OSError:
+        logs = []
+    for f in logs:
+        try:
+            st = f.stat()
+            sig = (str(f), st.st_size, st.st_mtime)
+            if sig not in _UID_SEEN:
+                with open(f, "rb") as fh:
+                    data = fh.read(6_000_000)
+                found = [next(g for g in m.groups() if g) for m in _UID_RE.finditer(data)]
+                _UID_SEEN[sig] = int(found[-1]) if found else None
+            uid = _UID_SEEN[sig]
+        except OSError:
+            continue
+        if uid:
+            if (load_json(ROBLOX_ACCOUNT_FILE, {}) or {}).get("id") != uid:
+                save_json(ROBLOX_ACCOUNT_FILE, {"id": uid, "at": int(time.time())})
+            return uid
+    return (load_json(ROBLOX_ACCOUNT_FILE, {}) or {}).get("id")
+
+
+def make_premium_key(name, days=0, uid=None):
     seed = owner_seed()
     if not seed:
         raise PermissionError("Only the owner can create premium keys.")
     now = int(time.time())
-    payload = {"v": 1, "id": uuid.uuid4().hex[:12], "for": (name or "").strip()[:40], "iat": now,
+    payload = {"v": 2 if uid else 1, "id": uuid.uuid4().hex[:12], "for": (name or "").strip()[:40], "iat": now,
                "exp": now + int(days) * 86400 if days else 0}
+    if uid:
+        payload["uid"] = int(uid)
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
     code = PREMIUM_PREFIX + _b64u(body) + "." + _b64u(ed_sign(seed, body))
     issued = load_json(OWNER_ISSUED_FILE, []) or []
@@ -4530,7 +4572,7 @@ def read_premium_key(code):
         data = json.loads(body)
     except ValueError:
         return None
-    return data if isinstance(data, dict) and data.get("v") == 1 and data.get("id") else None
+    return data if isinstance(data, dict) and data.get("v") in (1, 2) and data.get("id") else None
 
 
 def revoked_premium_ids(refresh=False, fetch=True):
@@ -4560,7 +4602,81 @@ def premium_status(settings, refresh=False, fetch=True):
         return {"active": False, "reason": "expired", "for": data.get("for"), "exp": data["exp"]}
     if data["id"] in revoked_premium_ids(refresh, fetch):
         return {"active": False, "reason": "revoked", "for": data.get("for")}
+    if data.get("uid") and current_roblox_uid() != data["uid"]:
+        return {"active": False, "reason": "account", "for": data.get("for")}
     return {"active": True, "for": data.get("for"), "exp": data.get("exp") or 0, "id": data["id"], "since": data.get("iat")}
+
+
+OWNER_GH_FILE = DATA_DIR / "owner_github.json"
+GH_TOKEN_URL = ("https://github.com/settings/personal-access-tokens/new?name=Orbit%20owner%20panel"
+                "&description=Lets%20Orbit%20turn%20premium%20keys%20off%20and%20on&expires_in=none&contents=write")
+
+
+def _dpapi(data, protect=True):
+    if not IS_WINDOWS:
+        return data
+
+    class BLOB(ctypes.Structure):
+        _fields_ = [("cbData", ctypes.c_ulong), ("pbData", ctypes.POINTER(ctypes.c_char))]
+    buf = ctypes.create_string_buffer(data, len(data))
+    src, out = BLOB(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_char))), BLOB()
+    crypt = ctypes.windll.crypt32
+    fn = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
+    if not fn(ctypes.byref(src), None, None, None, None, 0x1, ctypes.byref(out)):
+        raise OSError("Windows couldn't protect the GitHub token.")
+    try:
+        return ctypes.string_at(out.pbData, out.cbData)
+    finally:
+        ctypes.windll.kernel32.LocalFree(out.pbData)
+
+
+def owner_gh_token():
+    try:
+        data = load_json(OWNER_GH_FILE, {}) or {}
+        return _dpapi(base64.b64decode(data["token"]), False).decode() if data.get("token") else None
+    except Exception:
+        return None
+
+
+def gh_api(method, path, token, body=None, timeout=15):
+    req = urllib.request.Request("https://api.github.com" + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"User-Agent": APP_ID + "/" + APP_VERSION, "Accept": "application/vnd.github+json",
+                                          "Authorization": "Bearer " + token, "X-GitHub-Api-Version": "2022-11-28"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            raise PermissionError("GitHub didn't accept that token. It may have expired or been deleted.")
+        if e.code in (403, 404):
+            raise PermissionError("That token can't change files in the Orbit repo. Give it Contents: Read and write "
+                                  "access to the orbit-launcher repository.")
+        raise
+
+
+def push_revoked(key_id, revoked, token):
+    repo = update_repo()
+    if not repo:
+        raise RuntimeError("Orbit doesn't know its GitHub repo.")
+    path = f"/repos/{repo}/contents/premium_revoked.json"
+    try:
+        cur = gh_api("GET", path, token)
+        sha = cur.get("sha")
+        ids = {str(x) for x in (json.loads(base64.b64decode(cur.get("content") or "e30=")).get("revoked") or [])}
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        sha, ids = None, set()
+    ids = (ids | {key_id}) if revoked else (ids - {key_id})
+    text = json.dumps({"revoked": sorted(ids)}, indent=2) + "\n"
+    body = {"message": "Update premium keys", "content": base64.b64encode(text.encode()).decode()}
+    if sha:
+        body["sha"] = sha
+    gh_api("PUT", path, token, body)
+    save_json(PREMIUM_REVOKED_CACHE, {"ids": sorted(ids), "at": int(time.time())})
+    log(f"Updated premium_revoked.json on GitHub ({len(ids)} turned off)")
+    return ids
 
 
 PREMIUM_LOCKED = "Boost is a Premium feature. Activate a premium key in Credits to use it."
@@ -6914,6 +7030,12 @@ class Api:
             return {"error": "That premium key has expired."}
         if data["id"] in revoked_premium_ids(True):
             return {"error": "That premium key has been turned off by the owner."}
+        if data.get("uid"):
+            uid = current_roblox_uid()
+            if not uid:
+                return {"error": "Orbit can't tell which Roblox account you use yet. Join any Roblox game once, then try again."}
+            if uid != data["uid"]:
+                return {"error": f"This key belongs to {data.get('for') or 'someone else'}. It only works on their Roblox account."}
         self._settings["premium_key"] = code.strip()
         save_settings(self._settings)
         log(f"Premium activated ({data['id']})")
@@ -6929,7 +7051,11 @@ class Api:
         if not is_owner():
             return {"error": "Owner only."}
         try:
-            payload, code = make_premium_key(name, int(days or 0))
+            try:
+                user = roblox_user_by_name(name)
+            except urllib.error.URLError:
+                return {"error": "Couldn't reach Roblox to check that username. Check your internet and try again."}
+            payload, code = make_premium_key(user["name"], int(days or 0), user["id"])
             return {"key": payload, "code": code}
         except Exception as e:
             return self._err(e)
@@ -6938,23 +7064,66 @@ class Api:
         if not is_owner():
             return {"error": "Owner only."}
         issued = load_json(OWNER_ISSUED_FILE, []) or []
-        return {"issued": issued, "revoked_live": sorted(revoked_premium_ids(True)), "repo": update_repo()}
+        fresh = time.time() - (load_json(PREMIUM_REVOKED_CACHE, {}) or {}).get("at", 0) > 300
+        return {"issued": issued, "revoked_live": sorted(revoked_premium_ids(fresh)), "repo": update_repo()}
 
     def owner_revoke(self, key_id, revoked=True):
         if not is_owner():
             return {"error": "Owner only."}
         issued = load_json(OWNER_ISSUED_FILE, []) or []
+        token = owner_gh_token()
+        if token:
+            try:
+                ids = push_revoked(key_id, revoked, token)
+            except Exception as e:
+                return self._err(e)
+        else:
+            ids = {x["id"] for x in issued if x.get("revoked") and x["id"] != key_id} | revoked_premium_ids(True)
+            ids = (ids | {key_id}) if revoked else (ids - {key_id})
         for x in issued:
             if x.get("id") == key_id:
                 x["revoked"] = bool(revoked)
         save_json(OWNER_ISSUED_FILE, issued)
-        ids = sorted({x["id"] for x in issued if x.get("revoked")} | (revoked_premium_ids() - ({key_id} if not revoked else set())))
-        text = json.dumps({"revoked": ids}, indent=2)
+        text = json.dumps({"revoked": sorted(ids)}, indent=2)
+        if token:
+            return {"issued": issued, "pushed": True}
         copy_to_clipboard(text)
         repo = update_repo()
         if repo:
             webbrowser.open(f"https://github.com/{repo}/edit/main/premium_revoked.json")
         return {"issued": issued, "json": text}
+
+    def owner_github(self):
+        if not is_owner():
+            return {"error": "Owner only."}
+        data = load_json(OWNER_GH_FILE, {}) or {}
+        return {"connected": bool(owner_gh_token()), "user": data.get("user"), "token_url": GH_TOKEN_URL}
+
+    def owner_connect_github(self, token):
+        if not is_owner():
+            return {"error": "Owner only."}
+        token = (token or "").strip()
+        if not re.fullmatch(r"(github_pat_|ghp_)[A-Za-z0-9_]{20,}", token):
+            return {"error": "That doesn't look like a GitHub token. It starts with github_pat_."}
+        repo = update_repo()
+        try:
+            info = gh_api("GET", f"/repos/{repo}", token)
+            if not (info.get("permissions") or {}).get("push"):
+                raise PermissionError("That token can only read the repo. Give it Contents: Read and write.")
+            try:
+                user = gh_api("GET", "/user", token).get("login")
+            except Exception:
+                user = None
+            user = user or repo.split("/")[0]
+            save_json(OWNER_GH_FILE, {"token": base64.b64encode(_dpapi(token.encode())).decode(), "user": user})
+            log(f"Owner panel connected to GitHub as {user}")
+            return {"connected": True, "user": user}
+        except Exception as e:
+            return self._err(e)
+
+    def owner_disconnect_github(self):
+        OWNER_GH_FILE.unlink(missing_ok=True)
+        return {"connected": False}
 
     def owner_backup_key(self):
         if not is_owner():

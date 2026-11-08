@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.6.0
+- **Premium page:** a new Premium section in the menu. Put in a premium key to unlock premium, see how many days you have left, and see everything premium unlocks.
+- **Keys work for one player only:** each new premium key is made for one Roblox account and only works while that account is the one playing. A shared key does nothing for anyone else. The time starts when the key is made.
+- **Owner panel:** the player's username is checked against Roblox when you create a key. Connect GitHub once and turning keys off or back on is a single click, with no GitHub page to edit. The token is saved encrypted on your PC.
+
 ## v2.5.0
 - **Boost is now a Premium feature.** Without premium, the Boost page shows a lock. FPS Boost, game kits, the frame rate cap, graphics quality and the other performance tweaks there need an active premium key. If you had them on without premium, Orbit puts your old settings back.
 - **The Potato preset in FastFlags is Premium too.** The other presets and every graphics option stay free.
