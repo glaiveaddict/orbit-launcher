@@ -585,6 +585,31 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .tool-status.ok i { background: #4ade80; } .tool-status.warn i { background: #fbbf24; }
 .now-actions { display: flex; gap: 8px; margin-top: 8px; }
 .now-actions .btn { padding: 5px 10px; font-size: 12px; }
+
+.news-post { padding: 16px 0; border-top: 1px solid var(--line); animation: rise .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 50ms); }
+.news-post:first-child { border-top: 0; padding-top: 0; }
+.news-post h3 { margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.news-post .new { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; background: var(--grad); color: #fff; }
+.news-post .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.news-post .body { white-space: pre-wrap; line-height: 1.55; }
+.news-post img { max-width: 100%; border-radius: 12px; margin-top: 10px; }
+.nav-item .nav-dot { margin-left: auto; min-width: 18px; height: 18px; border-radius: 99px; background: var(--grad); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; padding: 0 5px; }
+.store-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.store-item { border: 1px solid var(--line); border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,.02); animation: rise .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.store-item .pv { height: 64px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
+.store-item .pv img { width: 44px; height: 44px; }
+.store-item b { font-size: 13.5px; } .store-item .small { flex: 1; }
+.level-card { display: flex; align-items: center; gap: 18px; }
+.level-badge { width: 74px; height: 74px; border-radius: 22px; background: var(--grad); display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 850; box-shadow: 0 10px 30px -10px var(--accent); flex: none; }
+.level-bar { height: 10px; border-radius: 99px; background: var(--panel3); overflow: hidden; margin: 8px 0 6px; }
+.level-bar i { display: block; height: 100%; background: var(--grad); transition: width 1s var(--ease); }
+.store-row { display: grid; grid-template-columns: 1fr 90px auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.store-row:first-of-type { border-top: 0; }
+.store-row b { display: block; } .store-row span { color: var(--muted); font-size: 12.5px; }
+.report { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.report span { font-size: 12.5px; padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,.05); }
+.pj-chip .bell { opacity: .55; padding: 0 2px; } .pj-chip .bell.on { opacity: 1; filter: drop-shadow(0 0 4px #fbbf24); }
+.lib-upd { font-size: 11px; color: var(--accent2); font-weight: 650; }
 </style>
 </head>
 <body>
@@ -625,6 +650,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       </div>
       <div class="card now rise" style="--i:1;display:none" id="nowCard"></div>
       <div class="card warn-card rise" style="--i:1;display:none" id="fsWarn"></div>
+      <div class="card rise" style="--i:1;display:none" id="reportCard"></div>
       <div class="grid2">
         <div class="card tilt rise" style="--i:1">
           <h3>Last server</h3>
@@ -678,6 +704,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <circle class="bgc" cx="50" cy="50" r="40"/><circle class="fg" id="achRing" cx="50" cy="50" r="40" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"/>
           <text x="50" y="56" text-anchor="middle" font-size="20" font-weight="800" fill="currentColor" id="achPct">0%</text></svg>
         <div><div class="big-num" id="achCount">0 / 15</div><div class="muted" id="achNext">Play a game to start unlocking.</div></div></div></div>
+      <div class="card rise" style="--i:1" id="levelCard"></div>
       <div class="ach-grid rise" style="--i:2" id="achGrid"></div>
     </section>
 
@@ -726,6 +753,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <button class="btn" id="openModsBtn">Open folder</button><button class="btn danger" id="delModBtn">Delete profile</button></div>
         <div class="row" id="modChips"></div>
       </div>
+      <div class="card rise" style="--i:3" id="storeCard"></div>
       <div class="card rise" style="--i:3" id="fontCard"></div>
       <div class="card rise" style="--i:3" id="xmakerCard"></div>
       <div class="card rise" style="--i:3">
@@ -777,6 +805,8 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <p class="sub">Create a free application in the Discord Developer Portal, name it "Roblox" so your status reads "Playing Roblox", and paste its Application ID here.</p>
         <button class="btn" id="dcPortal">Open Developer Portal</button>
       </div>
+      <div class="card rise" style="--i:4" id="shareCardDc"></div>
+      <div class="card rise" style="--i:5" id="overlayCard"></div>
     </section>
 
     <section class="page" id="page-appearance">
@@ -794,6 +824,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:3" id="splashCard"></div>
       <div class="card rise" style="--i:3" id="shareCard"></div>
       <div class="card rise" style="--i:3" id="galleryCard"></div>
+      <div class="card rise" style="--i:3" id="langCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Sounds</h3><p class="sub">Played when you launch Roblox and unlock achievements.</p>
         <div class="field"><div id="sndSeg"></div></div>
@@ -826,6 +857,11 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       </div>
     </section>
 
+    <section class="page" id="page-news">
+      <div class="page-head rise row" style="--i:0"><div><h1>News</h1><p>Updates, events and giveaways from the Orbit team.</p></div><span class="spacer"></span>
+        <button class="btn" id="newsRefresh">Refresh</button></div>
+      <div class="card rise" style="--i:1" id="newsList"></div>
+    </section>
     <section class="page" id="page-health">
       <div class="page-head rise row" style="--i:0"><div><h1>Health</h1><p>Checks everything Orbit needs and fixes problems in one click.</p></div><span class="spacer"></span>
         <button class="btn" id="healthRun">Run checks again</button></div>
@@ -833,6 +869,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="card rise" style="--i:2" id="healthList"></div>
       <div class="card rise" style="--i:2" id="probCard"></div>
       <div class="card rise" style="--i:2" id="rbxUpdCard"></div>
+      <div class="card rise" style="--i:2" id="storageCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Repair Roblox</h3><p class="sub">Tools for when Roblox acts up. None of these touch your Orbit settings unless it says so.</p>
         <div class="repair-grid">
@@ -858,6 +895,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="vstatus" id="updStatus"></div>
       </div>
       <div class="card rise" style="--i:7">
+        <div id="syncBox" style="margin-bottom:14px"></div>
         <div class="row"><div><h3>Backup &amp; restore</h3><p class="sub" style="margin:0">Save your settings, profiles, mods, stats and achievements to one file, then load them on any PC.</p></div><span class="spacer"></span>
           <button class="btn" id="bkExport">Export backup</button><button class="btn" id="bkImport">Restore</button></div>
       </div>
@@ -924,13 +962,14 @@ const ICONS = {
   boost: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
   file: '<path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/>',
   box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  news: '<path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2M8 9h6M8 13h6M8 17h4"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["servers", "Servers"],
                ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
-               ["#Orbit"], ["health", "Health"], ["credits", "Credits"]];
+               ["#Orbit"], ["news", "News"], ["health", "Health"], ["credits", "Credits"]];
 
 let api = null, S = null, cfg = null, page = "home";
 const iconCache = {};
@@ -1218,7 +1257,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: () => {}, credits: () => {}, library: renderLibrary, servers: renderServers,
-     achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth })[id]?.();
+     achievements: renderAchievements, screens: renderScreens, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -1252,6 +1291,7 @@ function renderFsWarn() {
     h("button", { class: "btn primary", onclick: () => { cfg.presets.exclusive_fullscreen = false; save(); renderFsWarn(); toast("Exclusive fullscreen is off. It applies next time Roblox starts.", "ok"); } }, "Turn it off"));
 }
 function renderHome() {
+  renderReport();
   renderNow(); renderFsWarn();
   $("#installText").textContent = S.install ? `Roblox found · ${S.install}` : "Roblox isn't installed yet. Get it from roblox.com/download.";
   $("#sideStatus").textContent = S.install ? "Roblox ready" : "Roblox not found";
@@ -1385,7 +1425,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
-  renderFonts(); renderMaker(); renderPacks();
+  renderStore(); renderFonts(); renderMaker(); renderPacks();
 }
 
 
@@ -1403,6 +1443,8 @@ function renderSession() {
     toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Break reminders"), h("span", {}, "A small popup suggests a break after this much play time. Applies from your next session.")),
       segmented([["0", "Off"], ["30", "30m"], ["60", "1h"], ["90", "1h 30m"], ["120", "2h"]], String(s.break_minutes || 0), (v) => { s.break_minutes = Number(v); save(); })),
+    toggleRow("Recap after each session", "When you leave a game you played for 2+ minutes, a popup sums up your time, ping, lag spikes and FPS.", s.session_report !== false, (v) => { s.session_report = v; save(); }),
+    toggleRow("Game update alerts", "A popup when a game in your Library releases an update.", s.game_update_alerts !== false, (v) => { s.game_update_alerts = v; save(); }),
     toggleRow("Auto-reconnect", "If Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone. Stops after 3 tries in 10 minutes.", s.auto_reconnect !== false, (v) => { s.auto_reconnect = v; save(); }),
     toggleRow("Lag spike alerts", "The badge flashes red when your ping suddenly jumps, so you know it was lag.", s.lag_alerts !== false, (v) => { s.lag_alerts = v; save(); }),
     toggleRow("Streamer mode", "Hides your server location and join buttons from the badge, popups, Home and Discord, so you can stream safely.", !!s.streamer_mode, (v) => { s.streamer_mode = v; save(); }),
@@ -1451,6 +1493,7 @@ function countUp(el, to, fmt) {
 
 let dcTimer = null;
 function renderDiscord() {
+  renderShareDc(); renderOverlay();
   const d = cfg.discord, box = $("#discordToggles"); box.innerHTML = "";
   const prev = () => $("#dcPreview").classList.toggle("off", !d.enabled);
   box.append(
@@ -1491,7 +1534,7 @@ function renderAppearance() {
     nameEl.after(h("div", { class: "custom-colors", id: "customColors" }, pick(0), pick(1), prev, h("span", { class: "muted small" }, "Main and glow color. Also used for the in-game badge.")));
   }
   const spc = $("#splashCard"); spc.innerHTML = "";
-  renderShare(); renderGallery();
+  renderShare(); renderGallery(); renderLang();
   spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
@@ -1519,6 +1562,7 @@ function renderCredits() {
     h("div", { class: "ring" }),
     h("div", { class: "avatar", "data-uid": c.roblox_id || "", title: c.roblox_id ? "Open Roblox profile" : "", onclick: () => c.roblox_id && api.open_url(`https://www.roblox.com/users/${c.roblox_id}/profile`) }, h("span", {}, c.handle.replace("@", "")[0].toUpperCase())),
     h("div", {}, h("div", { class: "role" }, c.role), h("div", { class: "handle" }, c.handle)))));
+  renderSync();
   $("#creditFoot").textContent = `Orbit Launcher v${S.version}` + (S.update_source ? ` · updates from github.com/${S.update_source}` : "");
   loadAvatars();
 }
@@ -1655,7 +1699,8 @@ async function renderLibrary() {
     play.onclick = () => playGame(g);
     const x = h("button", { class: "x", title: "Remove" }, "✕");
     x.onclick = async () => { if (await modal({ title: `Remove ${g.name}?`, text: "It only leaves your library. Stats and flag profiles stay.", ok: "Remove", danger: true })) { cfg.library = cfg.library.filter((y) => y !== g); save(); renderLibrary(); } };
-    art.append(play, x, h("div", { class: "pt" }, pt(g.pid) ? fmtDur(pt(g.pid)) + " played" : "Not played yet"));
+    const upd = (S.game_updated || {})[String(g.pid)];
+    art.append(play, x, h("div", { class: "pt" }, (pt(g.pid) ? fmtDur(pt(g.pid)) + " played" : "Not played yet") + (upd && Date.now() / 1000 - upd < 3 * 86400 ? ` · updated ${fmtAgo(upd)}` : "")));
     const cross = crossSelect(g.pid);
     const sel = h("select", { class: "input", title: "Mod pack for this game" }, h("option", { value: "" }, "Mods: default profile"),
       S.mod_profiles.map((m) => h("option", { value: m }, "Mods: " + m)));
@@ -1804,6 +1849,7 @@ async function renderTimeline(more) {
 }
 
 async function renderAchievements() {
+  renderLevel();
   const r = await api.achievements(), grid = $("#achGrid"); grid.innerHTML = "";
   const done = r.list.filter((a) => a.unlocked).length, total = r.list.length;
   $("#achCount").textContent = `${done} / ${total}`;
@@ -2045,7 +2091,7 @@ async function resync() {
   const st = await api.get_state(); Object.assign(cfg, st.settings); S.registered = st.registered;
 }
 async function renderHealth() {
-  renderProblems(); renderRobloxUpdates();
+  renderProblems(); renderRobloxUpdates(); renderStorage();
   const list = $("#healthList"); list.innerHTML = "";
   list.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Running checks...")));
   const checks = await api.health(); list.innerHTML = "";
@@ -2334,9 +2380,11 @@ async function renderJoin() {
     recent.forEach((u) => {
       const x = h("span", { class: "x", title: "Remove" }, "✕");
       x.onclick = async (e) => { e.stopPropagation(); const r = await api.forget_player(u.id); syncSettings(r); renderJoin(); };
-      row.append(h("span", { class: "pj-chip", title: `Look up ${u.name}`, onclick: () => { inp.value = u.name; find(); } }, h("img", { src: u.avatar || "", alt: "" }), u.display || u.name, x));
+      const bell = h("span", { class: "bell" + (u.alert ? " on" : ""), title: u.alert ? "Alerts on: you get a popup when they start playing" : "Alert me when they start playing" }, u.alert ? "🔔" : "🔕");
+      bell.onclick = async (e) => { e.stopPropagation(); const r = await api.toggle_alert(u.id); syncSettings(r); renderJoin(); toast(u.alert ? `Alerts off for ${u.name}.` : `You'll get a popup when ${u.name} starts playing. Press Ctrl+Alt+F to join them.`, "ok"); };
+      row.append(h("span", { class: "pj-chip", title: `Look up ${u.name}`, onclick: () => { inp.value = u.name; find(); } }, h("img", { src: u.avatar || "", alt: "" }), u.display || u.name, bell, x));
     });
-    box.append(h("div", { class: "stat-label", style: "margin-top:14px" }, "Recent"), row);
+    box.append(h("div", { class: "stat-label", style: "margin-top:14px" }, "Recent · tap 🔕 to get friend alerts"), row);
   }
 }
 function playerCard(u) {
@@ -2380,6 +2428,9 @@ async function renderFonts() {
   const fonts = await api.fonts(); box.innerHTML = "";
   const grid = h("div", { class: "fonts" });
   const pick = async (id) => { const r = await api.set_font(id); if (r.error) return toast(r.error, "err"); syncSettings(r); renderFonts(); toast(id ? "Font set. It shows next time Roblox starts through Orbit." : "Roblox's normal fonts are back next launch.", "ok"); };
+  const emo = segmented([["", "Twemoji (Roblox)"], ["windows", "Windows emoji"]], cfg.emoji || "", async (v) => { const r = await api.set_emoji(v); if (r.error) { toast(r.error, "err"); return renderFonts(); } syncSettings(r); toast("Emoji style saved for next launch.", "ok"); });
+  requestAnimationFrame(() => emo._remeasure());
+  setTimeout(() => box.append(h("div", { class: "toggle-row", style: "margin-top:10px" }, h("div", { class: "t" }, h("b", {}, "Emoji style"), h("span", {}, "\"Windows emoji\" uses the emoji font already on your PC for chat.")), emo)), 0);
   grid.append(h("button", { class: "font-card" + (!cfg.font ? " on" : ""), onclick: () => pick("") }, h("div", { class: "sample" }, "Aa Roblox"), h("b", {}, "Roblox default"), h("span", {}, "No font mod.")));
   fonts.forEach((f) => {
     const fam = "orbitfont_" + f.id;
@@ -2446,6 +2497,161 @@ function fpsCard(g) {
   return h("div", { class: "card rise", style: "--i:3" }, h("div", { class: "row", style: "margin-bottom:6px" }, h("h3", { style: "margin:0" }, "FPS"), h("span", { class: "spacer" }),
     h("span", { class: "ping-tag ping-good" }, `avg ${f.avg} fps`), h("span", { class: "ping-tag" }, `1% low ${f.low1}`)), sparkline(f.samples));
 }
+const I18N = { es: {"Ready to play": "Listo para jugar", "Copy join link": "Copiar enlace", "Screenshot": "Captura", "Turn it off": "Desactivar", "Game stats": "Estadísticas del juego", "Search": "Buscar", "Find a low-ping server": "Buscar servidor con poco ping", "+ New profile": "+ Nuevo perfil", "About & updates": "Acerca de y actualizaciones", "Accent": "Color de acento", "Achievements": "Logros", "Add app": "Añadir app", "Add game": "Añadir juego", "All": "Todo", "Appearance": "Apariencia", "Apply mods on launch": "Aplicar mods al iniciar", "Apply settings now": "Aplicar ajustes ahora", "Auto": "Auto", "Auto-reconnect": "Reconexión automática", "Average ping by server location": "Ping medio por ubicación del servidor", "Background": "Fondo", "Backup & restore": "Copia de seguridad", "Badge position": "Posición de la insignia", "Badge size": "Tamaño de la insignia", "Balanced": "Equilibrado", "Bedtime": "Hora de dormir", "Best day": "Mejor día", "Best ping": "Mejor ping", "Boost": "Rendimiento", "Boost my game profiles too": "Optimizar también mis perfiles de juego", "Bottom left": "Abajo izquierda", "Bottom right": "Abajo derecha", "Break reminders": "Recordatorios de descanso", "Cancel": "Cancelar", "Capture": "Captura", "Center": "Centro", "Center dot": "Punto central", "Check for updates": "Buscar actualizaciones", "Checking Roblox...": "Comprobando Roblox...", "Checking...": "Comprobando...", "Checks everything Orbit needs and fixes problems in one click.": "Revisa todo lo que Orbit necesita y arregla problemas con un clic.", "Choose .ico file": "Elegir archivo .ico", "Choose image": "Elegir imagen", "Circle": "Círculo", "Clear Roblox cache": "Borrar caché de Roblox", "Clear cache": "Borrar caché", "Close": "Cerrar", "Close Roblox": "Cerrar Roblox", "Close after": "Cerrar después", "Close to the system tray": "Cerrar a la bandeja del sistema", "Color": "Color", "Compact": "Compacto", "Copy": "Copiar", "Copy image": "Copiar imagen", "Credits": "Créditos", "Cross": "Cruz", "Crosshair maker": "Creador de miras", "Crosshairs": "Miras", "Cursors": "Cursores", "Daily play goal": "Meta diaria de juego", "Dark": "Oscuro", "Death": "Muerte", "Delete profile": "Borrar perfil", "Desktop": "Escritorio", "Dim": "Oscurecer", "Discord application ID": "ID de aplicación de Discord", "Dot": "Punto", "Download Roblox updates ahead of time": "Descargar actualizaciones de Roblox por adelantado", "Exclusive fullscreen is on": "La pantalla completa exclusiva está activada", "Export backup": "Exportar copia", "Extensions": "Extensiones", "Extra flags": "Flags extra", "FPS and frame-time tracking": "Medición de FPS y tiempo por fotograma", "Files in this profile": "Archivos de este perfil", "Find a server with room, or the one with the best connection, and jump straight in.": "Encuentra un servidor con espacio o con la mejor conexión y entra directo.", "Find player": "Buscar jugador", "Find servers": "Buscar servidores", "Fine-tune": "Ajuste fino", "Fonts": "Fuentes", "Frame rate cap": "Límite de FPS", "Full history": "Historial completo", "Game": "Juego", "Game kits": "Kits de juego", "Games played": "Juegos jugados", "Global hotkeys": "Atajos globales", "Graphics": "Gráficos", "Graphics tweaks Roblox still allows. Give a game its own profile to use different settings there.": "Ajustes gráficos que Roblox aún permite. Da a un juego su propio perfil para usar otros ajustes ahí.", "Health": "Estado", "High": "Alto", "High performance power plan": "Plan de energía de alto rendimiento", "Highest": "Máximo", "Home": "Inicio", "Hop to region": "Saltar a región", "Hotkeys": "Atajos", "Import pack": "Importar pack", "Install": "Instalar", "Install Orbit": "Instalar Orbit", "Instant replay": "Repetición instantánea", "Interface size": "Tamaño de la interfaz", "Join": "Unirse", "Join a player": "Unirse a un jugador", "Join best ping": "Unirse con mejor ping", "Join emptiest": "Unirse al más vacío", "Just remind me": "Solo recordarme", "Keystrokes & clicks overlay": "Overlay de teclas y clics", "Lag spike alerts": "Alertas de picos de lag", "Large": "Grande", "Last played": "Última vez", "Last server": "Último servidor", "Last session": "Última sesión", "Launch Roblox": "Abrir Roblox", "Launch with Roblox": "Abrir junto con Roblox", "Let other apps go first when you tab out": "Dar prioridad a otras apps al salir de Roblox", "Library": "Biblioteca", "Light": "Claro", "Lighting quality": "Calidad de iluminación", "Live ping on the badge": "Ping en vivo en la insignia", "Load more": "Cargar más", "Loading game stats...": "Cargando estadísticas...", "Looking for Roblox...": "Buscando Roblox...", "Looking them up...": "Buscando...", "Low": "Bajo", "Lowest": "Mínimo", "Make Orbit (and Roblox's icon) yours.": "Personaliza Orbit (y el icono de Roblox).", "Make my card": "Crear mi tarjeta", "Max": "Máx", "Max FPS": "Máx FPS", "Medium": "Medio", "Mod profiles": "Perfiles de mods", "Mods": "Mods", "Most empty": "Más vacío", "Most full": "Más lleno", "Most played": "Más jugados", "Movement": "Movimiento", "My image": "Mi imagen", "No font mod.": "Sin mod de fuente.", "No mods in this profile yet.": "Aún no hay mods en este perfil.", "No server yet": "Aún no hay servidor", "Normal": "Normal", "Nothing tracked yet.": "Aún no hay nada registrado.", "Off": "Apagado", "Offer to rejoin after a crash": "Ofrecer volver tras un cierre", "Open": "Abrir", "Open Developer Portal": "Abrir portal de desarrollador", "Open Roblox folder": "Abrir carpeta de Roblox", "Open folder": "Abrir carpeta", "Open launcher log": "Abrir registro", "Orbit packs": "Packs de Orbit", "Overlay position": "Posición del overlay", "Paste a game link or place ID": "Pega un enlace de juego o ID", "Performance": "Rendimiento", "Ping": "Ping", "Play": "Jugar", "Play a game through Orbit first": "Primero juega algo con Orbit", "Play a game to start unlocking.": "Juega algo para empezar a desbloquear.", "Play calendar": "Calendario de juego", "Player card": "Tarjeta de jugador", "Players": "Jugadores", "Preview": "Vista previa", "Priority for Roblox": "Prioridad para Roblox", "Put Roblox back to stock": "Dejar Roblox como de fábrica", "Quick actions": "Acciones rápidas", "Quick presets": "Ajustes rápidos", "Recent": "Recientes", "Recent problems": "Problemas recientes", "Recent servers": "Servidores recientes", "Recent sessions": "Sesiones recientes", "Recently played": "Jugados recientemente", "Refresh": "Actualizar", "Region hopper": "Saltador de región", "Region test": "Prueba de región", "Reinstall": "Reinstalar", "Reinstall Roblox": "Reinstalar Roblox", "Rejoin": "Volver a unirse", "Remove": "Quitar", "Repair Roblox": "Reparar Roblox", "Reset": "Restablecer", "Reset flags": "Restablecer flags", "Reset my FastFlags": "Restablecer mis FastFlags", "Restore": "Restaurar", "Restore stock": "Restaurar original", "Roblox default": "Predeterminado de Roblox", "Roblox graphics quality": "Calidad gráfica de Roblox", "Roblox icon": "Icono de Roblox", "Roblox updates": "Actualizaciones de Roblox", "Roblox's choice": "Lo decide Roblox", "Run checks again": "Revisar de nuevo", "Running checks...": "Revisando...", "Save": "Guardar", "Save as image": "Guardar como imagen", "Save crosshair": "Guardar mira", "Saved": "Guardado", "Saved servers": "Servidores guardados", "Scanning servers...": "Buscando servidores...", "Screenshots": "Capturas", "Search pages, games and actions...": "Busca páginas, juegos y acciones...", "Server badge while playing": "Insignia del servidor al jugar", "Server location popup": "Aviso de ubicación del servidor", "Server locations": "Ubicaciones de servidores", "Servers": "Servidores", "Session history": "Historial de sesiones", "Session timer on the badge": "Temporizador en la insignia", "Sessions": "Sesiones", "Share this profile": "Compartir este perfil", "Shortcuts": "Accesos directos", "Show clicks per second": "Mostrar clics por segundo", "Show in folder": "Mostrar en carpeta", "Show more": "Mostrar más", "Show my game on Discord": "Mostrar mi juego en Discord", "Show the game you're playing on your Discord profile.": "Muestra el juego al que juegas en tu perfil de Discord.", "Show the game's icon": "Mostrar el icono del juego", "Size & sharing": "Tamaño y compartir", "Small": "Pequeño", "Smart join": "Unión inteligente", "Sort by game": "Ordenar por juego", "Sort new screenshots by game": "Ordenar capturas nuevas por juego", "Sounds": "Sonidos", "Squeeze out more FPS and open your other apps automatically.": "Saca más FPS y abre tus otras apps automáticamente.", "Starfield": "Estrellas", "Start menu": "Menú inicio", "Start with Windows": "Iniciar con Windows", "Startup animation": "Animación de inicio", "Stats": "Estadísticas", "Streamer mode": "Modo streamer", "Style": "Estilo", "Swap Roblox's sounds, cursors, fonts and textures. Originals come back when you remove a mod.": "Cambia sonidos, cursores, fuentes y texturas de Roblox. Los originales vuelven al quitar un mod.", "The people behind Orbit.": "Las personas detrás de Orbit.", "Theme": "Tema", "Theme code": "Código de tema", "Theme gallery": "Galería de temas", "Time": "Tiempo", "Today": "Hoy", "Top game": "Juego top", "Top left": "Arriba izquierda", "Top right": "Arriba derecha", "Total play time": "Tiempo total de juego", "Track play time": "Registrar tiempo de juego", "Turn off Xbox background recording": "Desactivar grabación en segundo plano de Xbox", "Tweaks": "Ajustes", "Unlimited": "Ilimitado", "Unlocked automatically as you play through Orbit.": "Se desbloquean solos mientras juegas con Orbit.", "Update automatically": "Actualizar automáticamente", "Update ready": "Actualización lista", "Use Orbit for Roblox links": "Usar Orbit para enlaces de Roblox", "Use it on the Roblox window": "Usarlo en la ventana de Roblox", "Use my fastest graphics card": "Usar mi tarjeta gráfica más rápida", "Volume": "Volumen", "Warp speed": "Velocidad warp", "Weekly recap": "Resumen semanal", "What's new": "Novedades", "Windows Game Mode": "Modo juego de Windows", "Your favorite games. Each one can have its own FastFlags and mod pack.": "Tus juegos favoritos. Cada uno puede tener sus propios FastFlags y pack de mods.", "Your play time, weekly recap and full session history.": "Tu tiempo de juego, resumen semanal e historial completo.", "played this week": "jugado esta semana", "▶ Play": "▶ Reproducir", "News": "Noticias", "Pack store": "Tienda de packs", "Friend alerts": "Alertas de amigos", "Share to Discord": "Compartir en Discord", "Stream overlay": "Overlay para stream", "Storage cleaner": "Limpiador de almacenamiento", "Settings sync": "Sincronizar ajustes", "Language": "Idioma", "Emoji style": "Estilo de emojis", "Orbit level": "Nivel de Orbit", "Session report": "Resumen de sesión", "Game update alerts": "Alertas de actualización de juegos", "Clean": "Limpiar", "Copy link": "Copiar enlace", "Open in browser": "Abrir en navegador", "Share player card": "Compartir tarjeta", "Share weekly recap": "Compartir resumen", "Share join link": "Compartir enlace para unirse", "Sync now": "Sincronizar ahora", "Restore from sync": "Restaurar desde la sincronización", "Auto-clean weekly": "Limpieza automática", "Get": "Obtener", "Installed": "Instalado", "Read more": "Leer más", "Mark all read": "Marcar todo como leído", "Windows emoji": "Emojis de Windows", "Recap after each session": "Resumen al terminar cada sesión", "Level": "Nivel"}, pt: {"Ready to play": "Pronto para jogar", "Copy join link": "Copiar link", "Screenshot": "Captura", "Turn it off": "Desativar", "Game stats": "Estatísticas do jogo", "Search": "Buscar", "Find a low-ping server": "Buscar servidor com ping baixo", "+ New profile": "+ Novo perfil", "About & updates": "Sobre e atualizações", "Accent": "Cor de destaque", "Achievements": "Conquistas", "Add app": "Adicionar app", "Add game": "Adicionar jogo", "All": "Todos", "Appearance": "Aparência", "Apply mods on launch": "Aplicar mods ao iniciar", "Apply settings now": "Aplicar agora", "Auto": "Auto", "Auto-reconnect": "Reconexão automática", "Average ping by server location": "Ping médio por local do servidor", "Background": "Fundo", "Backup & restore": "Backup e restauração", "Badge position": "Posição do selo", "Badge size": "Tamanho do selo", "Balanced": "Equilibrado", "Bedtime": "Hora de dormir", "Best day": "Melhor dia", "Best ping": "Melhor ping", "Boost": "Desempenho", "Boost my game profiles too": "Otimizar meus perfis de jogo também", "Bottom left": "Inferior esquerdo", "Bottom right": "Inferior direito", "Break reminders": "Lembretes de pausa", "Cancel": "Cancelar", "Capture": "Captura", "Center": "Centro", "Center dot": "Ponto central", "Check for updates": "Procurar atualizações", "Checking Roblox...": "Verificando o Roblox...", "Checking...": "Verificando...", "Checks everything Orbit needs and fixes problems in one click.": "Verifica tudo que o Orbit precisa e corrige problemas com um clique.", "Choose .ico file": "Escolher arquivo .ico", "Choose image": "Escolher imagem", "Circle": "Círculo", "Clear Roblox cache": "Limpar cache do Roblox", "Clear cache": "Limpar cache", "Close": "Fechar", "Close Roblox": "Fechar Roblox", "Close after": "Fechar depois", "Close to the system tray": "Fechar para a bandeja", "Color": "Cor", "Compact": "Compacto", "Copy": "Copiar", "Copy image": "Copiar imagem", "Credits": "Créditos", "Cross": "Cruz", "Crosshair maker": "Criador de mira", "Crosshairs": "Miras", "Cursors": "Cursores", "Daily play goal": "Meta diária", "Dark": "Escuro", "Death": "Morte", "Delete profile": "Excluir perfil", "Desktop": "Área de trabalho", "Dim": "Escurecer", "Discord application ID": "ID do aplicativo do Discord", "Dot": "Ponto", "Download Roblox updates ahead of time": "Baixar atualizações do Roblox antes", "Exclusive fullscreen is on": "Tela cheia exclusiva está ativada", "Export backup": "Exportar backup", "Extensions": "Extensões", "Extra flags": "Flags extras", "FPS and frame-time tracking": "Medição de FPS e tempo de quadro", "Files in this profile": "Arquivos deste perfil", "Find a server with room, or the one with the best connection, and jump straight in.": "Encontre um servidor com vaga ou com a melhor conexão e entre direto.", "Find player": "Buscar jogador", "Find servers": "Buscar servidores", "Fine-tune": "Ajuste fino", "Fonts": "Fontes", "Frame rate cap": "Limite de FPS", "Full history": "Histórico completo", "Game": "Jogo", "Game kits": "Kits de jogo", "Games played": "Jogos jogados", "Global hotkeys": "Atalhos globais", "Graphics": "Gráficos", "Graphics tweaks Roblox still allows. Give a game its own profile to use different settings there.": "Ajustes gráficos que o Roblox ainda permite. Dê a um jogo seu próprio perfil para usar outras configurações.", "Health": "Saúde", "High": "Alto", "High performance power plan": "Plano de energia de alto desempenho", "Highest": "Máximo", "Home": "Início", "Hop to region": "Pular para região", "Hotkeys": "Atalhos", "Import pack": "Importar pack", "Install": "Instalar", "Install Orbit": "Instalar Orbit", "Instant replay": "Replay instantâneo", "Interface size": "Tamanho da interface", "Join": "Entrar", "Join a player": "Entrar com um jogador", "Join best ping": "Entrar no melhor ping", "Join emptiest": "Entrar no mais vazio", "Just remind me": "Só me lembrar", "Keystrokes & clicks overlay": "Overlay de teclas e cliques", "Lag spike alerts": "Alertas de picos de lag", "Large": "Grande", "Last played": "Última vez", "Last server": "Último servidor", "Last session": "Última sessão", "Launch Roblox": "Abrir Roblox", "Launch with Roblox": "Abrir junto com o Roblox", "Let other apps go first when you tab out": "Priorizar outros apps ao sair do Roblox", "Library": "Biblioteca", "Light": "Claro", "Lighting quality": "Qualidade de iluminação", "Live ping on the badge": "Ping ao vivo no selo", "Load more": "Carregar mais", "Loading game stats...": "Carregando estatísticas...", "Looking for Roblox...": "Procurando o Roblox...", "Looking them up...": "Buscando...", "Low": "Baixo", "Lowest": "Mínimo", "Make Orbit (and Roblox's icon) yours.": "Deixe o Orbit (e o ícone do Roblox) do seu jeito.", "Make my card": "Criar meu cartão", "Max": "Máx", "Max FPS": "Máx FPS", "Medium": "Médio", "Mod profiles": "Perfis de mods", "Mods": "Mods", "Most empty": "Mais vazio", "Most full": "Mais cheio", "Most played": "Mais jogados", "Movement": "Movimento", "My image": "Minha imagem", "No font mod.": "Sem mod de fonte.", "No mods in this profile yet.": "Ainda não há mods neste perfil.", "No server yet": "Nenhum servidor ainda", "Normal": "Normal", "Nothing tracked yet.": "Nada registrado ainda.", "Off": "Desligado", "Offer to rejoin after a crash": "Oferecer voltar após um crash", "Open": "Abrir", "Open Developer Portal": "Abrir portal do desenvolvedor", "Open Roblox folder": "Abrir pasta do Roblox", "Open folder": "Abrir pasta", "Open launcher log": "Abrir log", "Orbit packs": "Packs do Orbit", "Overlay position": "Posição do overlay", "Paste a game link or place ID": "Cole um link de jogo ou ID", "Performance": "Desempenho", "Ping": "Ping", "Play": "Jogar", "Play a game through Orbit first": "Jogue algo pelo Orbit primeiro", "Play a game to start unlocking.": "Jogue algo para começar a desbloquear.", "Play calendar": "Calendário de jogo", "Player card": "Cartão de jogador", "Players": "Jogadores", "Preview": "Prévia", "Priority for Roblox": "Prioridade para o Roblox", "Put Roblox back to stock": "Deixar o Roblox original", "Quick actions": "Ações rápidas", "Quick presets": "Predefinições rápidas", "Recent": "Recentes", "Recent problems": "Problemas recentes", "Recent servers": "Servidores recentes", "Recent sessions": "Sessões recentes", "Recently played": "Jogados recentemente", "Refresh": "Atualizar", "Region hopper": "Pulador de região", "Region test": "Teste de região", "Reinstall": "Reinstalar", "Reinstall Roblox": "Reinstalar Roblox", "Rejoin": "Voltar", "Remove": "Remover", "Repair Roblox": "Reparar Roblox", "Reset": "Redefinir", "Reset flags": "Redefinir flags", "Reset my FastFlags": "Redefinir meus FastFlags", "Restore": "Restaurar", "Restore stock": "Restaurar original", "Roblox default": "Padrão do Roblox", "Roblox graphics quality": "Qualidade gráfica do Roblox", "Roblox icon": "Ícone do Roblox", "Roblox updates": "Atualizações do Roblox", "Roblox's choice": "O Roblox decide", "Run checks again": "Verificar de novo", "Running checks...": "Verificando...", "Save": "Salvar", "Save as image": "Salvar como imagem", "Save crosshair": "Salvar mira", "Saved": "Salvo", "Saved servers": "Servidores salvos", "Scanning servers...": "Procurando servidores...", "Screenshots": "Capturas", "Search pages, games and actions...": "Busque páginas, jogos e ações...", "Server badge while playing": "Selo do servidor durante o jogo", "Server location popup": "Aviso de local do servidor", "Server locations": "Locais dos servidores", "Servers": "Servidores", "Session history": "Histórico de sessões", "Session timer on the badge": "Cronômetro no selo", "Sessions": "Sessões", "Share this profile": "Compartilhar este perfil", "Shortcuts": "Atalhos", "Show clicks per second": "Mostrar cliques por segundo", "Show in folder": "Mostrar na pasta", "Show more": "Mostrar mais", "Show my game on Discord": "Mostrar meu jogo no Discord", "Show the game you're playing on your Discord profile.": "Mostre o jogo que você está jogando no seu perfil do Discord.", "Show the game's icon": "Mostrar o ícone do jogo", "Size & sharing": "Tamanho e compartilhamento", "Small": "Pequeno", "Smart join": "Entrada inteligente", "Sort by game": "Organizar por jogo", "Sort new screenshots by game": "Organizar novas capturas por jogo", "Sounds": "Sons", "Squeeze out more FPS and open your other apps automatically.": "Ganhe mais FPS e abra seus outros apps automaticamente.", "Starfield": "Estrelas", "Start menu": "Menu Iniciar", "Start with Windows": "Iniciar com o Windows", "Startup animation": "Animação de abertura", "Stats": "Estatísticas", "Streamer mode": "Modo streamer", "Style": "Estilo", "Swap Roblox's sounds, cursors, fonts and textures. Originals come back when you remove a mod.": "Troque sons, cursores, fontes e texturas do Roblox. Os originais voltam ao remover um mod.", "The people behind Orbit.": "As pessoas por trás do Orbit.", "Theme": "Tema", "Theme code": "Código do tema", "Theme gallery": "Galeria de temas", "Time": "Tempo", "Today": "Hoje", "Top game": "Jogo top", "Top left": "Superior esquerdo", "Top right": "Superior direito", "Total play time": "Tempo total de jogo", "Track play time": "Registrar tempo de jogo", "Turn off Xbox background recording": "Desativar gravação em segundo plano do Xbox", "Tweaks": "Ajustes", "Unlimited": "Ilimitado", "Unlocked automatically as you play through Orbit.": "Desbloqueadas automaticamente enquanto você joga pelo Orbit.", "Update automatically": "Atualizar automaticamente", "Update ready": "Atualização pronta", "Use Orbit for Roblox links": "Usar o Orbit para links do Roblox", "Use it on the Roblox window": "Usar na janela do Roblox", "Use my fastest graphics card": "Usar minha placa de vídeo mais rápida", "Volume": "Volume", "Warp speed": "Velocidade warp", "Weekly recap": "Resumo semanal", "What's new": "Novidades", "Windows Game Mode": "Modo de Jogo do Windows", "Your favorite games. Each one can have its own FastFlags and mod pack.": "Seus jogos favoritos. Cada um pode ter seus próprios FastFlags e pack de mods.", "Your play time, weekly recap and full session history.": "Seu tempo de jogo, resumo semanal e histórico completo.", "played this week": "jogado nesta semana", "▶ Play": "▶ Tocar", "News": "Notícias", "Pack store": "Loja de packs", "Friend alerts": "Alertas de amigos", "Share to Discord": "Compartilhar no Discord", "Stream overlay": "Overlay para live", "Storage cleaner": "Limpador de armazenamento", "Settings sync": "Sincronizar configurações", "Language": "Idioma", "Emoji style": "Estilo de emoji", "Orbit level": "Nível do Orbit", "Session report": "Resumo da sessão", "Game update alerts": "Alertas de atualização de jogos", "Clean": "Limpar", "Copy link": "Copiar link", "Open in browser": "Abrir no navegador", "Share player card": "Compartilhar cartão", "Share weekly recap": "Compartilhar resumo", "Share join link": "Compartilhar link para entrar", "Sync now": "Sincronizar agora", "Restore from sync": "Restaurar da sincronização", "Auto-clean weekly": "Limpeza automática", "Get": "Obter", "Installed": "Instalado", "Read more": "Ler mais", "Mark all read": "Marcar tudo como lido", "Windows emoji": "Emojis do Windows", "Recap after each session": "Resumo ao fim de cada sessão", "Level": "Nível"} };
+let LANG = "en", langObs = null;
+function trText(n) {
+  const dict = I18N[LANG]; if (!dict) return;
+  const raw = n.nodeValue, t = raw.trim(); if (!t || !dict[t] || dict[t] === t) return;
+  const next = raw.replace(t, dict[t]); if (next !== raw) n.nodeValue = next;
+}
+function trTree(root) {
+  const dict = I18N[LANG]; if (!dict || !root) return;
+  if (root.nodeType === 3) return trText(root);
+  if (root.nodeType !== 1) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+  while ((n = w.nextNode())) trText(n);
+  (root.querySelectorAll ? [root, ...root.querySelectorAll("[placeholder],[title]")] : []).forEach((el) => {
+    for (const a of ["placeholder", "title"]) { const v = el.getAttribute && el.getAttribute(a); if (v && dict[v.trim()] && dict[v.trim()] !== v) el.setAttribute(a, dict[v.trim()]); }
+  });
+}
+function startI18n() {
+  LANG = (cfg && cfg.language) || "en";
+  if (LANG === "en" || !I18N[LANG]) return;
+  document.documentElement.lang = LANG;
+  trTree(document.body);
+  langObs = new MutationObserver((muts) => { for (const m of muts) { if (m.type === "characterData") trText(m.target); else m.addedNodes.forEach((n) => trTree(n)); } });
+  langObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+function renderLang() {
+  const box = $("#langCard"); if (!box) return; box.innerHTML = "";
+  const seg = segmented([["en", "English"], ["es", "Español"], ["pt", "Português"]], cfg.language || "en", async (v) => { cfg.language = v; await saveNow(); toast("Switching language..."); setTimeout(() => api.reload_ui(), 500); });
+  box.append(h("div", { class: "toggle-row", style: "padding:0" }, h("div", { class: "t" }, h("b", {}, "Language"), h("span", {}, "Menus, titles, buttons and setting names. Longer help text is still English for now.")), seg));
+  requestAnimationFrame(() => seg._remeasure());
+}
+
+async function renderNews(refresh) {
+  const box = $("#newsList"); box.innerHTML = "";
+  box.append(h("div", { class: "row" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Loading news...")));
+  const r = await api.news(); box.innerHTML = "";
+  const posts = r.posts || [], seen = new Set(cfg.news_seen || []);
+  if (!posts.length) { box.append(h("p", { class: "sub", style: "margin:0" }, "No news yet. Check back soon!")); return; }
+  posts.forEach((p, i) => box.append(h("div", { class: "news-post", style: `--i:${i}` },
+    h("h3", {}, p.title, seen.has(p.id) ? h("span") : h("span", { class: "new" }, "NEW")),
+    h("div", { class: "meta" }, [p.date, p.author].filter(Boolean).join(" · ")),
+    h("div", { class: "body" }, p.body || ""), ...(p.image ? [h("img", { src: p.image, alt: "" })] : []),
+    ...(p.link ? [h("div", { style: "margin-top:10px" }, h("button", { class: "btn", onclick: () => api.open_url(p.link) }, "Read more"))] : []))));
+  await api.mark_news(posts.map((p) => p.id)); cfg.news_seen = [...new Set([...posts.map((p) => p.id), ...(cfg.news_seen || [])])];
+  updateNewsDot(0);
+}
+function updateNewsDot(n) {
+  const item = $('.nav-item[data-page="news"]'); if (!item) return;
+  item.querySelector(".nav-dot")?.remove();
+  if (n > 0) item.append(h("span", { class: "nav-dot" }, String(n)));
+}
+async function checkNews() {
+  const r = await api.news().catch(() => null); if (!r) return;
+  const seen = new Set(cfg.news_seen || []), fresh = (r.posts || []).filter((p) => !seen.has(p.id));
+  updateNewsDot(fresh.length);
+  if (fresh.length && page !== "news") toast(`News: ${fresh[0].title}`, "ok");
+}
+
+let storeCache = null;
+async function renderStore(refresh) {
+  const box = $("#storeCard"); if (!box) return;
+  box.innerHTML = "";
+  box.append(h("div", { class: "row", style: "margin-bottom:10px" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Pack store"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "New crosshairs, cursors, sounds and fonts, added by the Orbit team without needing an update.")),
+    h("button", { class: "btn ghost", onclick: () => { storeCache = null; renderStore(true); } }, "Refresh")));
+  if (!storeCache || refresh) storeCache = await api.store();
+  const items = storeCache.items || [];
+  if (!items.length) { box.append(h("p", { class: "muted small", style: "margin:0" }, "The store is empty right now.")); return; }
+  const grid = h("div", { class: "store-grid" });
+  items.forEach((it, i) => {
+    const get = h("button", { class: "btn primary" }, "Get");
+    get.onclick = async () => { get.disabled = true; get.textContent = "Getting..."; const r = await api.install_store_item(it.id); get.disabled = false; get.textContent = "Get";
+      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed. It shows next time Roblox starts through Orbit.`, "ok"); renderPacks(); if (it.kind === "font") renderFonts(); };
+    grid.append(h("div", { class: "store-item", style: `--i:${i}` }, h("div", { class: "pv" }, it.preview_url ? h("img", { src: it.preview_url, alt: "" }) : h("span", { class: "muted small" }, it.kind)),
+      h("div", {}, h("b", {}, it.name), h("div", { class: "muted small" }, (PACK_KINDS[it.kind] || it.kind) + (it.author ? " · " + it.author : ""))),
+      h("div", { class: "small muted" }, it.desc || ""), get));
+  });
+  box.append(grid);
+}
+
+async function renderLevel() {
+  const box = $("#levelCard"); if (!box) return;
+  const lv = await api.level(); box.innerHTML = "";
+  const bar = h("i");
+  box.append(h("div", { class: "level-card" }, h("div", { class: "level-badge" }, String(lv.level)),
+    h("div", { style: "flex:1" }, h("div", { class: "stat-label" }, "Orbit level"), h("div", { style: "font-size:20px;font-weight:750" }, `Level ${lv.level} · ${lv.title}`),
+      h("div", { class: "level-bar" }, bar), h("div", { class: "muted small" }, `${lv.xp} XP · ${lv.next} XP to level ${lv.level + 1} · 1 XP per minute played, 100 per achievement, 25 per day you play`))));
+  setTimeout(() => (bar.style.width = lv.progress * 100 + "%"), 150);
+}
+async function checkLevel() {
+  const lv = await api.level().catch(() => null);
+  if (lv && lv.up) { sfx("achievement"); burst(innerWidth / 2, innerHeight / 3, 140); achToast("⭐", `Level ${lv.level}!`, `You're now a ${lv.title}.`); }
+}
+
+async function renderReport() {
+  const box = $("#reportCard"); if (!box) return;
+  const r = await api.last_report(); box.innerHTML = "";
+  if (!r || Date.now() / 1000 - r.at > 2 * 86400) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const chips = [fmtDur(r.seconds)];
+  if (r.ping) chips.push(`avg ${r.ping.avg} ms`);
+  chips.push(r.spikes ? `${r.spikes} lag spike${r.spikes === 1 ? "" : "s"}` : "no lag spikes");
+  if (r.fps) chips.push(`${r.fps.avg} fps · 1% low ${r.fps.low1}`);
+  if (r.problems && r.problems.length) chips.push(`${r.problems.length} disconnect${r.problems.length === 1 ? "" : "s"}`);
+  if (r.location && !cfg.session.streamer_mode) chips.push(r.location);
+  box.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("div", { class: "stat-label" }, "Last session · " + fmtAgo(r.at)), h("b", { style: "font-size:16px" }, r.name)),
+    h("button", { class: "btn ghost", onclick: () => openGame(r.place_id) }, "Game stats")), h("div", { class: "report" }, ...chips.map((c) => h("span", {}, c))));
+}
+
+async function renderStorage() {
+  const box = $("#storageCard"); if (!box) return;
+  const list = await api.storage(); box.innerHTML = "";
+  if (list.error) return;
+  const mb = (b) => b > 1073741824 ? (b / 1073741824).toFixed(1) + " GB" : (b / 1048576).toFixed(b > 1048576 * 10 ? 0 : 1) + " MB";
+  const total = list.reduce((n, c) => n + (c.auto ? c.bytes : 0), 0);
+  cfg.storage = cfg.storage || { auto_clean: false };
+  box.append(h("div", { class: "row", style: "margin-bottom:6px" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Storage cleaner"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, `${mb(total)} can be freed safely.`))));
+  list.forEach((c) => {
+    const btn = h("button", { class: "btn", disabled: c.bytes < 1048576 || c.id === "screenshots" }, c.id === "screenshots" ? "Kept" : c.id === "clips" ? "Clean 30d+" : "Clean");
+    btn.onclick = async () => { btn.disabled = true; const r = await api.clean_storage(c.id); if (r.error) { btn.disabled = false; return toast(r.error, "err"); } toast(`Freed ${mb(r.freed)}.`, "ok"); renderStorage(); };
+    box.append(h("div", { class: "store-row" }, h("div", {}, h("b", {}, c.title), h("span", {}, c.desc)), h("div", { class: "num" }, mb(c.bytes)), btn));
+  });
+  box.append(toggleRow("Auto-clean weekly", "Every day or so, Orbit removes old Roblox logs, its own temporary files and old Roblox versions (when Roblox is closed).", !!cfg.storage.auto_clean, (v) => { cfg.storage.auto_clean = v; save(); }));
+}
+
+async function renderSync() {
+  const box = $("#syncBox"); if (!box) return;
+  const r = await api.sync_info(); box.innerHTML = "";
+  const opts = [["", "Off"], ...r.candidates.map((c) => [c.path, c.name])];
+  const seg = segmented(opts, r.folder || "", async (v) => { const x = await api.set_sync(v); if (x.error) return toast(x.error, "err"); syncSettings(x); toast(v ? "Synced. Orbit keeps a backup there and updates it every few hours." : "Settings sync is off.", "ok"); renderSync(); });
+  box.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Settings sync"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, r.candidates.length ? "Keeps a backup of everything in your cloud folder, so a new PC can pick it up." : "No OneDrive, Google Drive or Dropbox folder found on this PC.")), seg));
+  if (r.folder) box.append(h("div", { class: "row", style: "margin-top:8px" }, h("span", { class: "muted small", style: "flex:1" }, r.last ? `Last synced ${fmtAgo(r.last)}` : "Not synced yet"),
+    h("button", { class: "btn ghost", onclick: async () => { const x = await api.set_sync(r.folder); x.error ? toast(x.error, "err") : (toast("Synced.", "ok"), renderSync()); } }, "Sync now"),
+    ...(r.remote_newer ? [h("button", { class: "btn primary", onclick: async () => { if (!(await modal({ title: "Restore from sync?", text: "This replaces your settings, mods and stats with the synced backup.", ok: "Restore", danger: true }))) return; const x = await api.restore_sync(); x && x.error ? toast(x.error, "err") : (toast("Restored. Reloading...", "ok"), setTimeout(() => api.reload_ui(), 800)); } }, "Restore from sync")] : [])));
+  requestAnimationFrame(() => seg._remeasure());
+}
+
+function renderShareDc() {
+  const box = $("#shareCardDc"); if (!box) return; box.innerHTML = "";
+  const inp = h("input", { class: "input mono", placeholder: "https://discord.com/api/webhooks/...", value: cfg.discord.webhook || "", style: "flex:1" });
+  inp.onchange = async () => { const r = await api.set_webhook(inp.value); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(inp.value ? "Webhook saved." : "Webhook removed.", "ok"); renderShareDc(); };
+  const share = (kind, label) => h("button", { class: "btn", disabled: !cfg.discord.webhook, onclick: async (e) => { const b = e.currentTarget; b.disabled = true; const r = await api.share_discord(kind); b.disabled = false; r && r.error ? toast(r.error, "err") : toast("Posted to Discord.", "ok"); } }, label);
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Share to Discord"), h("p", { class: "sub" }, "Paste a channel webhook once (channel settings > Integrations > Webhooks > Copy Webhook URL), then post with one click."),
+    h("div", { class: "row" }, inp), h("div", { class: "row", style: "margin-top:10px" }, share("card", "Share player card"), share("recap", "Share weekly recap"), share("join", "Share join link")));
+}
+async function renderOverlay() {
+  const box = $("#overlayCard"); if (!box) return;
+  const url = await api.overlay_url(); box.innerHTML = "";
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Stream overlay"), h("p", { class: "sub" }, "A live card for OBS showing your game, server region, session time, ping and FPS. In OBS: Sources > + > Browser, paste this link, size 520 x 140. It follows streamer mode."),
+    h("div", { class: "row" }, h("input", { class: "input mono", readonly: true, value: url, style: "flex:1" }),
+      h("button", { class: "btn", onclick: async () => { await api.copy_text(url); toast("Overlay link copied.", "ok"); } }, "Copy link"),
+      h("button", { class: "btn", onclick: () => api.open_url(url) }, "Open in browser")));
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
@@ -2462,6 +2668,12 @@ function palActions() {
   A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
   A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: "Boost", run: async () => { const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
   A.push({ ico: "▣", t: "Mini player", k: "Window", run: () => $("#miniBtn").click() });
+  A.push({ ico: "📰", t: "Orbit news", k: "Orbit", run: () => go("news") });
+  A.push({ ico: "🛒", t: "Pack store", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#storeCard").scrollIntoView({ behavior: "smooth" }), 400); } });
+  A.push({ ico: "📺", t: "Stream overlay link", k: "Discord", run: async () => { const u = await api.overlay_url(); await api.copy_text(u); toast("Overlay link copied.", "ok"); } });
+  A.push({ ico: "🧹", t: "Storage cleaner", k: "Health", run: () => { go("health"); setTimeout(() => $("#storageCard").scrollIntoView({ behavior: "smooth" }), 500); } });
+  A.push({ ico: "⭐", t: "My Orbit level", k: "You", run: () => go("achievements") });
+  A.push({ ico: "🌐", t: "Language", k: "Appearance", run: () => { go("appearance"); setTimeout(() => $("#langCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "🔗", t: "Copy join link", k: "Share", run: async () => { const r = await api.join_link(); r.error ? toast(r.error, "err") : toast("Join link copied.", "ok"); } });
   A.push({ ico: "👤", t: "Join a player", k: "Library", run: () => { go("library"); setTimeout(() => $("#joinCard input").focus(), 400); } });
   A.push({ ico: "📡", t: "Test regions", k: "Servers", run: () => { go("servers"); setTimeout(() => renderRegion(true), 300); } });
@@ -2635,6 +2847,7 @@ function wire() {
   });
 
   $("#healthRun").onclick = () => renderHealth();
+  $("#newsRefresh").onclick = () => renderNews(true);
   $("#miniBtn").onclick = async () => { const r = await api.toggle_mini(); if (r && r.error) toast(r.error, "err"); };
   $("#shotSort").onclick = async () => { const r = await api.sort_screenshots(); if (r.error) return toast(r.error, "err"); toast(r.moved ? `Moved ${r.moved} screenshot${r.moved === 1 ? "" : "s"} into game folders.` : "Nothing to sort. Only screenshots taken during a tracked session can be matched to a game.", r.moved ? "ok" : ""); shotGame = ""; renderScreens(); };
   $("#packExport").onclick = async () => { await saveNow(); const r = await api.export_mod_pack(cfg.mod_profile); if (!r) return; r.error ? toast(r.error, "err") : toast(`Saved ${r.count} file${r.count === 1 ? "" : "s"} as a mod pack. Friends can open it with Import pack.`, "ok"); };
@@ -2731,7 +2944,7 @@ async function init() {
   $("#ver").textContent = "v" + S.version;
   if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
-  buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits();
+  buildNav(); wire(); wireUpdates(); wireExtras(); renderCredits(); startI18n();
   go("home");
   api.ui_ready("app");
   let liveSig = JSON.stringify([S.playtime, S.last_server]), curSig = JSON.stringify(S.current || null);
@@ -2747,6 +2960,8 @@ async function init() {
   window.addEventListener("focus", liveTick);
   setTimeout(showWhatsNew, 900);
   setTimeout(checkAchievements, 2600);
+  setTimeout(checkLevel, 3400);
+  setTimeout(checkNews, 4200);
   setTimeout(() => checkUpdates(false), 1800);
   api.check_version().then((r) => {
     if (!r) return;

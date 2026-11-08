@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.3.0
+- **Friend alerts:** tap the bell next to a player in Library > Join a player and you'll get a popup when they start playing. Press Ctrl+Alt+F to join them.
+- **Share to Discord:** paste a channel webhook once, then post your player card, weekly recap or a join link with one click (Discord page).
+- **Stream overlay:** a live card for OBS with your game, server region, session time, ping and FPS. Add it as a Browser source (Discord page). Follows streamer mode.
+- **Orbit News:** a new News page with updates, events and giveaways, plus a badge when there's something new.
+- **Pack store:** new crosshairs, cursors, sounds and fonts you can install in one click (Mods page), added without needing an Orbit update.
+- **Español and Português:** menus, titles, buttons and setting names (Appearance > Language).
+- **Game update alerts:** a popup when a game in your Library releases an update, and "updated" labels on Library cards.
+- **Session recap:** after each game, a popup and a Home card with your time, ping, lag spikes, FPS and disconnects.
+- **Orbit levels:** earn XP from play time, achievements and days played. Your level and title show on Achievements and your player card.
+- **Storage cleaner:** see what's taking space (old Roblox versions, logs, cache, Orbit temp files, clips) and clean it, or turn on auto-clean (Health page).
+- **Settings sync:** keeps a backup in your OneDrive, Google Drive or Dropbox folder so a new PC can restore everything (Credits page).
+- **Emoji style:** use your PC's Windows emoji in Roblox chat instead of Roblox's own (Mods > Fonts).
+
 ## v2.2.0
 - **Unlimited FPS is back** as an option, now with a **tab-out guard**: when Roblox isn't the window in front, Orbit drops it to low priority and Windows' power-saving mode, so Discord, your browser and the desktop stay smooth. Full speed returns the moment you click back into Roblox. The guard is on by default (Boost > Fine-tune).
 - **Join a player:** type a Roblox username in the Library to see if they're online or in a game, then join their server in one click. It works whenever their Roblox privacy lets you join them. Recent players are saved for quick rejoining.

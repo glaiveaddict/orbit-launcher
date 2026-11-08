@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -136,6 +136,12 @@ DEFAULT_SETTINGS = {
     "font": "",
     "profile": {"roblox_id": None, "username": "", "display": ""},
     "recent_players": [],
+    "emoji": "",
+    "language": "en",
+    "sync": {"folder": ""},
+    "storage": {"auto_clean": False},
+    "news_seen": [],
+    "last_level": 0,
     "fps": {"enabled": False},
     "replay": {"enabled": False, "seconds": 30, "fps": 30},
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True},
@@ -146,6 +152,7 @@ DEFAULT_SETTINGS = {
         "client_id": "",
         "show_join_button": False,
         "show_game_icon": True,
+        "webhook": "",
     },
     "session": {
         "server_popup": True,
@@ -166,6 +173,8 @@ DEFAULT_SETTINGS = {
         "bedtime": "",
         "bedtime_action": "remind",
         "badge_fps": True,
+        "session_report": True,
+        "game_update_alerts": True,
     },
     "appearance": {
         "mode": "Dark",
@@ -736,6 +745,9 @@ def apply_all(settings, version_dir=None, place_id=None):
                 overrides.update(font_overrides(settings, d))
             except Exception as e:
                 log(f"Font mod failed: {e}")
+        emoji = emoji_source(settings.get("emoji") or "") if settings.get("apply_mods", True) else None
+        if emoji:
+            overrides["content/fonts/TwemojiMozilla.ttf"] = emoji
         cross = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id is not None else None
         if cross and settings.get("apply_mods", True):
             src = crosshair_source(cross)
@@ -1552,7 +1564,7 @@ class SessionMonitor:
         if game is not None and self.game is game:
             save_json(CURRENT_FILE, {"place_id": game["place_id"], "job_id": game["job_id"], "name": game.get("name"),
                                      "joined": int(game["joined"]), "location": game.get("location"),
-                                     "icon": game.get("icon"), "ip": game.get("ip")})
+                                     "icon": game.get("icon"), "ip": game.get("ip"), "ping": game.get("ping")})
 
     def _join_details(self, game):
         info = game_info(game["place_id"])
@@ -1574,6 +1586,9 @@ class SessionMonitor:
                 break
             game["pings"].append([int(time.time()), ms])
             del game["pings"][:-720]
+            if ms is not None:
+                game["ping"] = ms
+                self._publish(game)
             time.sleep(10)
 
     def note_problem(self, line):
@@ -1657,6 +1672,13 @@ class SessionMonitor:
         if record and self.session.get("track_playtime"):
             record_playtime(game["place_id"], game["name"], seconds)
             record_session(game, seconds)
+        if record and seconds >= 120:
+            try:
+                _, line = write_session_report(game, seconds)
+                if self.session.get("session_report", True):
+                    spawn_toast(f"{game.get('name') or 'Session'} recap", line)
+            except Exception as e:
+                log(f"Session report failed: {e}")
         if record and self.session.get("sort_screenshots"):
             threading.Thread(target=sort_screenshots, daemon=True).start()
         self._discord(None)
@@ -2057,6 +2079,9 @@ class AutoAttach:
         self.last_guard = 0
 
     def tick(self):
+        if time.time() - getattr(self, "last_periodic", 0) > 20:
+            self.last_periodic = time.time()
+            threading.Thread(target=periodic_jobs, args=(self.owner,), daemon=True).start()
         if time.time() - self.last_guard > 30:
             self.last_guard = time.time()
             self.guard_links()
@@ -2151,6 +2176,7 @@ def background_main():
     save_json(BACKGROUND_FILE, {"pids": [os.getpid(), os.getppid()], "version": APP_VERSION})
     log(f"Background tracking started (v{APP_VERSION})")
     threading.Thread(target=hotkey_loop, args=("background",), daemon=True).start()
+    threading.Thread(target=OverlayServer.start, daemon=True).start()
     AutoAttach("background").loop(interval=6)
 
 
@@ -2184,7 +2210,8 @@ HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server
            4: (0x4F, "open", "Ctrl+Alt+O", "Open Orbit"),
            5: (0x53, "screenshot", "Ctrl+Alt+S", "Screenshot the Roblox window (saved and copied)"),
            6: (0x4A, "joinlink", "Ctrl+Alt+J", "Copy a link friends can use to join your server"),
-           7: (0x43, "clip", "Ctrl+Alt+C", "Save an instant replay of the last 30 seconds")}
+           7: (0x43, "clip", "Ctrl+Alt+C", "Save an instant replay of the last 30 seconds"),
+           8: (0x46, "joinfriend", "Ctrl+Alt+F", "Join the friend from your last friend alert")}
 
 
 def current_game():
@@ -2227,6 +2254,12 @@ def run_hotkey(action, force=False):
         spawn_toast("Replay saved" if r else "Replay isn't running", Path(r).name if r else "Turn on Instant replay in Boost first.")
     elif action == "launch":
         spawn_self(LAUNCH_FLAG, "")
+    elif action == "joinfriend":
+        fa = load_json(DATA_DIR / "friend_alert.json", None) or {}
+        if fa.get("id") and time.time() - fa.get("at", 0) < 3600:
+            spawn_self(LAUNCH_FLAG, follow_uri(fa["id"]))
+        else:
+            spawn_toast("No recent friend alert", "Turn on alerts for players in Library > Join a player.")
     elif action == "open":
         if pid_alive((load_json(GUI_FILE, {}) or {}).get("pids", [0])[0]):
             SHOW_FLAG.write_text(str(time.time()))
@@ -3802,6 +3835,9 @@ def player_card(settings):
     d.text((340, 100), name[:22], font=_font(64, True), fill=(245, 240, 255))
     if prof.get("username"):
         d.text((344, 180), "@" + prof["username"], font=_font(30), fill=(190, 180, 220))
+    lv = orbit_level()
+    d.rounded_rectangle([340, 236, 340 + 24 + int(_font(26, True).getlength(f"LEVEL {lv['level']} · {lv['title'].upper()}")), 280], 20, fill=a1)
+    d.text((352, 241), f"LEVEL {lv['level']} · {lv['title'].upper()}", font=_font(26, True), fill=(255, 255, 255))
     play = load_json(PLAYTIME_FILE, {}) or {}
     total = sum(e.get("seconds", 0) for e in play.values())
     sessions = _sessions()
@@ -3881,6 +3917,445 @@ def apply_jump_list():
         raise RuntimeError(errors[0])
     log("Taskbar jump list ready")
     return True
+
+
+PERIODIC_FILE = DATA_DIR / "periodic.json"
+PRESENCE_FILE = DATA_DIR / "presence.json"
+GAME_UPDATES_FILE = DATA_DIR / "game_updates.json"
+LAST_REPORT_FILE = DATA_DIR / "last_report.json"
+NEWS_FILE = DATA_DIR / "news_cache.json"
+STORE_FILE = DATA_DIR / "store_cache.json"
+OVERLAY_PORT = 17171
+WEBHOOK_RE = re.compile(r"https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+")
+
+
+def claim_periodic(owner):
+    st = load_json(PERIODIC_FILE, {}) or {}
+    mine = st.get("pid") == os.getpid()
+    if not mine and time.time() - st.get("at", 0) < 150 and pid_alive(st.get("pid")):
+        return False
+    save_json(PERIODIC_FILE, {"pid": os.getpid(), "owner": owner, "at": int(time.time())})
+    return True
+
+
+def presence_of(ids):
+    out = {}
+    for i in range(0, len(ids), 50):
+        data = post_json("https://presence.roblox.com/v1/presence/users", {"userIds": ids[i:i + 50]})
+        for p in data.get("userPresences", []):
+            out[str(p.get("userId"))] = p
+    return out
+
+
+def check_friend_alerts():
+    settings = load_settings()
+    watch = [x for x in settings.get("recent_players", []) if x.get("alert")]
+    if not watch:
+        return
+    pres = presence_of([int(x["id"]) for x in watch])
+    old = load_json(PRESENCE_FILE, {}) or {}
+    new = {}
+    for u in watch:
+        p = pres.get(str(u["id"])) or {}
+        t = p.get("userPresenceType", 0)
+        new[str(u["id"])] = t
+        if t == 2 and old.get(str(u["id"])) not in (2, None):
+            where = p.get("lastLocation") or "a game"
+            save_json(DATA_DIR / "friend_alert.json", {"id": u["id"], "name": u.get("display") or u.get("name"), "at": int(time.time())})
+            spawn_toast(f"{u.get('display') or u.get('name')} is playing", f"{where}. Press Ctrl+Alt+F to join them.")
+            log(f"Friend alert: {u.get('name')} started playing {where}")
+    save_json(PRESENCE_FILE, new)
+
+
+def check_game_updates():
+    settings = load_settings()
+    if not settings["session"].get("game_update_alerts", True) or not settings.get("library"):
+        return
+    unis = {}
+    for g in settings["library"]:
+        info = game_info(g["pid"])
+        if info.get("universe"):
+            unis[str(info["universe"])] = info.get("name") or g.get("name")
+    if not unis:
+        return
+    data = fetch_json("https://games.roblox.com/v1/games?universeIds=" + ",".join(list(unis)[:50]), timeout=10).get("data", [])
+    seen = load_json(GAME_UPDATES_FILE, {}) or {}
+    for d in data:
+        uid, updated = str(d.get("id")), d.get("updated")
+        if not updated:
+            continue
+        if seen.get(uid) and seen[uid] != updated:
+            spawn_toast(f"{d.get('name') or unis.get(uid)} just updated", "New version is live. Rejoin to get it.")
+            log(f"Game update: {d.get('name')} ({updated})")
+        seen[uid] = updated
+    save_json(GAME_UPDATES_FILE, seen)
+
+
+def game_updated_times(settings):
+    seen = load_json(GAME_UPDATES_FILE, {}) or {}
+    out = {}
+    for g in settings.get("library") or []:
+        info = _GAME_CACHE.get(str(g["pid"])) or cached_game(g["pid"]) or {}
+        stamp = seen.get(str(info.get("universe")))
+        if stamp:
+            try:
+                from datetime import datetime
+                out[str(g["pid"])] = int(datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp())
+            except Exception:
+                pass
+    return out
+
+
+def lag_spikes(pings):
+    vals, spikes = [], 0
+    for _, p in pings:
+        if p is None:
+            continue
+        if len(vals) >= 4:
+            base = sorted(vals[-12:])[len(vals[-12:]) // 2]
+            if p > max(150, base * 2.2, base + 80):
+                spikes += 1
+        vals.append(p)
+    return spikes
+
+
+def write_session_report(game, seconds):
+    problems = [x for x in (load_json(PROBLEMS_FILE, []) or []) if x.get("time", 0) >= game.get("joined", 0) - 5]
+    ping = ping_summary(game.get("pings") or [])
+    rep = {"name": game.get("name") or "Roblox", "place_id": str(game.get("place_id")), "seconds": int(seconds),
+           "location": game.get("location"), "ping": ping, "spikes": lag_spikes(game.get("pings") or []),
+           "fps": game.get("fps"), "problems": [x.get("title") for x in problems][:5], "at": int(time.time())}
+    save_json(LAST_REPORT_FILE, rep)
+    parts = [fmt_duration(seconds)]
+    if ping:
+        parts.append(f"avg {ping['avg']} ms")
+    if rep["spikes"]:
+        parts.append(f"{rep['spikes']} lag spike{'s' if rep['spikes'] != 1 else ''}")
+    if rep["fps"]:
+        parts.append(f"{rep['fps']['avg']} fps")
+    if rep["problems"]:
+        parts.append(f"{len(rep['problems'])} disconnect{'s' if len(rep['problems']) != 1 else ''}")
+    return rep, " · ".join(parts)
+
+
+def orbit_level():
+    play = load_json(PLAYTIME_FILE, {}) or {}
+    minutes = sum(e.get("seconds", 0) for e in play.values()) // 60
+    ach = sum(1 for x in achievements_state()["list"] if x["unlocked"])
+    days = len(calendar_data())
+    xp = int(minutes + ach * 100 + days * 25)
+    level = 1
+    while xp >= 60 * level * level:
+        level += 1
+    floor, ceil = 60 * (level - 1) ** 2, 60 * level * level
+    titles = [(1, "Stargazer"), (5, "Comet"), (10, "Orbiter"), (15, "Nova"), (20, "Pulsar"), (30, "Quasar"), (40, "Black Hole")]
+    title = [t for lv, t in titles if level >= lv][-1]
+    return {"xp": xp, "level": level, "title": title, "progress": round((xp - floor) / max(1, ceil - floor), 3),
+            "next": ceil - xp, "parts": {"minutes": minutes, "achievements": ach, "days": days}}
+
+
+def dir_size(p):
+    try:
+        if p.is_file():
+            return p.stat().st_size
+        return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    except OSError:
+        return 0
+
+
+def storage_report():
+    root = LOCALAPPDATA / "Roblox" / "Versions"
+    players = player_dirs()
+    old_versions = [d for d in players[1:] if d.parent == root]
+    logs = [p for p in ROBLOX_LOGS.glob("*.log") if p.stat().st_mtime < time.time() - 86400] if ROBLOX_LOGS.is_dir() else []
+    temp = [p for p in (DATA_DIR / "rbx-download", DATA_DIR / "fps", DATA_DIR / "fontcache", REPLAY_DIR) if p.exists()]
+    clips = Path.home() / "Videos" / "Orbit"
+    shots = screenshot_dirs()
+    cats = [
+        ("old_versions", "Old Roblox versions", "Older copies of Roblox kept after updates.", sum(dir_size(d) for d in old_versions), True),
+        ("logs", "Old Roblox logs", "Log files older than a day.", sum(dir_size(p) for p in logs), True),
+        ("cache", "Roblox cache", "Downloaded game files. Roblox re-downloads what it needs.", sum(dir_size(p) for p in roblox_cache_paths() if "logs" not in str(p)), True),
+        ("orbit_temp", "Orbit temporary files", "Leftover downloads, FPS data and replay buffers.", sum(dir_size(p) for p in temp), True),
+        ("clips", "Replay clips", "Clips saved with Ctrl+Alt+C (Videos\\Orbit).", dir_size(clips) if clips.exists() else 0, False),
+        ("screenshots", "Screenshots", "Your Roblox screenshots. Never cleaned automatically.", sum(dir_size(d) for d in shots), False),
+    ]
+    return [{"id": c, "title": t, "desc": d, "bytes": b, "auto": a} for c, t, d, b, a in cats]
+
+
+def clean_storage(cat):
+    if cat in ("old_versions", "cache") and roblox_running():
+        raise OSError("Close Roblox first.")
+    freed = 0
+    if cat == "old_versions":
+        root = LOCALAPPDATA / "Roblox" / "Versions"
+        for d in [d for d in player_dirs()[1:] if d.parent == root]:
+            freed += dir_size(d)
+            shutil.rmtree(d, ignore_errors=True)
+    elif cat == "logs":
+        for p in ROBLOX_LOGS.glob("*.log"):
+            if p.stat().st_mtime < time.time() - 86400:
+                freed += dir_size(p)
+                p.unlink(missing_ok=True)
+    elif cat == "cache":
+        for p in roblox_cache_paths():
+            freed += dir_size(p)
+            shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+    elif cat == "orbit_temp":
+        for p in (DATA_DIR / "rbx-download", DATA_DIR / "fps", DATA_DIR / "fontcache"):
+            freed += dir_size(p)
+            shutil.rmtree(p, ignore_errors=True)
+        if not (Replay.proc and Replay.proc.poll() is None):
+            freed += dir_size(REPLAY_DIR)
+            shutil.rmtree(REPLAY_DIR, ignore_errors=True)
+    elif cat == "clips":
+        clips = Path.home() / "Videos" / "Orbit"
+        for p in clips.glob("*.mp4") if clips.exists() else []:
+            if p.stat().st_mtime < time.time() - 30 * 86400:
+                freed += dir_size(p)
+                p.unlink(missing_ok=True)
+    else:
+        raise ValueError("That can't be cleaned from here.")
+    log(f"Cleaned {cat}: {freed / 1048576:.1f} MB")
+    return freed
+
+
+def sync_candidates():
+    home = Path.home()
+    out = []
+    for env in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial"):
+        if os.environ.get(env) and Path(os.environ[env]).is_dir():
+            out.append(("OneDrive", Path(os.environ[env])))
+    for p in (home / "Google Drive", home / "My Drive", Path("G:/My Drive"), home / "Dropbox", home / "iCloudDrive"):
+        try:
+            if p.is_dir():
+                out.append((p.name if p.name != "My Drive" else "Google Drive", p))
+        except OSError:
+            pass
+    seen, uniq = set(), []
+    for name, p in out:
+        if str(p) not in seen:
+            seen.add(str(p))
+            uniq.append({"name": name, "path": str(p)})
+    return uniq
+
+
+def sync_file(settings):
+    folder = (settings.get("sync") or {}).get("folder")
+    return Path(folder) / "Orbit" / "Orbit-sync.orbitbackup" if folder else None
+
+
+def run_sync(settings, force=False):
+    f = sync_file(settings)
+    if not f:
+        return None
+    meta = load_json(DATA_DIR / "sync.json", {}) or {}
+    if not force and time.time() - meta.get("at", 0) < 6 * 3600:
+        return None
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    export_backup(tmp, settings)
+    os.replace(tmp, f)
+    save_json(DATA_DIR / "sync.json", {"at": int(time.time()), "file": str(f)})
+    log(f"Synced backup to {f}")
+    return str(f)
+
+
+def emoji_source(style):
+    if style == "windows" and IS_WINDOWS:
+        f = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / "seguiemj.ttf"
+        return f if f.exists() else None
+    return None
+
+
+def raw_url(path):
+    repo = update_repo()
+    return f"https://raw.githubusercontent.com/{repo}/main/{path}" if repo else None
+
+
+def fetch_news():
+    url = raw_url("news.json")
+    if not url:
+        return load_json(NEWS_FILE, {"posts": []})
+    try:
+        data = fetch_json(url + f"?t={int(time.time() // 300)}", timeout=10)
+        posts = [p for p in (data.get("posts") or []) if isinstance(p, dict) and p.get("id") and p.get("title")][:30]
+        save_json(NEWS_FILE, {"posts": posts, "at": int(time.time())})
+        return {"posts": posts}
+    except Exception as e:
+        log(f"News fetch failed: {e}")
+        return load_json(NEWS_FILE, {"posts": []})
+
+
+STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font"}
+STORE_ROOTS = ("content/", "PlatformContent/", "ExtraContent/")
+
+
+def fetch_store():
+    url = raw_url("store/index.json")
+    if not url:
+        return load_json(STORE_FILE, {"items": []})
+    try:
+        data = fetch_json(url + f"?t={int(time.time() // 300)}", timeout=10)
+        items = []
+        for it in data.get("items") or []:
+            if not isinstance(it, dict) or it.get("kind") not in STORE_KINDS or not it.get("id") or not it.get("files"):
+                continue
+            if not re.fullmatch(r"[a-z0-9_-]{2,40}", str(it["id"])):
+                continue
+            it["preview_url"] = raw_url("store/" + it["preview"]) if it.get("preview") else None
+            items.append(it)
+        save_json(STORE_FILE, {"items": items, "at": int(time.time())})
+        return {"items": items}
+    except Exception as e:
+        log(f"Store fetch failed: {e}")
+        return load_json(STORE_FILE, {"items": []})
+
+
+def install_store_item(settings, item_id):
+    items = (load_json(STORE_FILE, {}) or {}).get("items") or []
+    it = next((x for x in items if x.get("id") == item_id), None)
+    if not it:
+        raise ValueError("That item isn't in the store anymore.")
+    folder = mods_dir(settings)
+    count = 0
+    for target, src in it["files"].items():
+        if it["kind"] != "font" and not str(target).startswith(STORE_ROOTS):
+            continue
+        if ".." in str(target).split("/") or ".." in str(src).split("/"):
+            continue
+        url = raw_url("store/" + src)
+        if it["kind"] == "font":
+            FONT_DIR.mkdir(parents=True, exist_ok=True)
+            for old in FONT_DIR.glob("custom.*"):
+                old.unlink(missing_ok=True)
+            ext = ".otf" if str(src).lower().endswith(".otf") else ".ttf"
+            download_file(url, FONT_DIR / ("custom" + ext))
+            settings["font"] = "custom"
+        else:
+            download_file(url, folder / target)
+        count += 1
+    settings["apply_mods"] = True
+    save_settings(settings)
+    log(f"Installed store item {item_id} ({count} files)")
+    return count
+
+
+class OverlayServer:
+    started = False
+
+    @classmethod
+    def start(cls):
+        if cls.started:
+            return
+        import http.server
+        page = OVERLAY_HTML
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                path = self.path.split("?")[0]
+                if path in ("/", "/overlay"):
+                    body, ctype = page.encode("utf-8"), "text/html; charset=utf-8"
+                elif path == "/state":
+                    settings = load_settings()
+                    cur = load_json(CURRENT_FILE, None) or {}
+                    streamer = settings["session"].get("streamer_mode")
+                    live = load_json(FPS_LIVE_FILE, None) or {}
+                    st = {"game": cur.get("name"), "joined": cur.get("joined"), "ping": cur.get("ping"),
+                          "location": None if streamer else cur.get("location"),
+                          "region": next((r for r in REGIONS if in_region(cur.get("location"), r)), None),
+                          "fps": live.get("fps") if time.time() - live.get("at", 0) < 5 else None,
+                          "accent": accent_pair(settings["appearance"]), "level": orbit_level()["level"]}
+                    body, ctype = json.dumps(st).encode(), "application/json"
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        try:
+            srv = http.server.ThreadingHTTPServer(("127.0.0.1", OVERLAY_PORT), Handler)
+        except OSError:
+            return
+        cls.started = True
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        log(f"Stream overlay ready at http://127.0.0.1:{OVERLAY_PORT}/overlay")
+
+
+OVERLAY_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:transparent;font-family:'Segoe UI',system-ui,sans-serif;color:#fff;overflow:hidden}
+.card{display:inline-flex;align-items:center;gap:14px;padding:12px 18px 12px 12px;border-radius:18px;background:rgba(10,6,20,.82);
+border:2px solid var(--a);box-shadow:0 0 26px -6px var(--a);transition:opacity .5s,transform .5s}
+.card.hide{opacity:0;transform:translateY(10px)}
+.hole{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#000 40%,var(--a) 46%,transparent 72%);flex:none}
+.g{font-weight:700;font-size:20px;line-height:1.1}.s{font-size:14px;opacity:.85;margin-top:3px}
+.chips{display:flex;gap:6px;margin-top:6px}.chip{font-size:13px;font-weight:700;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1)}
+.good{color:#4ade80}.mid{color:#fbbf24}.bad{color:#fb7185}
+</style></head><body><div class="card hide" id="c"><div class="hole"></div><div><div class="g" id="g">Roblox</div><div class="s" id="s"></div>
+<div class="chips"><span class="chip" id="t">0:00</span><span class="chip" id="p"></span><span class="chip" id="f"></span></div></div></div>
+<script>
+let st=null;const $=(i)=>document.getElementById(i);
+const fmt=(x)=>{x=Math.max(0,Math.floor(x));const h=Math.floor(x/3600),m=Math.floor(x%3600/60),s=x%60;return h?`${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`:`${m}:${String(s).padStart(2,"0")}`};
+async function poll(){try{st=await (await fetch("/state",{cache:"no-store"})).json();}catch(e){}draw();}
+function draw(){const c=$("c");if(!st||!st.game){c.classList.add("hide");return;}c.classList.remove("hide");
+document.documentElement.style.setProperty("--a",st.accent[0]);$("g").textContent=st.game;
+$("s").textContent=st.location||st.region||"";$("t").textContent=fmt(Date.now()/1000-st.joined);
+const p=$("p");p.style.display=st.ping==null?"none":"";p.textContent=st.ping+" ms";p.className="chip "+(st.ping<80?"good":st.ping<150?"mid":"bad");
+const f=$("f");f.style.display=st.fps==null?"none":"";f.textContent=st.fps+" fps";}
+poll();setInterval(poll,2000);setInterval(draw,1000);
+</script></body></html>"""
+
+
+def share_to_discord(webhook, text=None, file=None):
+    if not WEBHOOK_RE.fullmatch(webhook or ""):
+        raise ValueError("That isn't a Discord webhook link. In Discord: channel settings > Integrations > Webhooks > Copy Webhook URL.")
+    boundary = uuid.uuid4().hex
+    parts = []
+    payload = json.dumps({"content": text or "", "username": "Orbit Launcher"})
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\nContent-Type: application/json\r\n\r\n{payload}\r\n'.encode())
+    if file:
+        f = Path(file)
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; filename="{f.name}"\r\nContent-Type: image/png\r\n\r\n'.encode()
+                     + f.read_bytes() + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    req = urllib.request.Request(webhook, data=b"".join(parts), method="POST",
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": f"{APP_NAME}/{APP_VERSION}"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.status
+
+
+def periodic_jobs(owner):
+    if not claim_periodic(owner):
+        return
+    now = time.time()
+    st = load_json(DATA_DIR / "periodic_runs.json", {}) or {}
+    jobs = [("friends", 60, check_friend_alerts), ("games", 30 * 60, check_game_updates),
+            ("sync", 30 * 60, lambda: run_sync(load_settings())), ("clean", 24 * 3600, auto_clean)]
+    for name, every, fn in jobs:
+        if now - st.get(name, 0) >= every:
+            st[name] = now
+            try:
+                fn()
+            except Exception as e:
+                log(f"Background job {name} failed: {e}")
+    save_json(DATA_DIR / "periodic_runs.json", st)
+
+
+def auto_clean():
+    if not (load_settings().get("storage") or {}).get("auto_clean"):
+        return
+    for cat in ("logs", "orbit_temp") + (() if roblox_running() else ("old_versions",)):
+        try:
+            clean_storage(cat)
+        except Exception as e:
+            log(f"Auto clean {cat}: {e}")
 
 
 def claim_monitor():
@@ -5041,6 +5516,7 @@ class Api:
             "accents": ACCENTS,
             "quick_presets": QUICK_PRESETS,
             "regions": list(REGIONS),
+            "game_updated": game_updated_times(self._settings),
             "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
             "credits": [{"role": r, "handle": h, "roblox_id": uid} for r, h, uid in CREDITS],
             "ext_path": str(EXTENSIONS_DIR / EXTENSION_NAME),
@@ -5849,6 +6325,136 @@ class Api:
         r = take_roblox_screenshot()
         return {"path": r} if r else {"error": "Open Roblox first."}
 
+    def toggle_alert(self, uid):
+        for x in self._settings.get("recent_players", []):
+            if x.get("id") == uid:
+                x["alert"] = not x.get("alert")
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def set_webhook(self, url):
+        url = (url or "").strip()
+        if url and not WEBHOOK_RE.fullmatch(url):
+            return {"error": "That isn't a Discord webhook link."}
+        self._settings["discord"]["webhook"] = url
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def share_discord(self, kind):
+        try:
+            hook = self._settings["discord"].get("webhook")
+            if not hook:
+                return {"error": "Paste a Discord webhook link first."}
+            name = (self._settings.get("profile") or {}).get("display") or "I"
+            if kind == "card":
+                share_to_discord(hook, f"{name}'s Orbit player card", player_card(self._settings))
+            elif kind == "recap":
+                recap = weekly_recap()
+                if recap.get("empty"):
+                    return {"error": "Play something this week first."}
+                dest = pictures_dir() / "Orbit" / f"Orbit-recap-{time.strftime('%Y-%m-%d')}.png"
+                render_recap_png(recap, self._settings, dest)
+                share_to_discord(hook, f"{name}'s week on Roblox", dest)
+            elif kind == "join":
+                link = join_link()
+                if not link:
+                    return {"error": "Join a server first."}
+                cur = load_json(CURRENT_FILE, None) or {}
+                share_to_discord(hook, f"Join me in **{cur.get('name') or 'Roblox'}**: {link}")
+            else:
+                return {"error": "Unknown share."}
+            return True
+        except urllib.error.HTTPError as e:
+            return {"error": f"Discord refused it ({e.code}). Check the webhook link."}
+        except Exception as e:
+            return self._err(e)
+
+    def overlay_url(self):
+        threading.Thread(target=OverlayServer.start, daemon=True).start()
+        return f"http://127.0.0.1:{OVERLAY_PORT}/overlay"
+
+    def news(self):
+        return fetch_news()
+
+    def mark_news(self, ids):
+        self._settings["news_seen"] = list(dict.fromkeys(list(ids or []) + self._settings.get("news_seen", [])))[:200]
+        save_settings(self._settings)
+        return True
+
+    def store(self):
+        return fetch_store()
+
+    def install_store_item(self, item_id):
+        try:
+            n = install_store_item(self._settings, item_id)
+            return {"count": n, "settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def level(self):
+        lv = orbit_level()
+        lv["up"] = lv["level"] > (self._settings.get("last_level") or 0) and (self._settings.get("last_level") or 0) > 0
+        if lv["level"] != self._settings.get("last_level"):
+            self._settings["last_level"] = lv["level"]
+            save_settings(self._settings)
+        return lv
+
+    def storage(self):
+        try:
+            return storage_report()
+        except Exception as e:
+            return self._err(e)
+
+    def clean_storage(self, cat):
+        try:
+            return {"freed": clean_storage(cat)}
+        except Exception as e:
+            return self._err(e)
+
+    def sync_info(self):
+        meta = load_json(DATA_DIR / "sync.json", {}) or {}
+        f = sync_file(self._settings)
+        remote = None
+        if f and f.exists():
+            remote = int(f.stat().st_mtime)
+        return {"candidates": sync_candidates(), "folder": (self._settings.get("sync") or {}).get("folder", ""),
+                "last": meta.get("at"), "remote": remote, "remote_newer": bool(remote and remote > (meta.get("at") or 0) + 60)}
+
+    def set_sync(self, folder):
+        try:
+            if folder and not Path(folder).is_dir():
+                return {"error": "That folder doesn't exist."}
+            self._settings["sync"] = {"folder": folder or ""}
+            save_settings(self._settings)
+            if folder:
+                run_sync(self._settings, force=True)
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def restore_sync(self):
+        try:
+            f = sync_file(self._settings)
+            if not f or not f.exists():
+                return {"error": "No synced backup found in that folder yet."}
+            import_backup(f)
+            save_json(DATA_DIR / "sync.json", {"at": int(time.time()), "file": str(f)})
+            return True
+        except Exception as e:
+            return self._err(e)
+
+    def set_emoji(self, style):
+        if style and not emoji_source(style):
+            return {"error": "Couldn't find Windows' emoji font on this PC."}
+        self._settings["emoji"] = style or ""
+        if style:
+            self._settings["apply_mods"] = True
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def last_report(self):
+        return load_json(LAST_REPORT_FILE, None)
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -6002,6 +6608,7 @@ def _run_gui(mode, after_update, selftest):
         threading.Thread(target=watch_show_requests, daemon=True).start()
         threading.Thread(target=AutoAttach("window").loop, daemon=True).start()
         threading.Thread(target=hotkey_loop, args=("window",), daemon=True).start()
+        threading.Thread(target=OverlayServer.start, daemon=True).start()
 
         def jump_list():
             time.sleep(4)

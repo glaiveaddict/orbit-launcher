@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "neon-square",
+      "name": "Neon Square",
+      "kind": "crosshair",
+      "author": "@stabzane",
+      "desc": "A teal square with a center dot. Very easy to spot.",
+      "preview": "crosshairs/neon_square.png",
+      "files": {
+        "content/textures/MouseLockedCursor.png": "crosshairs/neon_square.png"
+      }
+    },
+    {
+      "id": "diamond",
+      "name": "Diamond",
+      "kind": "crosshair",
+      "author": "@stabzane",
+      "desc": "An orange diamond that frames your target.",
+      "preview": "crosshairs/diamond.png",
+      "files": {
+        "content/textures/MouseLockedCursor.png": "crosshairs/diamond.png"
+      }
+    },
+    {
+      "id": "tiny-cross",
+      "name": "Tiny Cross",
+      "kind": "crosshair",
+      "author": "@stabzane",
+      "desc": "A tiny white cross for players who like it minimal.",
+      "preview": "crosshairs/tiny_cross.png",
+      "files": {
+        "content/textures/MouseLockedCursor.png": "crosshairs/tiny_cross.png"
+      }
+    },
+    {
+      "id": "bow-ring",
+      "name": "Bow Ring",
+      "kind": "crosshair",
+      "author": "@stabzane",
+      "desc": "Rings plus drop marks underneath, made for bows in BedWars.",
+      "preview": "crosshairs/bow_ring.png",
+      "files": {
+        "content/textures/MouseLockedCursor.png": "crosshairs/bow_ring.png"
+      }
+    },
+    {
+      "id": "heart-cursor",
+      "name": "Heart",
+      "kind": "cursor",
+      "author": "@stabzane",
+      "desc": "A pink heart mouse cursor.",
+      "preview": "cursors/heart.png",
+      "files": {
+        "content/textures/Cursors/KeyboardMouse/ArrowCursor.png": "cursors/heart.png",
+        "content/textures/Cursors/KeyboardMouse/ArrowFarCursor.png": "cursors/heart.png"
+      }
+    }
+  ]
+}

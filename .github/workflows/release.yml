@@ -209,6 +209,11 @@ jobs:
           print("CHECK replay:", out, [l.strip() for l in dur.splitlines() if "Duration" in l])
           ok &= bool(out)
           print("CHECK fps_ready:", ol.fps_ready())
+          import json as _j, urllib.request as _u
+          ol.OverlayServer.start(); time.sleep(1)
+          st = _j.loads(_u.urlopen(f"http://127.0.0.1:{ol.OVERLAY_PORT}/state", timeout=5).read())
+          print("CHECK overlay:", sorted(st)); ok &= "game" in st
+          print("CHECK emoji font:", ol.emoji_source("windows"))
           me = os.getpid()
           thr, pri = ol.set_power_throttle(me, True), ol.set_priority(pid=me, cls=0x4000)
           print("CHECK tab-out guard calls:", thr, pri, ol.set_power_throttle(me, False), ol.set_priority(pid=me, cls=0x20))
