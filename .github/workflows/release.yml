@@ -176,6 +176,43 @@ jobs:
           sys.exit(0 if ok else 1)
           PY
 
+      - name: Windows feature checks
+        if: steps.ver.outputs.exists == 'false'
+        timeout-minutes: 8
+        run: |
+          python - <<'PY'
+          import os, sys, time, struct, subprocess, importlib.util
+          spec = importlib.util.spec_from_file_location("ol", "orbit_launcher.py")
+          ol = importlib.util.module_from_spec(spec); spec.loader.exec_module(ol)
+          ol.ensure_dirs()
+          ok = True
+          w, h, data = ol.capture_rect((0, 0, 640, 360))
+          png = ol._png_bytes(w, h, (data[i * w * 4:(i + 1) * w * 4] for i in range(h)))
+          from PIL import Image
+          import io
+          im = Image.open(io.BytesIO(png)); print("CHECK screenshot:", im.size, "colors", len(set(im.getdata())) > 5)
+          ok &= im.size == (640, 360)
+          ok &= ol._clipboard_put(13, "orbit test\0".encode("utf-16-le"))
+          print("CHECK clipboard text set")
+          dest = ol.take_roblox_screenshot((0, 0, 800, 450)); print("CHECK screenshot file:", dest, os.path.getsize(dest))
+          try:
+              print("CHECK presentmon asset:", ol.github_asset("GameTechDev/PresentMon", r"PresentMon-\d+\.\d+\.\d+-x64\.exe")[1])
+          except Exception as e:
+              print("CHECK presentmon asset lookup failed (rate limit is fine here):", e)
+          t = time.time(); ol.setup_ffmpeg(); print(f"CHECK ffmpeg downloaded in {time.time() - t:.0f}s, size {ol.FFMPEG.stat().st_size // 1048576} MB")
+          ol.REPLAY_DIR.mkdir(parents=True, exist_ok=True)
+          cmd = ol.Replay.command(30, 8, source=("-f", "gdigrab", "-draw_mouse", "0", "-i", "desktop"))
+          proc = subprocess.Popen(cmd); time.sleep(14); ol.kill_tree(proc.pid); time.sleep(1)
+          print("CHECK segments:", sorted(p.name for p in ol.REPLAY_DIR.glob("seg*.ts")))
+          out = ol.Replay.save(10, "CI")
+          dur = subprocess.run([str(ol.FFMPEG), "-i", out], capture_output=True, text=True).stderr if out else ""
+          print("CHECK replay:", out, [l.strip() for l in dur.splitlines() if "Duration" in l])
+          ok &= bool(out)
+          print("CHECK fps_ready:", ol.fps_ready())
+          print("CHECK frames:", ol.summarize_frames(ol.parse_frame_times(["MsBetweenPresents"], ["6.9"] * 200)))
+          sys.exit(0 if ok else 1)
+          PY
+
       - name: Upload test screenshots
         if: always() && steps.ver.outputs.exists == 'false'
         uses: actions/upload-artifact@v4

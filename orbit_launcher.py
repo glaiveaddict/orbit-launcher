@@ -19,7 +19,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.2.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -133,6 +133,11 @@ DEFAULT_SETTINGS = {
     "last_seen_version": "",
     "saved_servers": [],
     "game_crosshairs": {},
+    "font": "",
+    "profile": {"roblox_id": None, "username": "", "display": ""},
+    "recent_players": [],
+    "fps": {"enabled": False},
+    "replay": {"enabled": False, "seconds": 30, "fps": 30},
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True},
     "hotkeys": {"enabled": True},
     "mod_profile": "Default",
@@ -155,6 +160,12 @@ DEFAULT_SETTINGS = {
         "break_minutes": 0,
         "sort_screenshots": False,
         "daily_minutes": 0,
+        "auto_reconnect": True,
+        "lag_alerts": True,
+        "streamer_mode": False,
+        "bedtime": "",
+        "bedtime_action": "remind",
+        "badge_fps": True,
     },
     "appearance": {
         "mode": "Dark",
@@ -324,6 +335,7 @@ def fmt_ago(ts):
 
 
 HELPER_NAME = "OrbitHelper.exe"
+ACTION_FLAG = "--orbit-action"
 PREPARE_FLAG = "--prepare"
 
 
@@ -391,7 +403,7 @@ def self_command(*args):
 
 
 def spawn_self(*args):
-    fast = bool(args) and args[0] in (TOAST_FLAG, LAUNCH_FLAG, ATTACH_FLAG, BACKGROUND_FLAG)
+    fast = bool(args) and args[0] in (TOAST_FLAG, LAUNCH_FLAG, ATTACH_FLAG, BACKGROUND_FLAG, ACTION_FLAG)
     try:
         return subprocess.Popen(fast_command(*args) if fast else main_command(*args), creationflags=CREATE_NO_WINDOW,
                                 env=child_env())
@@ -718,6 +730,11 @@ def apply_all(settings, version_dir=None, place_id=None):
         except Exception as e:
             log(f"System boost failed: {e}")
         overrides = {}
+        if settings.get("apply_mods", True):
+            try:
+                overrides.update(font_overrides(settings, d))
+            except Exception as e:
+                log(f"Font mod failed: {e}")
         cross = (settings.get("game_crosshairs") or {}).get(str(place_id)) if place_id is not None else None
         if cross and settings.get("apply_mods", True):
             src = crosshair_source(cross)
@@ -1264,7 +1281,7 @@ def build_activity(discord, place_id, job_id, info, joined):
                    "large_text": _pad(info["name"])},
     }
     buttons = []
-    if discord.get("show_join_button") and job_id:
+    if discord.get("show_join_button") and job_id and not load_settings()["session"].get("streamer_mode"):
         buttons.append({"label": "Join server",
                         "url": f"https://www.roblox.com/games/start?placeId={place_id}&gameInstanceId={job_id}"})
     buttons.append({"label": "See game page", "url": f"https://www.roblox.com/games/{place_id}"})
@@ -1304,6 +1321,8 @@ def record_session(game, seconds):
     summary = ping_summary(game.get("pings") or [])
     if summary:
         entry["ping"] = summary
+    if game.get("fps"):
+        entry["fps"] = game["fps"]
     data.append(entry)
     save_json(SESSIONS_FILE, data[-1500:])
 
@@ -1451,6 +1470,7 @@ class SessionMonitor:
         if not getattr(self, "play_start", None):
             self.play_start = joined
         game["udmux"] = threading.Event()
+        self.last_code = None
         cached = game_info(place_id) if place_id in _GAME_CACHE or cached_game(place_id) else None
         if cached:
             game["name"], game["icon"] = cached["name"], cached.get("icon")
@@ -1503,6 +1523,29 @@ class SessionMonitor:
         self.last_code = code
         game = self.game or {}
         record_problem(explain_code(code), game, line)
+        if code in RECONNECT_CODES and self.session.get("auto_reconnect", True) and game.get("place_id"):
+            threading.Thread(target=self._reconnect, args=(dict(game), code), daemon=True).start()
+
+    def _reconnect(self, game, code):
+        now = time.time()
+        recent = [t for t in getattr(self, "reconnects", []) if now - t < 600]
+        if len(recent) >= 3:
+            log("Auto-reconnect skipped: 3 reconnects in the last 10 minutes")
+            spawn_toast("Not reconnecting again", "You've been disconnected a lot. Check your connection, then rejoin from Orbit.")
+            return
+        self.reconnects = recent + [now]
+        time.sleep(3)
+        same = code in (277, 266) and len(recent) == 0
+        job = game.get("job_id") if same else None
+        if not same:
+            try:
+                sv, _ = pick_server(game["place_id"], {game.get("job_id")})
+                job = sv["id"] if sv else None
+            except Exception:
+                job = None
+        log(f"Auto-reconnecting after error {code} ({'same server' if same else 'new server' if job else 'any server'})")
+        spawn_toast("Reconnecting...", f"Lost connection (error {code}). Putting you back in {'the same server' if same else 'a fresh server'}.")
+        spawn_self(LAUNCH_FLAG, rejoin_uri(game["place_id"], job))
 
     def on_udmux(self, ip):
         game = self.game
@@ -1528,16 +1571,23 @@ class SessionMonitor:
             if game["name"]:
                 break
             time.sleep(0.2)
-        if self.session.get("server_popup") and not game.get("quiet"):
+        streamer = self.session.get("streamer_mode")
+        if self.session.get("server_popup") and not game.get("quiet") and not streamer:
             spawn_toast(game["name"] or "Joined a game", location)
             time.sleep(6.8 if (self.session.get("badge_pos") or "Top right") == "Top center" else 0.4)
         if self.session.get("server_badge", True) and self.game is game:
-            show_badge(game["name"] or "Roblox", location, game.get("ip"), game.get("joined"))
+            show_badge(game["name"] or "Roblox", "Streamer mode" if streamer else location, game.get("ip"), game.get("joined"))
 
     def on_leave(self, at=None, record=True):
         game, self.game = self.game, None
         if not game:
             return
+        bed = getattr(self, "bed", None) or {}
+        if bed.get("hit") and not bed.get("closed") and self.session.get("bedtime_action") == "close":
+            bed["closed"] = True
+            threading.Thread(target=lambda: (time.sleep(4), close_roblox("bedtime, match over")), daemon=True).start()
+        if getattr(self, "fps", None):
+            game["fps"] = self.fps.summary()
         seconds = max(0, (at or time.time()) - game["joined"])
         close_badge()
         CURRENT_FILE.unlink(missing_ok=True)
@@ -1547,6 +1597,35 @@ class SessionMonitor:
         if record and self.session.get("sort_screenshots"):
             threading.Thread(target=sort_screenshots, daemon=True).start()
         self._discord(None)
+
+    def check_bedtime(self, now=None):
+        bt = (self.session.get("bedtime") or "").strip()
+        m = re.fullmatch(r"(\d{1,2}):(\d{2})", bt)
+        if not m:
+            return
+        now = now or time.time()
+        lt = time.localtime(now)
+        mins_now = lt.tm_hour * 60 + lt.tm_min
+        target = int(m.group(1)) * 60 + int(m.group(2))
+        diff = (mins_now - target) % 1440
+        night = time.strftime("%Y-%m-%d", time.localtime(now - diff * 60)) if diff < 360 else \
+            time.strftime("%Y-%m-%d", time.localtime(now + (1440 - diff) * 60))
+        st = getattr(self, "bed", None) or {}
+        if st.get("night") != night:
+            st = {"night": night}
+        close = self.session.get("bedtime_action") == "close"
+        if 0 < 1440 - diff <= 10 and not st.get("warned"):
+            st["warned"] = True
+            spawn_toast("Bedtime in 10 minutes", "Finish up your match." if close else "Time to start wrapping up.")
+        elif diff < 360:
+            if not st.get("hit"):
+                st["hit"], st["hit_at"] = True, now
+                spawn_toast("It's bedtime", "Roblox closes when you leave this match, or in 15 minutes." if close else "Good night!")
+                log(f"Bedtime reached ({bt})")
+            elif close and now - st["hit_at"] >= 15 * 60 and not st.get("closed"):
+                st["closed"] = True
+                close_roblox("bedtime")
+        self.bed = st
 
     def check_daily(self):
         limit = int(self.session.get("daily_minutes") or 0)
@@ -1674,6 +1753,16 @@ class SessionMonitor:
         log(f"Watching {log_path.name}")
         if (self.settings.get("overlay") or {}).get("keystrokes"):
             start_keys()
+        if (self.settings.get("fps") or {}).get("enabled"):
+            try:
+                self.fps = FpsTracker()
+                if not self.fps.start():
+                    self.fps = None
+            except Exception as e:
+                log(f"FPS tracking failed to start: {e}")
+                self.fps = None
+        if (self.settings.get("replay") or {}).get("enabled"):
+            threading.Thread(target=Replay.run_while_roblox, daemon=True).start()
         fh = self._open(log_path)
         last_check, not_running = 0, 0
         try:
@@ -1691,6 +1780,9 @@ class SessionMonitor:
                 self.boost.tick()
                 self.check_break()
                 self.check_daily()
+                self.check_bedtime()
+                if getattr(self, "fps", None):
+                    self.fps.poll(self.game)
                 newer = self._newest_log()
                 try:
                     current_mtime = log_path.stat().st_mtime
@@ -1727,6 +1819,9 @@ class SessionMonitor:
             self.on_leave(record=not handed)
             if not handed:
                 close_keys()
+                Replay.stop()
+            if getattr(self, "fps", None):
+                self.fps.stop()
             if self.ipc:
                 self.ipc.close()
 
@@ -2019,7 +2114,10 @@ def set_start_with_windows(on):
 HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server"),
            2: (0x4E, "new", "Ctrl+Alt+N", "Hop to a new server in the same game"),
            3: (0x42, "badge", "Ctrl+Alt+B", "Show or hide the server badge"),
-           4: (0x4F, "open", "Ctrl+Alt+O", "Open Orbit")}
+           4: (0x4F, "open", "Ctrl+Alt+O", "Open Orbit"),
+           5: (0x53, "screenshot", "Ctrl+Alt+S", "Screenshot the Roblox window (saved and copied)"),
+           6: (0x4A, "joinlink", "Ctrl+Alt+J", "Copy a link friends can use to join your server"),
+           7: (0x43, "clip", "Ctrl+Alt+C", "Save an instant replay of the last 30 seconds")}
 
 
 def current_game():
@@ -2047,6 +2145,21 @@ def run_hotkey(action, force=False):
             BADGE_HIDDEN.unlink(missing_ok=True)
         else:
             BADGE_HIDDEN.write_text("1")
+    elif action == "screenshot":
+        r = take_roblox_screenshot()
+        spawn_toast("Screenshot saved", "Copied to your clipboard too.") if r else spawn_toast("No Roblox window", "Open Roblox first.")
+    elif action == "joinlink":
+        link = join_link()
+        if link:
+            copy_to_clipboard(link)
+            spawn_toast("Join link copied", "Paste it to a friend so they can join your server.")
+        else:
+            spawn_toast("Not in a game", "Join a server first, then copy the link.")
+    elif action == "clip":
+        r = Replay.save()
+        spawn_toast("Replay saved" if r else "Replay isn't running", Path(r).name if r else "Turn on Instant replay in Boost first.")
+    elif action == "launch":
+        spawn_self(LAUNCH_FLAG, "")
     elif action == "open":
         if pid_alive((load_json(GUI_FILE, {}) or {}).get("pids", [0])[0]):
             SHOW_FLAG.write_text(str(time.time()))
@@ -2107,6 +2220,7 @@ def game_stats(pid):
         "ping_by_location": sorted(((loc, round(sum(v) / len(v)), len(v)) for loc, v in _ping_groups(sess).items()),
                                    key=lambda x: x[1])[:8],
         "last_ping": next((x["ping"] for x in reversed(sess) if x.get("ping")), None),
+        "last_fps": next((x["fps"] for x in reversed(sess) if x.get("fps")), None),
     }
 
 
@@ -2139,6 +2253,8 @@ CROSSHAIR_DIR = DATA_DIR / "crosshairs"
 
 
 def pack_file(pack_id):
+    if pack_id in CHARSOUNDS:
+        return resource_dir() / "ui" / "packs" / pack_id
     if str(pack_id).startswith("custom:"):
         return CROSSHAIR_DIR / (pack_id.split(":", 1)[1] + ".png")
     ext = ".ogg" if PACKS[pack_id][1] == "sound" else ".png"
@@ -2202,6 +2318,14 @@ def pack_states(settings):
         c["installed"] = all((folder / t).exists() and (folder / t).read_bytes() == src.read_bytes()
                              for t in PACK_TARGETS["crosshair"])
         out.append(c)
+    for pid, (name, desc) in CHARSOUNDS.items():
+        src = pack_file(pid)
+        files = sorted(src.glob("*.mp3")) if src.is_dir() else []
+        jump = src / "action_jump.mp3"
+        out.append({"id": pid, "name": name, "kind": "charsound", "desc": desc,
+                    "installed": bool(files) and all((folder / "content/sounds" / f.name).exists() and
+                                                     (folder / "content/sounds" / f.name).stat().st_size == f.stat().st_size for f in files),
+                    "data": "data:audio/mpeg;base64," + base64.b64encode(jump.read_bytes()).decode() if jump.exists() else ""})
     for pid, (name, kind, desc) in PACKS.items():
         src = pack_file(pid)
         installed = src.exists() and all((folder / t).exists() and (folder / t).stat().st_size == src.stat().st_size
@@ -2213,6 +2337,17 @@ def pack_states(settings):
 
 
 def install_pack(settings, pack_id, on=True):
+    if pack_id in CHARSOUNDS:
+        folder = mods_dir(settings)
+        for f in pack_file(pack_id).glob("*.mp3"):
+            dest = folder / "content" / "sounds" / f.name
+            if on:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dest)
+            else:
+                dest.unlink(missing_ok=True)
+        log(f"{'Installed' if on else 'Removed'} sound pack {pack_id}")
+        return
     if str(pack_id).startswith("custom:"):
         if not pack_file(pack_id).exists():
             raise ValueError("That crosshair is gone.")
@@ -2663,7 +2798,8 @@ class MiniApi:
         settings = load_settings()
         c = theme_colors(settings["appearance"])
         out = {"current": cur, "last": load_json(LAST_SERVER_FILE, None), "accent": accent_pair(settings["appearance"]),
-               "light": settings["appearance"].get("mode") == "Light", "bg": c["bg"]}
+               "light": settings["appearance"].get("mode") == "Light", "bg": c["bg"],
+               "streamer": bool(settings["session"].get("streamer_mode"))}
         if cur and roblox_running():
             out["ping"] = self._ping["ms"] if self._ping.get("ip") == cur.get("job_id") else None
             if time.time() - self._ping["at"] > 5:
@@ -2686,6 +2822,12 @@ class MiniApi:
     def open_main(self):
         SHOW_FLAG.write_text(str(time.time()))
         return True
+
+    def join_link(self):
+        link = join_link()
+        if link:
+            copy_to_clipboard(link)
+        return bool(link)
 
     def close(self):
         if self._window:
@@ -3075,6 +3217,598 @@ def cleanup_old_roblox(root, keep):
             log(f"Removed old Roblox {d.name}")
     for d in root.glob("*.orbit-staging"):
         shutil.rmtree(d, ignore_errors=True)
+
+
+RECONNECT_CODES = {266, 277, 279, 282}
+FPS_LIVE_FILE = DATA_DIR / "fps_live.json"
+TOOLS_DIR = DATA_DIR / "tools"
+PRESENTMON = TOOLS_DIR / "PresentMon.exe"
+FFMPEG = TOOLS_DIR / "ffmpeg.exe"
+REPLAY_DIR = DATA_DIR / "replay"
+
+
+def close_roblox(reason):
+    pids = pids_named("RobloxPlayerBeta.exe")
+    if not pids:
+        return
+    if IS_WINDOWS:
+        u = ctypes.windll.user32
+        WNDENUM = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+        targets = set(pids)
+
+        def cb(hwnd, _):
+            pid = ctypes.c_ulong()
+            u.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
+            if pid.value in targets and u.IsWindowVisible(ctypes.c_void_p(hwnd)):
+                u.PostMessageW(ctypes.c_void_p(hwnd), 0x0010, 0, 0)
+            return True
+        u.EnumWindows(WNDENUM(cb), 0)
+        for _ in range(16):
+            time.sleep(0.5)
+            if not pids_named("RobloxPlayerBeta.exe"):
+                break
+    for pid in pids_named("RobloxPlayerBeta.exe"):
+        kill_tree(pid)
+    log(f"Closed Roblox ({reason})")
+
+
+def join_link(cur=None):
+    cur = cur or load_json(CURRENT_FILE, None) or {}
+    if not cur.get("place_id") or not cur.get("job_id"):
+        return None
+    return f"https://www.roblox.com/games/start?placeId={cur['place_id']}&gameInstanceId={cur['job_id']}"
+
+
+def _png_bytes(width, height, bgra_rows):
+    import zlib
+    raw = bytearray()
+    for row in bgra_rows:
+        raw.append(0)
+        rgb = bytearray(len(row) // 4 * 3)
+        rgb[0::3], rgb[1::3], rgb[2::3] = row[2::4], row[1::4], row[0::4]
+        raw += rgb
+
+    def chunk(tag, data):
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b""))
+
+
+def capture_rect(rect):
+    L, T, R, B = rect
+    w, h = max(1, R - L), max(1, B - T)
+    u, g = ctypes.windll.user32, ctypes.windll.gdi32
+    u.GetDC.restype = ctypes.c_void_p
+    u.GetDC.argtypes = [ctypes.c_void_p]
+    u.ReleaseDC.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    g.CreateCompatibleDC.restype = ctypes.c_void_p
+    g.CreateCompatibleDC.argtypes = [ctypes.c_void_p]
+    g.DeleteDC.argtypes = [ctypes.c_void_p]
+    g.CreateCompatibleBitmap.restype = ctypes.c_void_p
+    g.CreateCompatibleBitmap.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+    g.SelectObject.restype = ctypes.c_void_p
+    g.SelectObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    g.BitBlt.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_void_p,
+                         ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    g.GetDIBits.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p,
+                            ctypes.c_void_p, ctypes.c_uint]
+    g.DeleteObject.argtypes = [ctypes.c_void_p]
+    screen = u.GetDC(None)
+    mem = g.CreateCompatibleDC(screen)
+    bmp = g.CreateCompatibleBitmap(screen, w, h)
+    old = g.SelectObject(mem, bmp)
+    g.BitBlt(mem, 0, 0, w, h, screen, L, T, 0x00CC0020 | 0x40000000)
+    bmi = ctypes.create_string_buffer(struct.pack("<IiiHHIIiiII", 40, w, -h, 1, 32, 0, 0, 0, 0, 0, 0) + b"\0" * 16)
+    buf = ctypes.create_string_buffer(w * h * 4)
+    g.GetDIBits(mem, bmp, 0, h, buf, bmi, 0)
+    g.SelectObject(mem, old)
+    g.DeleteObject(bmp)
+    g.DeleteDC(mem)
+    u.ReleaseDC(None, screen)
+    return w, h, buf.raw
+
+
+def take_roblox_screenshot(rect=None):
+    if not IS_WINDOWS:
+        return None
+    rect = rect or roblox_rect()
+    if not rect:
+        return None
+    L, T, R, B = rect
+    if L < 0 and T < 0:
+        L, T, R, B = L + 8, T + 8, R - 8, B - 8
+    w, h, data = capture_rect((L, T, R, B))
+    stride = w * 4
+    png = _png_bytes(w, h, (data[i * stride:(i + 1) * stride] for i in range(h)))
+    cur = load_json(CURRENT_FILE, None) or {}
+    name = re.sub(r'[<>:"/\\|?*]', "", cur.get("name") or "Roblox").strip()[:60] or "Roblox"
+    base = (screenshot_dirs() or [Path.home() / "Pictures" / "Roblox"])[0]
+    dest = base / name / f"Orbit_{time.strftime('%Y%m%d_%H%M%S')}.png"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(png)
+    try:
+        bottom_up = b"".join(data[i * stride:(i + 1) * stride] for i in range(h - 1, -1, -1))
+        dib = struct.pack("<IiiHHIIiiII", 40, w, h, 1, 32, 0, len(bottom_up), 0, 0, 0, 0) + bottom_up
+        _clipboard_put(8, dib)
+    except Exception as e:
+        log(f"Couldn't copy screenshot: {e}")
+    log(f"Screenshot saved: {dest}")
+    return str(dest)
+
+
+def region_test():
+    cache = load_json(LOCATION_CACHE_FILE, {}) or {}
+    by_loc = {}
+    for ip, val in cache.items():
+        loc = val[0] if isinstance(val, list) and val else None
+        if not loc:
+            continue
+        by_loc.setdefault(loc, [])
+        if len(by_loc[loc]) < 2:
+            by_loc[loc].append(ip)
+    if not by_loc:
+        return {"locations": [], "regions": [], "note": "Play a few games through Orbit first. The test pings Roblox servers you've been in before."}
+    from concurrent.futures import ThreadPoolExecutor
+
+    def test(item):
+        loc, ips = item
+        vals = []
+        for ip in ips:
+            for _ in range(2):
+                v = ping_ms(ip)
+                if v is not None:
+                    vals.append(v)
+        return {"location": loc, "ping": round(sorted(vals)[len(vals) // 2]) if vals else None, "samples": len(vals)}
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        locs = list(ex.map(test, list(by_loc.items())[:40]))
+    regions = []
+    for name in REGIONS:
+        vals = [x["ping"] for x in locs if x["ping"] is not None and in_region(x["location"], name)]
+        if vals:
+            regions.append({"region": name, "ping": min(vals), "servers": len(vals)})
+    regions.sort(key=lambda x: x["ping"])
+    locs.sort(key=lambda x: (x["ping"] is None, x["ping"] or 0))
+    note = None if any(x["ping"] is not None for x in locs) else \
+        "Roblox servers didn't answer pings from your network, so Orbit can't measure them right now."
+    result = {"at": int(time.time()), "regions": regions, "locations": locs, "note": note}
+    save_json(DATA_DIR / "region_test.json", result)
+    return result
+
+
+ROBLOX_UA = {"User-Agent": f"{APP_NAME}/{APP_VERSION}", "Accept": "application/json", "Content-Type": "application/json"}
+
+
+def post_json(url, body, timeout=10):
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=ROBLOX_UA, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def find_player(text):
+    text = (text or "").strip().lstrip("@")
+    m = re.search(r"roblox\.com/users/(\d+)", text)
+    if m or text.isdigit():
+        uid = int(m.group(1) if m else text)
+        info = fetch_json(f"https://users.roblox.com/v1/users/{uid}")
+        user = {"id": uid, "name": info.get("name"), "display": info.get("displayName")}
+    else:
+        if not re.fullmatch(r"[A-Za-z0-9_]{3,20}", text):
+            raise ValueError("That doesn't look like a Roblox username.")
+        data = post_json("https://users.roblox.com/v1/usernames/users", {"usernames": [text], "excludeBannedUsers": True})
+        if not data.get("data"):
+            raise ValueError(f'No Roblox player named "{text}".')
+        d = data["data"][0]
+        user = {"id": d["id"], "name": d["name"], "display": d.get("displayName")}
+    status, game = "Unknown", None
+    try:
+        pres = post_json("https://presence.roblox.com/v1/presence/users", {"userIds": [user["id"]]})["userPresences"][0]
+        status = {0: "Offline", 1: "Online", 2: "In a game", 3: "In Studio", 4: "Offline"}.get(pres.get("userPresenceType"), "Unknown")
+        if pres.get("placeId") or (status == "In a game" and pres.get("lastLocation")):
+            game = {"place_id": str(pres["placeId"]) if pres.get("placeId") else None, "name": pres.get("lastLocation")}
+    except Exception as e:
+        log(f"Presence lookup failed: {e}")
+    try:
+        user["avatar"] = avatar_url(user["id"], "150x150")
+    except Exception:
+        user["avatar"] = None
+    user.update(status=status, game=game)
+    return user
+
+
+def follow_uri(user_id):
+    return f"roblox://experiences/start?userId={int(user_id)}"
+
+
+def parse_frame_times(cols, lines):
+    idx = next((cols.index(c) for c in ("MsBetweenPresents", "msBetweenPresents", "FrameTime") if c in cols), None)
+    if idx is None:
+        return []
+    out = []
+    for line in lines:
+        parts = line.split(",")
+        try:
+            ms = float(parts[idx])
+        except (ValueError, IndexError):
+            continue
+        if 0 < ms < 1000:
+            out.append(ms)
+    return out
+
+
+def summarize_frames(frames):
+    if len(frames) < 30:
+        return None
+    avg = 1000 * len(frames) / sum(frames)
+    worst = sorted(frames, reverse=True)[:max(1, len(frames) // 100)]
+    low1 = 1000 / (sum(worst) / len(worst))
+    step = max(1, len(frames) // 60)
+    samples = [round(1000 * step / sum(frames[i:i + step])) for i in range(0, len(frames) - step + 1, step)][:60]
+    return {"avg": round(avg), "low1": round(low1), "samples": samples}
+
+
+class FpsTracker:
+    def __init__(self):
+        self.proc = None
+        self.csv = None
+        self.pos = 0
+        self.cols = None
+        self.frames = []
+        self.game_frames = []
+
+    def start(self):
+        if not IS_WINDOWS or not PRESENTMON.exists():
+            log("FPS tracking is on but PresentMon isn't set up yet")
+            return False
+        folder = DATA_DIR / "fps"
+        folder.mkdir(parents=True, exist_ok=True)
+        for old in sorted(folder.glob("session_*.csv"))[:-2]:
+            old.unlink(missing_ok=True)
+        self.csv = folder / f"session_{int(time.time())}.csv"
+        for args in (["--process_name", "RobloxPlayerBeta.exe", "--output_file", str(self.csv), "--terminate_on_proc_exit",
+                      "--stop_existing_session", "--session_name", "OrbitFPS", "--no_console_stats"],
+                     ["-process_name", "RobloxPlayerBeta.exe", "-output_file", str(self.csv), "-terminate_on_proc_exit",
+                      "-stop_existing_session", "-session_name", "OrbitFPS", "-no_top"]):
+            self.proc = subprocess.Popen([str(PRESENTMON), *args], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                         stdin=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW | 0x00004000)
+            time.sleep(2.5)
+            if self.proc.poll() is None:
+                log("FPS tracking started")
+                save_json(DATA_DIR / "fps_status.json", {"ok": True, "at": int(time.time())})
+                return True
+            err = (self.proc.stderr.read() or b"").decode("utf-8", "ignore").strip()
+            log(f"PresentMon exited: {err[:300]}")
+            if "access" in err.lower() or "denied" in err.lower() or "performance log users" in err.lower():
+                save_json(DATA_DIR / "fps_status.json", {"error": "access", "at": int(time.time())})
+                return False
+        save_json(DATA_DIR / "fps_status.json", {"error": "start", "at": int(time.time())})
+        return False
+
+    def poll(self, game):
+        if not self.csv or not self.csv.exists():
+            return
+        with open(self.csv, "rb") as f:
+            f.seek(self.pos)
+            chunk = f.read()
+        cut = chunk.rfind(b"\n")
+        if cut < 0:
+            return
+        self.pos += cut + 1
+        lines = chunk[:cut].decode("utf-8", "ignore").splitlines()
+        if self.cols is None and lines:
+            self.cols = [c.strip() for c in lines[0].split(",")]
+            lines = lines[1:]
+        if not self.cols:
+            return
+        new = parse_frame_times(self.cols, lines)
+        self.frames = (self.frames + new)[-4000:]
+        if game is not None:
+            self.game_frames = (self.game_frames + new)[-200000:]
+        recent, total = [], 0.0
+        for ms in reversed(self.frames):
+            recent.append(ms)
+            total += ms
+            if total >= 1000:
+                break
+        if recent and total > 0:
+            save_json(FPS_LIVE_FILE, {"fps": round(1000 * len(recent) / total), "at": int(time.time())})
+
+    def summary(self):
+        frames, self.game_frames = self.game_frames, []
+        return summarize_frames(frames)
+
+    def stop(self):
+        if self.proc and self.proc.poll() is None:
+            kill_tree(self.proc.pid)
+        FPS_LIVE_FILE.unlink(missing_ok=True)
+
+
+def fps_ready():
+    if not IS_WINDOWS:
+        return {"tool": False, "group": False}
+    group = False
+    try:
+        out = subprocess.run([sys_tool("whoami"), "/groups"], capture_output=True, text=True, timeout=10,
+                             creationflags=CREATE_NO_WINDOW).stdout
+        group = "S-1-5-32-559" in out or ("S-1-5-32-544" in out and "S-1-16-12288" in out)
+    except Exception:
+        pass
+    return {"tool": PRESENTMON.exists(), "group": group}
+
+
+def github_asset(repo, pattern):
+    rels = fetch_json(f"https://api.github.com/repos/{repo}/releases?per_page=15", timeout=15)
+    for rel in rels:
+        if rel.get("prerelease") or rel.get("draft"):
+            continue
+        for a in rel.get("assets", []):
+            if re.fullmatch(pattern, a.get("name", "")):
+                return a["browser_download_url"], a["name"]
+    raise ValueError(f"Couldn't find a download for {repo}.")
+
+
+def setup_presentmon():
+    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    if not PRESENTMON.exists():
+        url, name = github_asset("GameTechDev/PresentMon", r"PresentMon-\d+\.\d+\.\d+-x64\.exe")
+        download_file(url, PRESENTMON)
+        log(f"Downloaded {name}")
+    if fps_ready()["group"]:
+        return {"ready": True}
+    user = f'{os.environ.get("USERDOMAIN", "")}\\{os.environ.get("USERNAME", "")}'.strip("\\").replace("'", "''")
+    cmd = f"Add-LocalGroupMember -SID 'S-1-5-32-559' -Member '{user}' -ErrorAction SilentlyContinue"
+    r = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys_tool("powershell"),
+                                            f'-NoProfile -WindowStyle Hidden -Command "{cmd}"', None, 0)
+    if r <= 32:
+        raise PermissionError("Windows didn't give the one-time permission. FPS tracking needs it to read frame timings.")
+    save_json(DATA_DIR / "fps_status.json", {"pending_signout": True, "at": int(time.time())})
+    return {"needs_signout": True}
+
+
+class Replay:
+    proc = None
+
+    @classmethod
+    def command(cls, fps, wrap, seg=5, source=("-f", "gdigrab", "-draw_mouse", "0", "-i", "title=Roblox")):
+        return [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-framerate" if source[1] == "gdigrab" else "-r", str(fps),
+                *source, "-vf", "scale=-2:'min(1080,ih)'", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+                "-crf", "26", "-pix_fmt", "yuv420p", "-g", str(fps), "-f", "segment", "-segment_time", str(seg),
+                "-segment_wrap", str(wrap), "-reset_timestamps", "1", str(REPLAY_DIR / "seg%02d.ts")]
+
+    @classmethod
+    def run_while_roblox(cls):
+        rp = load_settings().get("replay") or {}
+        if not FFMPEG.exists() or not IS_WINDOWS:
+            log("Instant replay is on but ffmpeg isn't set up yet")
+            return
+        REPLAY_DIR.mkdir(parents=True, exist_ok=True)
+        fps = max(15, min(60, int(rp.get("fps") or 30)))
+        wrap = max(3, int((rp.get("seconds") or 30) / 5) + 2)
+        while roblox_running():
+            if (cls.proc is None or cls.proc.poll() is not None) and roblox_rect() and roblox_in_front():
+                for f in REPLAY_DIR.glob("seg*.ts"):
+                    f.unlink(missing_ok=True)
+                cls.proc = subprocess.Popen(cls.command(fps, wrap), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                            stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW | 0x00004000)
+                log("Instant replay recording started")
+            time.sleep(3)
+        cls.stop()
+
+    @classmethod
+    def stop(cls):
+        if cls.proc and cls.proc.poll() is None:
+            kill_tree(cls.proc.pid)
+        cls.proc = None
+
+    @classmethod
+    def save(cls, seconds=None, name=None):
+        if not FFMPEG.exists():
+            return None
+        seconds = seconds or int((load_settings().get("replay") or {}).get("seconds") or 30)
+        segs = sorted(REPLAY_DIR.glob("seg*.ts"), key=lambda p: p.stat().st_mtime) if REPLAY_DIR.is_dir() else []
+        segs = [p for p in segs if time.time() - p.stat().st_mtime < seconds + 20]
+        if not segs:
+            return None
+        cur = load_json(CURRENT_FILE, None) or {}
+        name = re.sub(r'[<>:"/\\|?*]', "", name or cur.get("name") or "Roblox").strip()[:60] or "Roblox"
+        out_dir = Path.home() / "Videos" / "Orbit"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest = out_dir / f"{name} {time.strftime('%Y-%m-%d %H-%M-%S')}.mp4"
+        work = REPLAY_DIR / "save"
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir(parents=True)
+        parts = []
+        for i, p in enumerate(segs):
+            try:
+                shutil.copy2(p, work / f"{i:03d}.ts")
+                parts.append(work / f"{i:03d}.ts")
+            except OSError:
+                pass
+        (work / "list.txt").write_text("".join(f"file '{x.name}'\n" for x in parts), encoding="utf-8")
+        joined = work / "joined.mp4"
+        run = lambda args: subprocess.run([str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", *args], capture_output=True,
+                                          timeout=90, creationflags=CREATE_NO_WINDOW)
+        r = run(["-f", "concat", "-safe", "0", "-i", str(work / "list.txt"), "-c", "copy", str(joined)])
+        if r.returncode == 0:
+            r = run(["-sseof", f"-{seconds}", "-i", str(joined), "-c", "copy", "-movflags", "+faststart", str(dest)])
+        shutil.rmtree(work, ignore_errors=True)
+        if r.returncode != 0 or not dest.exists():
+            log(f"Replay save failed: {r.stderr.decode('utf-8', 'ignore')[:300]}")
+            return None
+        log(f"Replay saved: {dest}")
+        return str(dest)
+
+
+def setup_ffmpeg(progress=None):
+    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    if FFMPEG.exists():
+        return True
+    import zipfile
+    url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+    z = TOOLS_DIR / "ffmpeg.zip"
+    download_file(url, z, progress)
+    with zipfile.ZipFile(z) as zf:
+        member = next(n for n in zf.namelist() if n.endswith("/bin/ffmpeg.exe"))
+        with zf.open(member) as src, open(FFMPEG.with_suffix(".part"), "wb") as out:
+            shutil.copyfileobj(src, out)
+    os.replace(FFMPEG.with_suffix(".part"), FFMPEG)
+    z.unlink(missing_ok=True)
+    log("Downloaded ffmpeg for instant replay")
+    return True
+
+
+FONTS = {
+    "inter": ("Inter", "Inter-SemiBold.otf", "Clean and modern, very readable."),
+    "poppins": ("Poppins", "Poppins-Medium.ttf", "Round and friendly geometric style."),
+    "mono": ("DejaVu Mono", "DejaVuSansMono-Bold.ttf", "Bold monospace, like a terminal."),
+}
+FONT_DIR = DATA_DIR / "fonts"
+
+
+def font_file(fid):
+    if fid == "custom":
+        found = sorted(FONT_DIR.glob("custom.*")) if FONT_DIR.is_dir() else []
+        return found[0] if found else None
+    if fid in FONTS:
+        f = resource_dir() / "ui" / "fonts" / FONTS[fid][1]
+        return f if f.exists() else None
+    return None
+
+
+def font_overrides(settings, version_dir):
+    src = font_file(settings.get("font") or "")
+    if not src:
+        return {}
+    out = {"content/fonts/CustomFont.ttf": src}
+    vdir = Path(version_dir)
+    families = vdir / "content" / "fonts" / "families"
+    cache = DATA_DIR / "fontcache" / vdir.name
+    cache.mkdir(parents=True, exist_ok=True)
+    for fam in (families.glob("*.json") if families.is_dir() else []):
+        try:
+            backup = vdir / MOD_BACKUP_DIR / "content" / "fonts" / "families" / fam.name
+            data = json.loads((backup if backup.exists() else fam).read_text(encoding="utf-8"))
+            for face in data.get("faces", []):
+                face["assetId"] = "rbxasset://fonts/CustomFont.ttf"
+            dest = cache / fam.name
+            dest.write_text(json.dumps(data), encoding="utf-8")
+            out[f"content/fonts/families/{fam.name}"] = dest
+        except Exception as e:
+            log(f"Font family {fam.name} skipped: {e}")
+    return out
+
+
+CHARSOUNDS = {
+    "charsounds_soft": ("Soft Steps", "Gentle jump, landing, walking and get-up sounds."),
+    "charsounds_retro": ("Retro", "Chiptune-style jump, landing and footsteps."),
+    "charsounds_quiet": ("Quiet", "Very soft movement sounds for focused play."),
+}
+
+
+def player_card(settings):
+    from PIL import Image, ImageDraw, ImageFilter
+    prof = settings.get("profile") or {}
+    uid = prof.get("roblox_id")
+    W, H = 1200, 675
+    c1, c2 = accent_pair(settings["appearance"])
+    a1, a2 = (tuple(int(x[i:i + 2], 16) for i in (1, 3, 5)) for x in (c1, c2))
+    img = Image.new("RGB", (W, H), (8, 5, 16))
+    glow = Image.new("RGB", (W, H), (0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([700, -300, 1500, 500], fill=a2)
+    gd.ellipse([-300, 350, 600, 1100], fill=a1)
+    img = Image.blend(img, glow.filter(ImageFilter.GaussianBlur(160)), 0.55)
+    d = ImageDraw.Draw(img)
+    av = avatar_file(uid) if uid else None
+    if av:
+        a = Image.open(av).convert("RGBA").resize((230, 230))
+        mask = Image.new("L", (230, 230), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, 229, 229], fill=255)
+        ring = Image.new("RGBA", (250, 250), (0, 0, 0, 0))
+        ImageDraw.Draw(ring).ellipse([0, 0, 249, 249], fill=a1 + (255,))
+        img.paste(ring, (60, 60), ring)
+        img.paste(a, (70, 70), mask)
+    name = prof.get("display") or prof.get("username") or "Orbit player"
+    if not av:
+        d.ellipse([60, 60, 310, 310], fill=a1)
+        d.ellipse([70, 70, 300, 300], fill=(20, 14, 34))
+        d.text((185, 185), name[:1].upper(), font=_font(120, True), fill=(245, 240, 255), anchor="mm")
+    d.text((340, 100), name[:22], font=_font(64, True), fill=(245, 240, 255))
+    if prof.get("username"):
+        d.text((344, 180), "@" + prof["username"], font=_font(30), fill=(190, 180, 220))
+    play = load_json(PLAYTIME_FILE, {}) or {}
+    total = sum(e.get("seconds", 0) for e in play.values())
+    sessions = _sessions()
+    ach = achievements_state()
+    done = sum(1 for x in ach["list"] if x["unlocked"])
+    regions = {}
+    for x in sessions:
+        for rname in REGIONS:
+            if x.get("location") and in_region(x["location"], rname):
+                regions[rname] = regions.get(rname, 0) + 1
+    fav = max(regions, key=regions.get) if regions else "-"
+    since = min([x.get("start", time.time()) for x in sessions] or [time.time()])
+    count = max(len(sessions), sum(e.get("sessions", 0) for e in play.values()))
+    x = 60
+    for label, val in (("PLAYED", fmt_duration(total)), ("SESSIONS", str(count)),
+                       ("ACHIEVEMENTS", f"{done}/{len(ach['list'])}"), ("TOP REGION", fav)):
+        d.rounded_rectangle([x, 340, x + 255, 470], 22, fill=(20, 14, 34), outline=a1, width=2)
+        d.text((x + 22, 360), label, font=_font(20, True), fill=(170, 160, 200))
+        d.text((x + 22, 395), val, font=_font(40, True), fill=(245, 240, 255))
+        x += 275
+    top = sorted(play.items(), key=lambda kv: -kv[1].get("seconds", 0))[:3]
+    d.text((60, 505), "TOP GAMES", font=_font(20, True), fill=(170, 160, 200))
+    for i, (pid, e) in enumerate(top):
+        d.text((60 + i * 370, 540), f"{i + 1}. {(e.get('name') or pid)[:24]}", font=_font(30, True), fill=(245, 240, 255))
+        d.text((60 + i * 370, 580), fmt_duration(e.get("seconds", 0)), font=_font(24), fill=a2)
+    d.text((W - 60, H - 30), f"Orbit Launcher · playing since {time.strftime('%b %Y', time.localtime(since))}",
+           font=_font(20), fill=(150, 140, 180), anchor="rs")
+    out = Path.home() / "Pictures" / "Orbit"
+    out.mkdir(parents=True, exist_ok=True)
+    dest = out / f"Orbit player card {time.strftime('%Y-%m-%d')}.png"
+    img.save(dest)
+    return dest
+
+
+def apply_jump_list():
+    if not IS_WINDOWS or not is_frozen():
+        return False
+    import clr
+    for asm in ("PresentationFramework", "PresentationCore", "WindowsBase"):
+        clr.AddReference(asm)
+    from System.Threading import ApartmentState, Thread, ThreadStart
+    from System.Windows.Shell import JumpList, JumpTask
+    exe = str(helper_ready() or sys.executable)
+    icon = str(INSTALLED_EXE if INSTALLED_EXE.exists() else sys.executable)
+    tasks = [("Launch Roblox", "launch", "Start Roblox through Orbit"), ("Rejoin last server", "rejoin", "Go back to your last server"),
+             ("New server", "new", "Hop to a fresh server in your current game"),
+             ("Copy join link", "joinlink", "Copy a link friends can use to join your server")]
+    errors = []
+
+    def work():
+        try:
+            jl = JumpList()
+            jl.ShowRecentCategory = False
+            jl.ShowFrequentCategory = False
+            for title, action, desc in tasks:
+                t = JumpTask()
+                t.Title = title
+                t.Description = desc
+                t.ApplicationPath = exe
+                t.Arguments = f"{ACTION_FLAG} {action}"
+                t.IconResourcePath = icon
+                t.IconResourceIndex = 0
+                jl.JumpItems.Add(t)
+            jl.Apply()
+        except Exception as e:
+            errors.append(str(e))
+    th = Thread(ThreadStart(work))
+    th.SetApartmentState(ApartmentState.STA)
+    th.Start()
+    th.Join()
+    if errors:
+        raise RuntimeError(errors[0])
+    log("Taskbar jump list ready")
+    return True
 
 
 def claim_monitor():
@@ -3986,13 +4720,15 @@ def show_badge_window(title, body, ip=None, joined=None):
         layout += [("sep", sep, f_loc, c["muted"]), ("ping", "··· ms", f_num, c["muted"], "999 ms")]
     if show_timer:
         layout += [("sep", sep, f_loc, c["muted"]), ("timer", "0:00", f_num, c["muted"], "0:00:00")]
+    if sess.get("badge_fps", True) and (settings.get("fps") or {}).get("enabled"):
+        layout += [("sep", sep, f_loc, c["muted"]), ("fps", "··· fps", f_num, c["muted"], "000 fps")]
     w = x + sum(f.measure(item[4] if len(item) > 4 else item[1]) for item in layout for f in [item[2]]) + 12
     cv = tk.Canvas(root, width=w, height=h, bg=key, highlightthickness=0, bd=0)
     cv.pack()
     r = h // 2
     pts = lambda x1, y1, x2, y2, rr: [x1 + rr, y1, x2 - rr, y1, x2, y1, x2, y1 + rr, x2, y2 - rr, x2, y2, x2 - rr, y2,
                                       x1 + rr, y2, x1, y2, x1, y2 - rr, x1, y1 + rr, x1, y1]
-    cv.create_polygon(pts(0, 0, w - 1, h - 1, r), smooth=True, splinesteps=20, fill=c["accent"], outline="")
+    border = cv.create_polygon(pts(0, 0, w - 1, h - 1, r), smooth=True, splinesteps=20, fill=c["accent"], outline="")
     cv.create_polygon(pts(1, 1, w - 2, h - 2, r - 1), smooth=True, splinesteps=20, fill=c["panel"], outline="")
     cx, cy = 12 + dot, h // 2
     cv.create_oval(cx - dot, cy - dot, cx + dot, cy + dot, fill=c["accent"], outline="")
@@ -4003,7 +4739,8 @@ def show_badge_window(title, body, ip=None, joined=None):
         kind, text, font, color = item[:4]
         items[kind] = cv.create_text(x, cy, text=text, anchor="w", font=font, fill=color)
         x += font.measure(item[4] if len(item) > 4 else text)
-    state = {"alpha": 0.0, "xy": None, "hwnd": None, "ping": None}
+    state = {"alpha": 0.0, "xy": None, "hwnd": None, "ping": None, "pings": [], "flash": 0.0}
+    lag_alerts = sess.get("lag_alerts", True)
     peak = 0.86
 
     def target_xy():
@@ -4060,11 +4797,28 @@ def show_badge_window(title, body, ip=None, joined=None):
     if show_ping:
         def pinger():
             while True:
-                state["ping"] = ping_ms(ip)
-                time.sleep(5)
+                p = ping_ms(ip)
+                state["ping"] = p
+                if p is not None:
+                    hist = state["pings"][-12:]
+                    if lag_alerts and len(hist) >= 4:
+                        base = sorted(hist)[len(hist) // 2]
+                        if p > max(150, base * 2.2, base + 80):
+                            state["flash"] = time.time() + 4
+                            log(f"Lag spike: {p} ms (usual {base} ms)")
+                    state["pings"] = hist + [p]
+                time.sleep(4)
         threading.Thread(target=pinger, daemon=True).start()
 
     def refresh_numbers():
+        flashing = time.time() < state["flash"]
+        if flashing != state.get("flashing"):
+            state["flashing"] = flashing
+            cv.itemconfigure(border, fill="#fb7185" if flashing else c["accent"])
+        if "fps" in items:
+            live = load_json(FPS_LIVE_FILE, None) or {}
+            f = live.get("fps") if time.time() - live.get("at", 0) < 5 else None
+            cv.itemconfigure(items["fps"], text="··· fps" if f is None else f"{f} fps")
         if "ping" in items:
             p = state["ping"]
             color = c["muted"] if p is None else "#4ade80" if p < 80 else "#fbbf24" if p < 150 else "#fb7185"
@@ -4116,8 +4870,39 @@ def app_icon_file():
     return base / "ui" / "orbit.ico"
 
 
+def _clipboard_put(fmt, data):
+    u, k = ctypes.windll.user32, ctypes.windll.kernel32
+    k.GlobalAlloc.restype = ctypes.c_void_p
+    k.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+    k.GlobalLock.restype = ctypes.c_void_p
+    k.GlobalLock.argtypes = [ctypes.c_void_p]
+    k.GlobalUnlock.argtypes = [ctypes.c_void_p]
+    u.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+    u.SetClipboardData.restype = ctypes.c_void_p
+    for _ in range(10):
+        if u.OpenClipboard(None):
+            break
+        time.sleep(0.05)
+    else:
+        return False
+    try:
+        u.EmptyClipboard()
+        h = k.GlobalAlloc(0x0002, len(data))
+        ptr = k.GlobalLock(h)
+        ctypes.memmove(ptr, data, len(data))
+        k.GlobalUnlock(h)
+        return bool(u.SetClipboardData(fmt, h))
+    finally:
+        u.CloseClipboard()
+
+
 def copy_to_clipboard(text):
     if IS_WINDOWS:
+        try:
+            if _clipboard_put(13, (str(text) + "\0").encode("utf-16-le")):
+                return
+        except Exception:
+            pass
         subprocess.run([sys_tool("clip")], input=text.encode("utf-16-le"), creationflags=CREATE_NO_WINDOW)
 
 
@@ -4846,6 +5631,152 @@ class Api:
         threading.Thread(target=predownload_roblox, kwargs={"force": True}, daemon=True).start()
         return True
 
+    def join_link(self):
+        link = join_link()
+        if not link:
+            return {"error": "Join a server first."}
+        copy_to_clipboard(link)
+        return {"link": link}
+
+    def region_test(self):
+        try:
+            return region_test()
+        except Exception as e:
+            return self._err(e)
+
+    def last_region_test(self):
+        return load_json(DATA_DIR / "region_test.json", None)
+
+    def find_player(self, text):
+        try:
+            return find_player(text)
+        except urllib.error.HTTPError as e:
+            return {"error": "Roblox is busy right now. Try again in a few seconds." if e.code == 429
+                    else f"Roblox returned an error ({e.code})."}
+        except Exception as e:
+            return self._err(e)
+
+    def join_player(self, user):
+        try:
+            uid = int(user.get("id"))
+            rp = [x for x in self._settings.get("recent_players", []) if x.get("id") != uid]
+            rp.insert(0, {k: user.get(k) for k in ("id", "name", "display", "avatar")} | {"at": int(time.time())})
+            self._settings["recent_players"] = rp[:12]
+            save_settings(self._settings)
+            r = self.launch(follow_uri(uid))
+            return {"settings": self._settings} if r is True else r
+        except Exception as e:
+            return self._err(e)
+
+    def forget_player(self, uid):
+        self._settings["recent_players"] = [x for x in self._settings.get("recent_players", []) if x.get("id") != uid]
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def fonts(self):
+        out = []
+        for fid, (name, fname, desc) in FONTS.items():
+            f = font_file(fid)
+            if f:
+                out.append({"id": fid, "name": name, "desc": desc, "data": "data:font/otf;base64," + base64.b64encode(f.read_bytes()).decode()})
+        cf = font_file("custom")
+        if cf:
+            out.append({"id": "custom", "name": "Your font", "desc": cf.name,
+                        "data": "data:font/otf;base64," + base64.b64encode(cf.read_bytes()).decode()})
+        return out
+
+    def set_font(self, fid):
+        if fid and not font_file(fid):
+            return {"error": "That font isn't available."}
+        self._settings["font"] = fid or ""
+        if fid:
+            self._settings["apply_mods"] = True
+        save_settings(self._settings)
+        return {"settings": self._settings}
+
+    def choose_font(self):
+        try:
+            picked = self._dialog("OPEN", file_types=("Fonts (*.ttf;*.otf)",))
+            if not picked:
+                return None
+            src = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            if src.suffix.lower() not in (".ttf", ".otf") or src.stat().st_size > 15_000_000:
+                return {"error": "Pick a .ttf or .otf font under 15 MB."}
+            FONT_DIR.mkdir(parents=True, exist_ok=True)
+            for old in FONT_DIR.glob("custom.*"):
+                old.unlink(missing_ok=True)
+            shutil.copy2(src, FONT_DIR / ("custom" + src.suffix.lower()))
+            return self.set_font("custom")
+        except Exception as e:
+            return self._err(e)
+
+    def set_profile(self, username):
+        try:
+            username = (username or "").strip()
+            if not username:
+                self._settings["profile"] = {"roblox_id": None, "username": "", "display": ""}
+            else:
+                u = find_player(username)
+                self._settings["profile"] = {"roblox_id": u["id"], "username": u["name"], "display": u.get("display") or u["name"]}
+            save_settings(self._settings)
+            return {"settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def player_card(self):
+        try:
+            f = player_card(self._settings)
+            return {"path": str(f), "data": data_url(f)}
+        except Exception as e:
+            return self._err(e)
+
+    def fps_status(self):
+        st = fps_ready()
+        info = load_json(DATA_DIR / "fps_status.json", {}) or {}
+        return {**st, "enabled": bool((self._settings.get("fps") or {}).get("enabled")),
+                "pending_signout": bool(info.get("pending_signout")) and not st["group"], "error": info.get("error")}
+
+    def fps_setup(self):
+        try:
+            r = setup_presentmon()
+            self._settings.setdefault("fps", {})["enabled"] = True
+            save_settings(self._settings)
+            return {**r, "settings": self._settings}
+        except Exception as e:
+            return self._err(e)
+
+    def replay_status(self):
+        rp = self._settings.get("replay") or {}
+        st = load_json(DATA_DIR / "ffmpeg_setup.json", {}) or {}
+        return {"tool": FFMPEG.exists(), "enabled": bool(rp.get("enabled")), "recording": bool(Replay.proc and Replay.proc.poll() is None),
+                "downloading": st.get("state") == "downloading", "progress": st.get("progress", 0), "error": st.get("error")}
+
+    def replay_setup(self):
+        def work():
+            try:
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "downloading", "progress": 0})
+                last = {"p": -1}
+
+                def prog(f):
+                    if f - last["p"] >= 0.01:
+                        last["p"] = f
+                        save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "downloading", "progress": round(f, 3)})
+                setup_ffmpeg(prog)
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "done", "progress": 1})
+            except Exception as e:
+                save_json(DATA_DIR / "ffmpeg_setup.json", {"state": "failed", "error": str(e)[:200]})
+                log(f"ffmpeg setup failed: {e}")
+        threading.Thread(target=work, daemon=True).start()
+        return True
+
+    def save_replay(self):
+        r = Replay.save()
+        return {"path": r} if r else {"error": "Nothing to save yet. Instant replay records while Roblox is open and in front."}
+
+    def screenshot_now(self):
+        r = take_roblox_screenshot()
+        return {"path": r} if r else {"error": "Open Roblox first."}
+
     def hotkeys(self):
         return [{"keys": v[2], "desc": v[3]} for v in HOTKEYS.values()]
 
@@ -4963,7 +5894,12 @@ def _run_gui(mode, after_update, selftest):
             if mode == "app":
                 table = process_table() or []
                 me = os.getpid()
-                checks = {"table": len(table) > 10 and any(pid == me for pid, _, _ in table),
+                try:
+                    jl = apply_jump_list() or not is_frozen()
+                except Exception as e:
+                    log(f"Jump list check failed: {e}")
+                    jl = False
+                checks = {"jumplist": jl, "table": len(table) > 10 and any(pid == me for pid, _, _ in table),
                           "alive_self": pid_alive(me), "alive_bogus": not pid_alive(4_000_000_001 % 4_000_000),
                           "named": me in pids_named(Path(sys.executable).name) or not is_frozen(),
                           "priority": set_priority(pid=me) == 1, "roblox": roblox_running() is False,
@@ -4994,6 +5930,14 @@ def _run_gui(mode, after_update, selftest):
         threading.Thread(target=watch_show_requests, daemon=True).start()
         threading.Thread(target=AutoAttach("window").loop, daemon=True).start()
         threading.Thread(target=hotkey_loop, args=("window",), daemon=True).start()
+
+        def jump_list():
+            time.sleep(4)
+            try:
+                apply_jump_list()
+            except Exception as e:
+                log(f"Jump list unavailable: {e}")
+        threading.Thread(target=jump_list, daemon=True).start()
     icon = app_icon_file()
     try:
         webview.start(debug=bool(os.environ.get("ORBIT_DEBUG")), icon=str(icon) if icon.exists() else None)
@@ -5031,6 +5975,14 @@ def main():
             background_main()
         except Exception:
             log("Background mode failed:\n" + traceback.format_exc())
+        return
+    if ACTION_FLAG in args:
+        i = args.index(ACTION_FLAG)
+        ensure_dirs()
+        try:
+            run_hotkey(args[i + 1] if len(args) > i + 1 else "", True)
+        except Exception:
+            log("Action failed:\n" + traceback.format_exc())
         return
     if is_helper() and not any(f in args for f in (TOAST_FLAG, LAUNCH_FLAG)):
         if INSTALLED_EXE.exists():

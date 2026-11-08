@@ -21,7 +21,7 @@ body { border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); bor
 .row { display: flex; align-items: center; gap: 6px; }
 .num { font-weight: 650; font-variant-numeric: tabular-nums; padding: 3px 8px; border-radius: 7px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 12px; }
 .sp { flex: 1; }
-button.b { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); padding: 4px 9px; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; cursor: pointer; transition: transform .2s, border-color .2s, background .2s; }
+button.b { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--fg); padding: 4px 7px; border-radius: 8px; font: 600 11.5px "Segoe UI", sans-serif; cursor: pointer; transition: transform .2s, border-color .2s, background .2s; }
 button.b:hover { border-color: var(--accent); transform: translateY(-1px); }
 button.b.p { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; color: #fff; }
 .good { color: #4ade80; } .mid { color: #fbbf24; } .bad { color: #fb7185; }
@@ -37,6 +37,7 @@ button.b.p { background: linear-gradient(135deg, var(--accent), var(--accent2));
     <span class="num" id="timer">0:00</span><span class="num" id="ping">– ms</span><span class="sp"></span>
     <button class="b" id="rejoin" title="Rejoin this server">Rejoin</button>
     <button class="b" id="hop" title="Hop to a new server">New</button>
+    <button class="b" id="link" title="Copy a link friends can use to join you">Link</button>
     <button class="b p" id="open" title="Open Orbit">Orbit</button>
   </div>
 <script>
@@ -50,7 +51,7 @@ async function refresh() {
   r.classList.toggle("light", !!st.light);
   cur = st.current;
   if (cur) {
-    $("#name").textContent = cur.name || "Roblox"; $("#loc").textContent = cur.location || "Finding server location...";
+    $("#name").textContent = cur.name || "Roblox"; $("#loc").textContent = st.streamer ? "Location hidden (streamer mode)" : (cur.location || "Finding server location...");
     const p = $("#ping"); p.textContent = st.ping == null ? "··· ms" : st.ping + " ms";
     p.className = "num " + (st.ping == null ? "" : st.ping < 80 ? "good" : st.ping < 150 ? "mid" : "bad");
   } else {
@@ -58,7 +59,7 @@ async function refresh() {
     $("#loc").textContent = st.last && st.last.name ? `Last: ${st.last.name}` : "Join a game and it shows up here";
     $("#ping").textContent = "– ms"; $("#ping").className = "num"; $("#timer").textContent = "0:00";
   }
-  $("#hop").disabled = !cur;
+  $("#hop").disabled = !cur; $("#link").disabled = !cur;
 }
 function tick() { if (cur && cur.joined) $("#timer").textContent = fmt(Date.now() / 1000 - cur.joined); }
 function boot() {
@@ -67,6 +68,7 @@ function boot() {
   $("#x").onclick = () => api.close();
   $("#rejoin").onclick = () => api.rejoin();
   $("#hop").onclick = () => api.hop();
+  $("#link").onclick = async () => { const ok = await api.join_link(); const b = $("#link"); b.textContent = ok ? "Copied" : "No game"; setTimeout(() => (b.textContent = "Link"), 1500); };
   $("#open").onclick = () => api.open_main();
   refresh(); setInterval(refresh, 2000); setInterval(tick, 1000);
 }

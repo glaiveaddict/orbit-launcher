@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.2.0
+- **Join a player:** type a Roblox username in the Library to see if they're online or in a game, then join their server in one click. It works whenever their Roblox privacy lets you join them. Recent players are saved for quick rejoining.
+- **Auto-reconnect:** if Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone.
+- **Lag spike alerts:** the in-game badge flashes red when your ping suddenly jumps.
+- **Region test:** on the Servers page, see which Roblox region gives you the lowest ping, using servers you've actually played on. The region hopper defaults to your best one.
+- **Join links:** copy a link friends can click to join your exact server (Home, mini player, Ctrl+Alt+J or the taskbar menu).
+- **Fonts:** swap Roblox's fonts for Inter, Poppins, DejaVu Mono, or your own .ttf/.otf file (Mods page).
+- **Movement sound packs:** new jump, landing, footstep and get-up sounds: Soft Steps, Retro and Quiet (Mods > Movement).
+- **Player card:** a shareable image of your all-time stats with your Roblox avatar (Stats page).
+- **Streamer mode:** hides server locations and join buttons from the badge, popups, Home, the mini player and Discord.
+- **Bedtime:** a heads-up 10 minutes before the time you pick, and optionally closes Roblox when your match ends (or 15 minutes after).
+- **Taskbar menu:** right-click Orbit on the taskbar for Launch Roblox, Rejoin, New server and Copy join link.
+- **Screenshot hotkey:** Ctrl+Alt+S saves just the Roblox window to that game's screenshot folder and copies it.
+- **FPS tracking:** real frame rate and 1% lows per session, plus live FPS on the badge, measured from outside Roblox with PresentMon. Needs a one-time Windows permission (Boost > Capture).
+- **Instant replay:** keeps the last 15, 30 or 60 seconds recorded; press Ctrl+Alt+C to save a clip to Videos\Orbit. Off by default because recording costs some CPU.
+
 ## v2.1.1
 - **Fix: PC freezing when you tab out of Roblox.** The Unlimited frame rate option let Roblox push your graphics card so hard (especially on loading screens and teleports) that Windows couldn't draw the desktop or other apps. Unlimited is gone: the highest cap is now 240 (Roblox's own maximum), and anyone who had Unlimited is moved to 240 automatically, even if they launch Roblox without Orbit.
 - **Overlays step aside properly:** the server badge and keystrokes overlay now fully hide whenever Roblox isn't the window in front, instead of staying as invisible always-on-top windows, and no longer re-assert "always on top" several times a second.

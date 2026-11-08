@@ -557,6 +557,34 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .lib-cross { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
 .lib-cross select { flex: 1; min-width: 0; width: 100%; }
 .lib-cross img { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
+
+.pj-row { display: flex; gap: 10px; }
+.pj-card { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.02); animation: rise .45s var(--spring) both; }
+.pj-card img { width: 56px; height: 56px; border-radius: 50%; background: var(--panel3); flex: none; }
+.pj-card b { display: block; font-size: 16px; }
+.pj-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 650; padding: 3px 9px; border-radius: 99px; background: rgba(255,255,255,.06); margin-top: 4px; }
+.pj-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pj-pill.game i { background: #4ade80; box-shadow: 0 0 8px #4ade80; } .pj-pill.online i { background: #38bdf8; } .pj-pill.studio i { background: #fbbf24; }
+.pj-recent { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.pj-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 4px; border-radius: 99px; border: 1px solid var(--line); background: rgba(255,255,255,.03); font-size: 12.5px; cursor: pointer; transition: border-color .2s, transform .25s var(--spring); }
+.pj-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+.pj-chip img { width: 24px; height: 24px; border-radius: 50%; background: var(--panel3); }
+.pj-chip .x { opacity: .5; padding: 0 4px; } .pj-chip .x:hover { opacity: 1; color: #fb7185; }
+.fonts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.font-card { border: 1px solid var(--line); border-radius: 13px; padding: 12px; cursor: pointer; background: rgba(255,255,255,.02); color: var(--text); text-align: left; transition: border-color .25s, transform .3s var(--spring); }
+.font-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.font-card.on { border-color: var(--accent); box-shadow: 0 0 20px -8px var(--accent); }
+.font-card .sample { font-size: 22px; line-height: 1.2; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.font-card b { font-size: 13px; display: block; } .font-card span { font-size: 11.5px; color: var(--muted); }
+.region-row { display: grid; grid-template-columns: 130px 1fr 60px; gap: 12px; align-items: center; padding: 6px 0; font-size: 13px; }
+.region-row .bar { margin: 0; }
+.region-row.best b { color: #4ade80; }
+.card-img { width: 100%; border-radius: 14px; margin-top: 12px; box-shadow: 0 12px 40px -18px rgba(0,0,0,.7); }
+.tool-status { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin: 6px 0 10px; }
+.tool-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.tool-status.ok i { background: #4ade80; } .tool-status.warn i { background: #fbbf24; }
+.now-actions { display: flex; gap: 8px; margin-top: 8px; }
+.now-actions .btn { padding: 5px 10px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -626,6 +654,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
     <section class="page" id="page-library">
       <div class="page-head rise row" style="--i:0"><div><h1>Library</h1><p>Your favorite games. Each one can have its own FastFlags and mod pack.</p></div><span class="spacer"></span>
         <button class="btn primary" id="libAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add game</button></div>
+      <div class="card rise" style="--i:1" id="joinCard"></div>
       <div class="lib-grid rise" style="--i:1" id="libGrid"></div>
       <div class="card rise" style="--i:2;margin-top:14px" id="savedCard"></div>
       <div class="card rise" style="--i:2;margin-top:14px" id="libSuggestCard"><h3>Recently played</h3><p class="sub">Add them to your library with one click.</p><div class="row" id="libSuggest"></div></div>
@@ -638,6 +667,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row" id="svQuick" style="margin-top:10px"></div>
       </div>
       <div class="card rise" style="--i:1" id="smartCard"></div>
+      <div class="card rise" style="--i:1" id="regionCard"></div>
       <div id="svResult"></div>
     </section>
 
@@ -669,6 +699,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
         <div class="row" style="margin-bottom:6px"><div><h3>Launch with Roblox</h3><p class="sub" style="margin:0">These open when Roblox starts through Orbit. Optionally close them when you stop playing.</p></div><span class="spacer"></span><button class="btn" id="appAdd">Add app</button></div>
         <div id="appList"></div>
       </div>
+      <div class="card rise" style="--i:3" id="captureCard"></div>
       <div class="card rise" style="--i:3" id="hotkeyCard"></div>
     </section>
 
@@ -695,6 +726,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
           <button class="btn" id="openModsBtn">Open folder</button><button class="btn danger" id="delModBtn">Delete profile</button></div>
         <div class="row" id="modChips"></div>
       </div>
+      <div class="card rise" style="--i:3" id="fontCard"></div>
       <div class="card rise" style="--i:3" id="xmakerCard"></div>
       <div class="card rise" style="--i:3">
         <div class="row" style="margin-bottom:4px"><div><h3 style="margin:0">Orbit packs</h3><p class="sub" style="margin:4px 0 0">Original crosshairs, cursors and death sounds made for Orbit. The crosshair is what you see in shift lock and first person. Installs into the selected mod profile.</p></div><span class="spacer"></span><div id="packTabs"></div></div>
@@ -711,6 +743,7 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
       <div class="page-head rise" style="--i:0"><h1>Stats</h1><p>Your play time, weekly recap and full session history.</p></div>
       <div class="card rise" style="--i:1" id="sessionToggles"></div>
       <div class="card rise" style="--i:2" id="todayCard"></div>
+      <div class="card rise" style="--i:2" id="cardCard"></div>
       <div class="grid3 rise" style="--i:2">
         <div class="card tilt"><div class="stat-label">Total play time</div><div class="big-num" id="statTotal">0m</div></div>
         <div class="card tilt"><div class="stat-label">Games played</div><div class="big-num" id="statGames">0</div></div>
@@ -1205,7 +1238,9 @@ function renderNow() {
   const tick = () => { const sec = Math.max(0, Math.floor(Date.now() / 1000 - cur.joined)); const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60; timer.textContent = (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
   card.innerHTML = "";
   card.append(gi, h("div", { style: "min-width:0" }, h("div", { class: "live" }, h("i"), "NOW PLAYING"), h("div", { class: "nm" }, cur.name || "Joining..."),
-    h("div", { class: "loc" }, "Server: ", h("b", {}, cur.location || "finding location..."))), timer);
+    h("div", { class: "loc" }, "Server: ", h("b", {}, cfg.session.streamer_mode ? "hidden (streamer mode)" : (cur.location || "finding location..."))),
+    h("div", { class: "now-actions" }, h("button", { class: "btn", onclick: async () => { const r = await api.join_link(); r.error ? toast(r.error, "err") : toast("Join link copied. Send it to a friend.", "ok"); } }, "Copy join link"),
+      h("button", { class: "btn", onclick: async () => { const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } }, "Screenshot"))), timer);
   tick(); nowTimer = setInterval(tick, 1000);
 }
 function renderFsWarn() {
@@ -1350,7 +1385,7 @@ async function renderMods() {
     list.append(h("div", { class: "empty" }, (() => { const d = h("div"); d.innerHTML = svg("box"); return d.firstChild; })(),
       h("div", {}, "No mods in this profile yet."), h("div", { class: "small" }, "Click Open folder and drop files in.")));
   } else files.forEach((f, i) => { const row = h("div", { class: "file", style: `--i:${i}` }); row.innerHTML = svg("file"); row.append(f); list.append(row); });
-  renderMaker(); renderPacks();
+  renderFonts(); renderMaker(); renderPacks();
 }
 
 
@@ -1368,6 +1403,10 @@ function renderSession() {
     toggleRow("Session timer on the badge", "Shows how long you've been in the current server.", s.badge_timer !== false, (v) => { s.badge_timer = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Break reminders"), h("span", {}, "A small popup suggests a break after this much play time. Applies from your next session.")),
       segmented([["0", "Off"], ["30", "30m"], ["60", "1h"], ["90", "1h 30m"], ["120", "2h"]], String(s.break_minutes || 0), (v) => { s.break_minutes = Number(v); save(); })),
+    toggleRow("Auto-reconnect", "If Roblox disconnects you (lost connection, error 277 or 279), Orbit puts you back in the same server, or a fresh one if it's gone. Stops after 3 tries in 10 minutes.", s.auto_reconnect !== false, (v) => { s.auto_reconnect = v; save(); }),
+    toggleRow("Lag spike alerts", "The badge flashes red when your ping suddenly jumps, so you know it was lag.", s.lag_alerts !== false, (v) => { s.lag_alerts = v; save(); }),
+    toggleRow("Streamer mode", "Hides your server location and join buttons from the badge, popups, Home and Discord, so you can stream safely.", !!s.streamer_mode, (v) => { s.streamer_mode = v; save(); }),
+    bedtimeRow(s),
     toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Overlay position"), h("span", {}, "Where the keystrokes sit on the Roblox window.")),
       segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"]], (cfg.overlay && cfg.overlay.keys_pos) || "Bottom right", (v) => { cfg.overlay.keys_pos = v; save(); })),
@@ -1377,7 +1416,7 @@ function renderSession() {
     toggleRow("Start with Windows", "Runs a tiny background helper (no window) so the badge, banner and stats work even when Orbit's window is closed, no matter how you open Roblox.", !!s.start_with_windows, async (v) => { const r = await api.set_startup(v); if (r && r.error) toast(r.error, "err"); else { s.start_with_windows = v; toast(v ? "Orbit now tracks Roblox in the background." : "Background tracking is off.", "ok"); } }),
     toggleRow("Track play time", "Keeps a record of how long you play each game.", s.track_playtime, (v) => { s.track_playtime = v; save(); }),
     toggleRow("Offer to rejoin after a crash", "If Roblox closes while you're in a game, asks to put you back in the same server.", s.crash_rejoin, (v) => { s.crash_rejoin = v; save(); }));
-  renderToday(); renderStats(); renderCalendar(); renderRecap(); renderTimeline();
+  renderToday(); renderPlayerCard(); renderStats(); renderCalendar(); renderRecap(); renderTimeline();
 }
 async function renderStats() {
   const data = S.playtime || {};
@@ -1635,7 +1674,7 @@ async function renderLibrary() {
         h("div", { class: "row" }, sel), h("div", { class: "row" }, cross)));
     grid.append(card);
   });
-  renderSaved();
+  renderSaved(); renderJoin();
   const sug = $("#libSuggest"); sug.innerHTML = "";
   const have = new Set(cfg.library.map((g) => String(g.pid)));
   const recent = Object.entries(S.playtime || {}).filter(([pid]) => !have.has(pid)).sort((a, b) => (b[1].last_played || 0) - (a[1].last_played || 0)).slice(0, 8);
@@ -1683,7 +1722,7 @@ function hopCard(pid, name) {
   return card;
 }
 function renderServers() {
-  renderSmart();
+  renderSmart(); renderRegion();
   const q = $("#svQuick"); q.innerHTML = "";
   cfg.library.slice(0, 10).forEach((g) => q.append(h("button", { class: "mini-chip", onclick: () => findServers(g.pid) }, g.name)));
   if (!cfg.library.length) q.append(h("span", { class: "muted small" }, "Tip: games in your Library show up here for one-click search."));
@@ -1898,7 +1937,7 @@ async function renderKits() {
   });
 }
 function renderBoost() {
-  renderFps(); renderKits(); renderFpsTune();
+  renderFps(); renderKits(); renderFpsTune(); renderCapture();
   const p = cfg.performance, box = $("#perfCard"); box.innerHTML = "";
   box.append(h("h3", { style: "margin-bottom:8px" }, "Performance"),
     toggleRow("Priority for Roblox", "Gives Roblox above-normal CPU priority while you play, without starving the rest of your PC.", p.high_priority, (v) => { p.high_priority = v; save(); }),
@@ -1989,6 +2028,7 @@ async function openGame(pid) {
   g.locations.forEach(([loc, n]) => { const bar = h("i"); locCard.append(h("div", { class: "loc-bar" }, h("span", {}, loc), h("div", { class: "bar" }, bar), h("span", { class: "muted num" }, String(n)))); setTimeout(() => (bar.style.width = n / top * 100 + "%"), 200); });
   body.append(locCard);
   if (g.last_ping || g.ping_by_location.length) body.append(pingCard(g));
+  const fc = fpsCard(g); if (fc) body.append(fc);
   const hist = h("div", { class: "card rise", style: "--i:4" }, h("h3", { style: "margin-bottom:8px" }, "Recent sessions"));
   if (!g.recent.length) hist.append(h("p", { class: "sub", style: "margin:0" }, "No sessions recorded yet."));
   g.recent.forEach((x, i) => hist.append(h("div", { class: "list-row", style: `--i:${i}` },
@@ -2043,21 +2083,21 @@ async function runRepair(kind, btn) {
 
 let packAudio = null;
 let packKind = "crosshair";
-const PACK_KINDS = { crosshair: "Shift-lock crosshair", cursor: "Cursor", sound: "Death sound" };
+const PACK_KINDS = { crosshair: "Shift-lock crosshair", cursor: "Cursor", sound: "Death sound", charsound: "Jump, land and footsteps" };
 async function renderPacks() {
   const grid = $("#packGrid"), all = await api.packs(); grid.innerHTML = "";
   const tabs = $("#packTabs");
-  if (tabs) { tabs.innerHTML = ""; const seg = segmented([["crosshair", "Crosshairs"], ["cursor", "Cursors"], ["sound", "Sounds"]], packKind, (v) => { packKind = v; renderPacks(); }); tabs.append(seg); requestAnimationFrame(() => seg._remeasure()); }
+  if (tabs) { tabs.innerHTML = ""; const seg = segmented([["crosshair", "Crosshairs"], ["cursor", "Cursors"], ["sound", "Death"], ["charsound", "Movement"]], packKind, (v) => { packKind = v; renderPacks(); }); tabs.append(seg); requestAnimationFrame(() => seg._remeasure()); }
   const packs = all.filter((p) => p.kind === packKind);
   packs.forEach((p, i) => {
     const pv = h("div", { class: "pv" + (p.kind === "crosshair" ? " cross" : "") });
-    if (p.kind !== "sound") pv.append(h("img", { src: p.data, alt: "" }));
+    if (p.kind !== "sound" && p.kind !== "charsound") pv.append(h("img", { src: p.data, alt: "" }));
     else pv.append(h("div", { class: "wave" }, ...Array.from({ length: 9 }, (_, k) => h("i", { style: `--k:${k};height:${[30, 55, 80, 45, 95, 60, 40, 70, 35][k]}%` }))));
     const card = h("div", { class: "pack" + (p.installed ? " on" : ""), style: `--i:${i}` }, pv,
       h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, PACK_KINDS[p.kind])),
       h("div", { class: "small muted" }, p.desc));
     const row = h("div", { class: "row" });
-    if (p.kind === "sound") {
+    if (p.kind === "sound" || p.kind === "charsound") {
       const play = h("button", { class: "btn ghost" }, "▶ Play");
       play.onclick = () => { if (packAudio) packAudio.pause(); packAudio = new Audio(p.data); packAudio.volume = cfg.sounds.volume ?? .6; card.classList.add("playing"); packAudio.onended = () => card.classList.remove("playing"); packAudio.play().catch(() => card.classList.remove("playing")); };
       row.append(play);
@@ -2260,6 +2300,150 @@ async function renderRobloxUpdates() {
   clearTimeout(rbxTimer);
   if (r.state === "downloading" && page === "health") rbxTimer = setTimeout(renderRobloxUpdates, 1500);
 }
+function bedtimeRow(s) {
+  const t = h("input", { class: "input", type: "time", value: s.bedtime || "", style: "width:120px" });
+  t.onchange = () => { s.bedtime = t.value || ""; save(); toast(t.value ? `Bedtime set for ${t.value}.` : "Bedtime is off.", "ok"); };
+  const act = segmented([["remind", "Just remind me"], ["close", "Close Roblox"]], s.bedtime_action || "remind", (v) => { s.bedtime_action = v; save(); });
+  const clear = h("button", { class: "btn ghost", onclick: () => { s.bedtime = ""; t.value = ""; save(); toast("Bedtime is off.", "ok"); } }, "Off");
+  requestAnimationFrame(() => act._remeasure());
+  return h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Bedtime"), h("span", {}, "A heads-up 10 minutes before. \"Close Roblox\" closes it when your match ends, or 15 minutes after bedtime.")),
+    h("div", { class: "row" }, t, act, clear));
+}
+
+let pjUser = null;
+async function renderJoin() {
+  const box = $("#joinCard"); box.innerHTML = "";
+  const inp = h("input", { class: "input", placeholder: "Roblox username or profile link", style: "flex:1" });
+  const go_ = h("button", { class: "btn primary" }, "Find player");
+  const out = h("div");
+  const find = async () => {
+    const q = inp.value.trim(); if (!q) return;
+    go_.disabled = true; out.innerHTML = ""; out.append(h("div", { class: "row", style: "margin-top:12px" }, h("span", { class: "spinner", style: "color:var(--accent)" }), h("span", { class: "muted" }, "Looking them up...")));
+    const r = await api.find_player(q); go_.disabled = false; out.innerHTML = "";
+    if (r.error) return toast(r.error, "err");
+    pjUser = r; out.append(playerCard(r));
+  };
+  go_.onclick = find; inp.onkeydown = (e) => { if (e.key === "Enter") find(); };
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Join a player"), h("p", { class: "sub" }, "Type someone's username to join the server they're in. This works when their Roblox privacy lets you join them (\"who can join me\" set to everyone, or you're friends)."),
+    h("div", { class: "pj-row" }, inp, go_), out);
+  const recent = cfg.recent_players || [];
+  if (recent.length) {
+    const row = h("div", { class: "pj-recent" });
+    recent.forEach((u) => {
+      const x = h("span", { class: "x", title: "Remove" }, "✕");
+      x.onclick = async (e) => { e.stopPropagation(); const r = await api.forget_player(u.id); syncSettings(r); renderJoin(); };
+      row.append(h("span", { class: "pj-chip", title: `Look up ${u.name}`, onclick: () => { inp.value = u.name; find(); } }, h("img", { src: u.avatar || "", alt: "" }), u.display || u.name, x));
+    });
+    box.append(h("div", { class: "stat-label", style: "margin-top:14px" }, "Recent"), row);
+  }
+}
+function playerCard(u) {
+  const cls = { "In a game": "game", "Online": "online", "In Studio": "studio" }[u.status] || "";
+  const join = h("button", { class: "btn primary" }, "Join");
+  join.onclick = async () => {
+    await saveNow(); sfx("launch"); const r = await api.join_player(u);
+    if (r && r.error) return toast(r.error, "err");
+    syncSettings(r); toast(`Joining ${u.display || u.name}... If their privacy doesn't allow it, Roblox will say so.`, "ok"); setTimeout(renderJoin, 600);
+  };
+  const where = u.game && u.game.name ? ` · ${u.game.name}` : "";
+  const note = u.status === "Offline" ? "They're offline right now." : u.status === "Online" ? "Online, but not in a game." : u.status === "In a game" ? "" : "Roblox only shows full status to friends, so try Join anyway.";
+  return h("div", { class: "pj-card" }, h("img", { src: u.avatar || "", alt: "" }),
+    h("div", { style: "flex:1;min-width:0" }, h("b", {}, u.display || u.name), h("span", { class: "muted small" }, "@" + u.name),
+      h("div", {}, h("span", { class: "pj-pill " + cls }, h("i"), u.status + where)), note ? h("div", { class: "muted small", style: "margin-top:4px" }, note) : h("span")),
+    h("button", { class: "btn ghost", onclick: () => api.open_url(`https://www.roblox.com/users/${u.id}/profile`) }, "Profile"), join);
+}
+
+async function renderRegion(run) {
+  const box = $("#regionCard"); if (!box) return;
+  box.innerHTML = "";
+  const btn = h("button", { class: "btn" }, run ? "Testing..." : "Test regions");
+  btn.disabled = !!run; btn.onclick = () => renderRegion(true);
+  box.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Region test"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Pings Roblox servers you've played on before to find the region with the lowest ping for you.")), btn));
+  const r = run ? await api.region_test() : await api.last_region_test();
+  if (run) { btn.disabled = false; btn.textContent = "Test again"; }
+  if (!r) return;
+  if (r.error) return toast(r.error, "err");
+  if (r.note) box.append(h("p", { class: "muted small", style: "margin:10px 0 0" }, r.note));
+  if (!r.regions || !r.regions.length) return;
+  const worst = Math.max(...r.regions.map((x) => x.ping), 100);
+  r.regions.forEach((x, i) => { const bar = h("i"); box.append(h("div", { class: "region-row" + (i === 0 ? " best" : "") }, h("b", {}, x.region), h("div", { class: "bar" }, bar), h("span", { class: "num " + pingClass(x.ping) }, x.ping + " ms"))); setTimeout(() => (bar.style.width = x.ping / worst * 100 + "%"), 150); });
+  const best = r.regions[0];
+  box.append(h("p", { class: "muted small", style: "margin:8px 0 0" }, `${best.region} is your best region. ` + (run ? "" : `Last tested ${fmtAgo(r.at)}. `) + "The region hopper under a game's servers will default to it."));
+  try { localStorage.setItem("orbitHopRegion", best.region); } catch (e) {}
+}
+
+async function renderFonts() {
+  const box = $("#fontCard"); if (!box) return;
+  const fonts = await api.fonts(); box.innerHTML = "";
+  const grid = h("div", { class: "fonts" });
+  const pick = async (id) => { const r = await api.set_font(id); if (r.error) return toast(r.error, "err"); syncSettings(r); renderFonts(); toast(id ? "Font set. It shows next time Roblox starts through Orbit." : "Roblox's normal fonts are back next launch.", "ok"); };
+  grid.append(h("button", { class: "font-card" + (!cfg.font ? " on" : ""), onclick: () => pick("") }, h("div", { class: "sample" }, "Aa Roblox"), h("b", {}, "Roblox default"), h("span", {}, "No font mod.")));
+  fonts.forEach((f) => {
+    const fam = "orbitfont_" + f.id;
+    if (!document.getElementById(fam)) { const st = document.createElement("style"); st.id = fam; st.textContent = `@font-face{font-family:${fam};src:url(${f.data});}`; document.head.append(st); }
+    grid.append(h("button", { class: "font-card" + (cfg.font === f.id ? " on" : ""), onclick: () => pick(f.id) }, h("div", { class: "sample", style: `font-family:${fam}` }, "Aa Sword 99"), h("b", {}, f.name), h("span", {}, f.desc)));
+  });
+  box.append(h("div", { class: "row", style: "margin-bottom:10px" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Fonts"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Changes the font in Roblox's menus, chat and most game text.")),
+    h("button", { class: "btn", onclick: async () => { const r = await api.choose_font(); if (!r) return; if (r.error) return toast(r.error, "err"); syncSettings(r); renderFonts(); toast("Your font is set for next launch.", "ok"); } }, "Use my own font")), grid);
+}
+
+async function renderPlayerCard(make) {
+  const box = $("#cardCard"); if (!box) return;
+  box.innerHTML = "";
+  const prof = cfg.profile || {};
+  const inp = h("input", { class: "input", placeholder: "Your Roblox username", value: prof.username || "", style: "flex:1" });
+  const saveBtn = h("button", { class: "btn" }, "Save");
+  saveBtn.onclick = async () => { saveBtn.disabled = true; const r = await api.set_profile(inp.value); saveBtn.disabled = false; if (r.error) return toast(r.error, "err"); syncSettings(r); toast(inp.value ? `Hi ${cfg.profile.display || cfg.profile.username}!` : "Profile cleared.", "ok"); renderPlayerCard(); };
+  const makeBtn = h("button", { class: "btn primary" }, "Make my card");
+  makeBtn.onclick = () => renderPlayerCard(true);
+  box.append(h("h3", { style: "margin-bottom:4px" }, "Player card"), h("p", { class: "sub" }, "A shareable image of your all-time stats with your avatar. Saved to Pictures\\Orbit."),
+    h("div", { class: "row" }, inp, saveBtn, makeBtn));
+  if (make) {
+    makeBtn.disabled = true; makeBtn.textContent = "Making...";
+    const r = await api.player_card(); makeBtn.disabled = false; makeBtn.textContent = "Make my card";
+    if (r.error) return toast(r.error, "err");
+    sfx("ready");
+    box.append(h("img", { class: "card-img", src: r.data, alt: "Your player card" }), h("div", { class: "row", style: "margin-top:10px" },
+      h("button", { class: "btn", onclick: () => api.show_in_folder(r.path) }, "Show in folder"), h("span", { class: "muted small" }, r.path)));
+  }
+}
+
+let capTimer = null;
+async function renderCapture() {
+  const box = $("#captureCard"); if (!box) return;
+  const [fs, rs] = await Promise.all([api.fps_status(), api.replay_status()]); box.innerHTML = "";
+  const fpsLine = fs.group && fs.tool ? ["ok", "Ready. FPS shows on the badge and in game stats while you play."]
+    : fs.pending_signout ? ["warn", "Almost there: sign out of Windows and back in once, then it works."]
+    : fs.error === "access" ? ["warn", "Windows blocked frame tracking. Click Set up again and allow the prompt, then sign out and back in."]
+    : ["", "Needs a one-time setup: Orbit downloads Microsoft-backed PresentMon and asks Windows for permission once."];
+  const fpsBtn = h("button", { class: "btn" + (fs.group && fs.tool ? "" : " primary") }, fs.group && fs.tool ? "Set up again" : "Set up FPS tracking");
+  fpsBtn.onclick = async () => { fpsBtn.disabled = true; fpsBtn.textContent = "Setting up..."; const r = await api.fps_setup(); fpsBtn.disabled = false; if (r.error) { toast(r.error, "err"); return renderCapture(); } syncSettings(r); toast(r.needs_signout ? "Done. Sign out of Windows and back in once to finish." : "FPS tracking is ready.", "ok"); renderCapture(); };
+  const rp = cfg.replay = cfg.replay || { enabled: false, seconds: 30, fps: 30 };
+  const repLine = rs.downloading ? ["warn", `Downloading the recorder... ${Math.round((rs.progress || 0) * 100)}%`] : rs.tool ? ["ok", rs.recording ? "Recording in the background right now." : "Ready. It records while Roblox is open and in front."]
+    : rs.error ? ["warn", "Download failed: " + rs.error] : ["", "Needs a one-time download of the free ffmpeg recorder (about 140 MB)."];
+  const lenSeg = segmented([["15", "15s"], ["30", "30s"], ["60", "60s"]], String(rp.seconds || 30), (v) => { rp.seconds = Number(v); save(); });
+  box.append(h("h3", { style: "margin-bottom:6px" }, "Capture"),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "FPS and frame-time tracking"), h("span", {}, "Measures Roblox's real frame rate from outside the game, without touching Roblox."),
+      h("div", { class: "tool-status " + fpsLine[0] }, h("i"), fpsLine[1])), h("div", { class: "row" }, fpsBtn, switchEl(fs.enabled, (v) => { cfg.fps = cfg.fps || {}; cfg.fps.enabled = v; save(); }))),
+    h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Instant replay"), h("span", {}, "Keeps the last moments recorded (no sound) so you can save a clip with Ctrl+Alt+C. Uses some CPU, so it can cost a few FPS."),
+      h("div", { class: "tool-status " + repLine[0] }, h("i"), repLine[1])),
+      h("div", { class: "row" }, rs.tool ? lenSeg : h("button", { class: "btn primary", disabled: rs.downloading, onclick: async () => { await api.replay_setup(); setTimeout(renderCapture, 600); } }, "Download recorder"),
+        switchEl(!!rp.enabled, (v) => { rp.enabled = v; save(); toast(v ? "Instant replay starts with your next Roblox session." : "Instant replay is off.", "ok"); }))),
+    h("div", { class: "row", style: "margin-top:10px" },
+      h("button", { class: "btn", onclick: async () => { const r = await api.save_replay(); r.error ? toast(r.error, "err") : toast("Clip saved to Videos\\Orbit.", "ok"); } }, "Save replay now"),
+      h("button", { class: "btn", onclick: async () => { const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } }, "Screenshot Roblox"),
+      h("span", { class: "muted small" }, "Right-click Orbit on your taskbar for Launch, Rejoin, New server and Copy join link.")));
+  if (rs.tool) requestAnimationFrame(() => lenSeg._remeasure());
+  clearTimeout(capTimer);
+  if (rs.downloading && page === "boost") capTimer = setTimeout(renderCapture, 1500);
+}
+function fpsCard(g) {
+  const f = g.last_fps; if (!f) return null;
+  return h("div", { class: "card rise", style: "--i:3" }, h("div", { class: "row", style: "margin-bottom:6px" }, h("h3", { style: "margin:0" }, "FPS"), h("span", { class: "spacer" }),
+    h("span", { class: "ping-tag ping-good" }, `avg ${f.avg} fps`), h("span", { class: "ping-tag" }, `1% low ${f.low1}`)), sparkline(f.samples));
+}
 let palItems = [], palSel = 0;
 function palActions() {
   const A = [];
@@ -2276,6 +2460,13 @@ function palActions() {
   A.push({ ico: "♥", t: "Run health check", k: "Orbit", run: () => go("health") });
   A.push({ ico: "⚡", t: cfg.performance.boost ? "Turn off FPS Boost" : "Turn on FPS Boost", k: "Boost", run: async () => { const r = await api.set_boost(!cfg.performance.boost, cfg.performance.boost_level || "Max"); if (r.error) return toast(r.error, "err"); syncSettings(r); toast(cfg.performance.boost ? "FPS Boost is on." : "FPS Boost is off.", "ok"); if (page === "boost") renderBoost(); } });
   A.push({ ico: "▣", t: "Mini player", k: "Window", run: () => $("#miniBtn").click() });
+  A.push({ ico: "🔗", t: "Copy join link", k: "Share", run: async () => { const r = await api.join_link(); r.error ? toast(r.error, "err") : toast("Join link copied.", "ok"); } });
+  A.push({ ico: "👤", t: "Join a player", k: "Library", run: () => { go("library"); setTimeout(() => $("#joinCard input").focus(), 400); } });
+  A.push({ ico: "📡", t: "Test regions", k: "Servers", run: () => { go("servers"); setTimeout(() => renderRegion(true), 300); } });
+  A.push({ ico: "🎬", t: "Save instant replay", k: "Capture", run: async () => { const r = await api.save_replay(); r.error ? toast(r.error, "err") : toast("Clip saved.", "ok"); } });
+  A.push({ ico: "📸", t: "Screenshot Roblox", k: "Capture", run: async () => { const r = await api.screenshot_now(); r.error ? toast(r.error, "err") : toast("Screenshot saved and copied.", "ok"); } });
+  A.push({ ico: "🕶", t: cfg.session.streamer_mode ? "Turn off streamer mode" : "Turn on streamer mode", k: "Privacy", run: () => { cfg.session.streamer_mode = !cfg.session.streamer_mode; save(); toast(`Streamer mode ${cfg.session.streamer_mode ? "on" : "off"}.`, "ok"); if (page === "home") renderNow(); } });
+  A.push({ ico: "🪪", t: "Make my player card", k: "Stats", run: () => { go("session"); setTimeout(() => renderPlayerCard(true), 400); } });
   A.push({ ico: "✛", t: "Crosshair maker", k: "Mods", run: () => { go("mods"); setTimeout(() => $("#xmakerCard").scrollIntoView({ behavior: "smooth" }), 400); } });
   A.push({ ico: "⌨", t: cfg.overlay && cfg.overlay.keystrokes ? "Turn off keystrokes overlay" : "Turn on keystrokes overlay", k: "Overlay", run: () => { cfg.overlay.keystrokes = !cfg.overlay.keystrokes; save(); toast(`Keystrokes overlay ${cfg.overlay.keystrokes ? "on" : "off"} for your next session.`, "ok"); } });
   THEMES.forEach((t) => A.push({ ico: "🎨", t: `Theme: ${t.name}`, k: "Appearance", run: () => { go("appearance"); setTimeout(() => [...$$(".theme-card")].find((b) => b.textContent.startsWith(t.name))?.click(), 300); } }));
