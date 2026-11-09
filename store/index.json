@@ -61,7 +61,7 @@
       "name": "Starry Night",
       "kind": "sky",
       "author": "@stabzane",
-      "desc": "A deep blue night sky full of stars, with a soft purple glow at the horizon. Shows in games that use Roblox's default sky.",
+      "desc": "A deep blue night sky full of stars, with a soft purple glow at the horizon. Shows in games that use Roblox's default sky. Games that set their own sky, like BedWars, keep theirs.",
       "preview": "skies/starry-night/preview.png",
       "files": {
         "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/starry-night/sky512_bk.tex",
@@ -77,7 +77,7 @@
       "name": "Sunset",
       "kind": "sky",
       "author": "@stabzane",
-      "desc": "A warm orange and pink sunset fading into a purple evening. Shows in games that use Roblox's default sky.",
+      "desc": "A warm orange and pink sunset fading into a purple evening. Shows in games that use Roblox's default sky. Games that set their own sky, like BedWars, keep theirs.",
       "preview": "skies/sunset/preview.png",
       "files": {
         "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/sunset/sky512_bk.tex",
@@ -93,7 +93,7 @@
       "name": "Clear Day",
       "kind": "sky",
       "author": "@stabzane",
-      "desc": "A clean, bright blue sky with no clouds. Easy on the eyes. Shows in games that use Roblox's default sky.",
+      "desc": "A clean, bright blue sky with no clouds. Easy on the eyes. Shows in games that use Roblox's default sky. Games that set their own sky, like BedWars, keep theirs.",
       "preview": "skies/clear-day/preview.png",
       "files": {
         "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/clear-day/sky512_bk.tex",

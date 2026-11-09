@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.13.2
+- **Sharper custom skies:** Starry Night, Sunset and Clear Day are now full resolution (1024×1024, the same as Roblox's own sky). If you already have one, press Remove and then Get to download the new version.
+- Custom skies replace Roblox's default sky. Games that set their own sky, like BedWars, keep theirs, and the Pack store now says so.
+
 ## v2.13.1
 - **"What's new" only shows once:** it pops up the first time you open Orbit after an update, then stays away until the next update. Before, changing any setting could make it come back every time you opened Orbit.
 

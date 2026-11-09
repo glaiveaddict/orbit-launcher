@@ -3282,7 +3282,7 @@ async function renderStore(refresh) {
       get.disabled = true;
       if (on) { const r = await api.remove_store_item(it.id); get.disabled = false; if (r.error) return toast(r.error, "err"); storeCache.installed = r.installed; toast(`${it.name} removed.`, "ok"); renderStore(); renderPacks(); return; }
       get.textContent = "Getting..."; const r = await api.install_store_item(it.id); get.disabled = false; get.textContent = "Get";
-      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed.` + (it.kind === "sky" ? " Plain gray sky is off so it can show." : "") + (r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok");
+      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed.` + (it.kind === "sky" ? " Plain gray sky is off so it can show. Games with their own sky, like BedWars, keep theirs." : "") + (r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok");
       storeCache = null; renderStore(); renderPacks(); if (it.kind === "font") renderFonts(); };
     const pv = it.kind === "sky" && it.preview_url ? h("div", { class: "pv", style: `background:url("${it.preview_url}") center/cover` }) : h("div", { class: "pv" }, it.preview_url ? h("img", { src: it.preview_url, alt: "" }) : h("span", { class: "muted small" }, it.kind));
     grid.append(h("div", { class: "store-item", style: `--i:${i}` }, pv,
