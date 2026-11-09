@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.13.3
+- **FPS counter fixed:** the FPS overlay showed "-- FPS" unless FPS tracking was also set up separately. Turning on Show FPS now sets everything up for you, and the overlay card tells you if a step is left (a one-time Windows permission, then signing out and back in once).
+- If the FPS counter can't read your FPS in game, the overlay now says why instead of just showing "--".
+
 ## v2.13.2
 - **Sharper custom skies:** Starry Night, Sunset and Clear Day are now full resolution (1024×1024, the same as Roblox's own sky). If you already have one, press Remove and then Get to download the new version.
 - Custom skies replace Roblox's default sky. Games that set their own sky, like BedWars, keep theirs, and the Pack store now says so.

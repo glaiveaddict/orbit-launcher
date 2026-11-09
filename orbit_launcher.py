@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.13.2"
+APP_VERSION = "2.13.3"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2070,7 +2070,7 @@ class SessionMonitor:
             threading.Thread(target=self._afk_watch, daemon=True).start()
         if any((x.get("daily_limit") or 0) for x in self.settings.get("library") or []):
             threading.Thread(target=self._limit_watch, daemon=True).start()
-        if (self.settings.get("fps") or {}).get("enabled"):
+        if (self.settings.get("fps") or {}).get("enabled") or (self.settings.get("overlay") or {}).get("stats_fps"):
             try:
                 self.fps = FpsTracker()
                 if not self.fps.start():
@@ -3972,8 +3972,17 @@ class FpsTracker:
         self.game_frames = []
 
     def start(self):
+        if IS_WINDOWS and not PRESENTMON.exists():
+            try:
+                TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+                url, name = github_asset("GameTechDev/PresentMon", r"PresentMon-\d+\.\d+\.\d+-x64\.exe")
+                download_file(url, PRESENTMON)
+                log(f"Downloaded {name} for the FPS counter")
+            except Exception as e:
+                log(f"Couldn't download PresentMon: {e}")
         if not IS_WINDOWS or not PRESENTMON.exists():
             log("FPS tracking is on but PresentMon isn't set up yet")
+            save_json(DATA_DIR / "fps_status.json", {"error": "tool", "at": int(time.time())})
             return False
         folder = DATA_DIR / "fps"
         folder.mkdir(parents=True, exist_ok=True)
@@ -5467,7 +5476,7 @@ def show_stats_window():
     def rot(x, y):
         dx, dy = x - cx, y - cy
         return cx + dx * math.cos(ang) + dy * math.sin(ang), cy - dx * math.sin(ang) + dy * math.cos(ang)
-    state = {"pings": [], "fps": None, "shown": False, "xy": None}
+    state = {"pings": [], "fps": None, "shown": False, "xy": None, "t0": time.time()}
     ip = (load_json(CURRENT_FILE, None) or {}).get("ip")
 
     def pinger():
@@ -5489,6 +5498,13 @@ def show_stats_window():
             live = load_json(FPS_LIVE_FILE, None) or {}
             f = live.get("fps") if time.time() - live.get("at", 0) < 5 else None
             txt = f"{f} FPS" if f is not None else "-- FPS"
+            if f is None and time.time() - state.get("t0", time.time()) > 12:
+                err = (load_json(DATA_DIR / "fps_status.json", {}) or {}).get("error")
+                if err:
+                    note = "Finish FPS setup in Orbit (Boost)" if err in ("access", "start") else "FPS counter couldn't download"
+                    nx, ny = rot(cx, y_fps + 26)
+                    cv.create_text(nx + 1, ny + 1, text=note, font=f_small, fill="#05030a", angle=tilt)
+                    cv.create_text(nx, ny, text=note, font=f_small, fill="#fbbf24", angle=tilt)
             col = a2 if f is None or f >= 60 else "#fbbf24" if f >= 30 else "#fb7185"
             x, y = rot(cx, y_fps)
             cv.create_text(x + 2, y + 2, text=txt, font=f_big, fill="#05030a", angle=tilt)

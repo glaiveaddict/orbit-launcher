@@ -1671,8 +1671,25 @@ async function renderSetups() {
   lockCard(box, "Setups");
 }
 async function renderStatsOverlay() {
-  const box = $("#statsOvCard"); if (!box) return; box.innerHTML = "";
+  const box = $("#statsOvCard"); if (!box) return;
+  const fs = hasPrem() && api.fps_status ? await api.fps_status() : null; box.innerHTML = "";
   const ov = cfg.overlay || (cfg.overlay = {});
+  const fpsOk = fs && fs.tool && fs.group;
+  const setupFps = async (btn) => {
+    if (btn) { btn.disabled = true; btn.textContent = "Setting up..."; }
+    const r = await api.fps_setup(); if (r.error) { toast(r.error, "err"); return renderStatsOverlay(); }
+    syncSettings(r); toast(r.needs_signout ? "Almost done. Sign out of Windows and back in once, then FPS shows in game." : "FPS counter is ready. It shows next time you play.", "ok");
+    renderStatsOverlay(); renderCapture();
+  };
+  let fpsNote = null;
+  if (ov.stats_fps && fs && !fpsOk) {
+    const msg = fs.pending_signout ? ["warn", "Almost there: sign out of Windows and back in once, then FPS shows in game."]
+      : fs.error === "access" ? ["warn", "Windows blocked reading your FPS. Click Set up and press Yes on the Windows prompt."]
+      : ["warn", "The FPS counter needs a one-time setup before it can read your FPS."];
+    const b = h("button", { class: "btn primary", style: "margin-left:auto" }, fs.pending_signout ? "Set up again" : "Set up");
+    b.onclick = () => setupFps(b);
+    fpsNote = h("div", { class: "row", style: "margin-top:10px;gap:10px" }, h("div", { class: "tool-status " + msg[0] }, h("i"), msg[1]), b);
+  }
   const prev = h("div", { class: "ov-prev" });
   const draw = () => {
     prev.innerHTML = "";
@@ -1686,11 +1703,11 @@ async function renderStatsOverlay() {
   };
   const pos = segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"]], ov.stats_pos || "Top left", (v) => { ov.stats_pos = v; save(); draw(); });
   const tilt = segmented([["tilt", "Tilted"], ["flat", "Straight"]], ov.stats_tilt !== false ? "tilt" : "flat", (v) => { ov.stats_tilt = v === "tilt"; save(); draw(); });
-  box.append(h("h3", { style: "margin-bottom:4px" }, "FPS and ping overlay"), h("p", { class: "sub" }, "Shows your FPS in big tilted numbers and a live ping graph in a corner of the game. Clicks go through it, and it hides when you tab out. FPS needs FPS tracking (Capture, above)."),
+  box.append(h("h3", { style: "margin-bottom:4px" }, "FPS and ping overlay"), h("p", { class: "sub" }, "Shows your FPS in big tilted numbers and a live ping graph in a corner of the game. Clicks go through it, and it hides when you tab out."),
     h("div", { class: "grid2", style: "gap:14px;align-items:start" }, prev, h("div", {},
-      toggleRow("Show FPS", "Big numbers: purple when smooth, yellow under 60, red under 30.", !!ov.stats_fps, (v) => { ov.stats_fps = v; save(); draw(); }),
+      toggleRow("Show FPS", "Big numbers: purple when smooth, yellow under 60, red under 30.", !!ov.stats_fps, async (v) => { ov.stats_fps = v; save(); draw(); if (v && fs && !fpsOk && !fs.pending_signout) await setupFps(); else renderStatsOverlay(); }),
       toggleRow("Show ping graph", "The last minute of ping, so you can see lag building up.", !!ov.stats_ping, (v) => { ov.stats_ping = v; save(); draw(); }))),
-    h("div", { class: "row", style: "margin-top:10px;flex-wrap:wrap" }, pos, tilt), h("p", { class: "muted small", style: "margin:8px 0 0" }, "Starts with your next Roblox session."));
+    h("div", { class: "row", style: "margin-top:10px;flex-wrap:wrap" }, pos, tilt), h("p", { class: "muted small", style: "margin:8px 0 0" }, "Starts with your next Roblox session."), fpsNote || "");
   draw(); requestAnimationFrame(() => { pos._remeasure(); tilt._remeasure(); });
   lockCard(box, "The FPS and ping overlay");
 }
