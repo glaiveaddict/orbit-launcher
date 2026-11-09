@@ -1,0 +1,30 @@
+name: sky-check
+on:
+  push:
+    branches: [sky-check]
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - shell: python
+        run: |
+          import json, urllib.request, zipfile, io, struct
+          get = lambda u: urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"}), timeout=60).read()
+          ver = json.loads(get("https://clientsettings.roblox.com/v2/client-version/WindowsPlayer"))["clientVersionUpload"]
+          print("version", ver)
+          man = get(f"https://setup.rbxcdn.com/{ver}-rbxPkgManifest.txt").decode()
+          pk = [l for l in man.splitlines() if l.endswith(".zip")]
+          print("packages", pk)
+          for name in pk:
+              if not any(k in name for k in ("texture", "sky", "content-platform")):
+                  continue
+              z = zipfile.ZipFile(io.BytesIO(get(f"https://setup.rbxcdn.com/{ver}-{name}")))
+              hits = [n for n in z.namelist() if "sky" in n.lower() or "cloud" in n.lower()]
+              print("==", name, len(z.namelist()), "entries; sky/cloud:", hits[:60])
+              for n in hits:
+                  d = z.read(n)
+                  if d[:4] == b"DDS ":
+                      h, w = struct.unpack("<II", d[12:20]); mips = struct.unpack("<I", d[28:32])[0]
+                      print("   ", n, len(d), "DDS", w, "x", h, "mips", mips, d[84:88], "dx10fmt", struct.unpack("<I", d[128:132])[0] if d[84:88] == b"DX10" else "")
+                  else:
+                      print("   ", n, len(d), d[:8])
