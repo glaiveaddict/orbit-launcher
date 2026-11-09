@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.11.0"
+APP_VERSION = "2.12.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -151,7 +151,7 @@ DEFAULT_SETTINGS = {
     "fps": {"enabled": False},
     "replay": {"enabled": False, "seconds": 30, "fps": 30},
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True, "crosshair": "",
-                "crosshair_mode": "locked", "crosshair_size": 100, "stats_fps": False, "stats_ping": False, "stats_pos": "Top left", "stats_tilt": True},
+                "crosshair_mode": "locked", "crosshair_size": 100, "stats_fps": False, "stats_ping": False, "stats_pos": "Top left", "stats_tilt": True, "timer": False, "timer_pos": "Top right"},
     "hotkeys": {"enabled": True},
     "mod_profile": "Default",
     "discord": {
@@ -297,7 +297,7 @@ PREMIUM_FORCED = {("session", "server_popup"): False, ("session", "server_badge"
                   ("session", "lag_alerts"): False, ("hotkeys", "enabled"): False, ("fps", "enabled"): False,
                   ("replay", "enabled"): False, ("session", "auto_hop"): "off", ("session", "badge_pc"): False,
                   ("session", "mute_tabbed"): False, ("session", "dnd"): False, ("overlay", "stats_fps"): False,
-                  ("overlay", "stats_ping"): False, ("session", "clip_spikes"): False}
+                  ("overlay", "stats_ping"): False, ("session", "clip_spikes"): False, ("overlay", "timer"): False}
 
 
 def load_settings(raw=False):
@@ -2055,6 +2055,8 @@ class SessionMonitor:
         ov = self.settings.get("overlay") or {}
         if ov.get("stats_fps") or ov.get("stats_ping"):
             start_stats_overlay()
+        if ov.get("timer"):
+            start_timer_overlay()
         if self.session.get("dnd"):
             threading.Thread(target=set_dnd, args=(True,), daemon=True).start()
         if self.session.get("pause_music"):
@@ -2135,6 +2137,7 @@ class SessionMonitor:
                 close_keys()
                 close_crosshair_overlay()
                 close_stats_overlay()
+                close_timer_overlay()
                 Replay.stop()
                 if self.session.get("dnd"):
                     set_dnd(False)
@@ -2448,7 +2451,10 @@ HOTKEYS = {1: (0x52, "rejoin", "Ctrl+Alt+R", "Rejoin your current or last server
            9: (0x50, "party", "Ctrl+Alt+P", "Join your party leader"),
            10: (0x31, "setup1", "Ctrl+Alt+1", "Switch to your first saved setup"),
            11: (0x32, "setup2", "Ctrl+Alt+2", "Switch to your second saved setup"),
-           12: (0x33, "setup3", "Ctrl+Alt+3", "Switch to your third saved setup")}
+           12: (0x33, "setup3", "Ctrl+Alt+3", "Switch to your third saved setup"),
+           13: (0x54, "timer_go", "Ctrl+Alt+T", "Speedrun timer: start, or stop and save"),
+           14: (0x59, "timer_split", "Ctrl+Alt+Y", "Speedrun timer: split"),
+           15: (0x55, "timer_reset", "Ctrl+Alt+U", "Speedrun timer: reset")}
 
 
 def current_game():
@@ -2476,7 +2482,8 @@ def run_hotkey(action, force=False):
             BADGE_HIDDEN.unlink(missing_ok=True)
         else:
             BADGE_HIDDEN.write_text("1")
-    elif action in ("screenshot", "clip", "joinfriend", "party", "setup1", "setup2", "setup3") and not has_premium(load_settings(raw=True)):
+    elif action in ("screenshot", "clip", "joinfriend", "party", "setup1", "setup2", "setup3", "timer_go", "timer_split",
+                    "timer_reset") and not has_premium(load_settings(raw=True)):
         spawn_toast("Premium feature", "Put in a premium key on Orbit's Premium page to use this.")
     elif action == "screenshot":
         r = take_roblox_screenshot()
@@ -2493,6 +2500,10 @@ def run_hotkey(action, force=False):
         spawn_toast("Replay saved" if r else "Replay isn't running", Path(r).name if r else "Turn on Instant replay in Boost first.")
     elif action == "launch":
         spawn_self(LAUNCH_FLAG, "")
+    elif action in ("timer_go", "timer_split", "timer_reset"):
+        r = timer_action(action[6:])
+        if r.get("pb"):
+            spawn_toast("New personal best!", f"{fmt_time(r['total'])} in {r.get('name') or 'this game'}.")
     elif action in ("setup1", "setup2", "setup3"):
         raw = load_settings(raw=True)
         setups = raw.get("setups") or []
@@ -2596,6 +2607,13 @@ PACKS = {
     "death_soft_pop": ("Soft Pop", "sound", "A short, soft pop when you reset or die."),
     "death_warp": ("Warp Out", "sound", "A sci-fi warp swoosh."),
     "death_retro": ("Retro Blip", "sound", "A quick three-note retro blip."),
+    "crosshair_gold_halo": ("Gold Halo", "crosshair", "A gold ring with a bright center. Premium."),
+    "crosshair_diamond_sight": ("Diamond Sight", "crosshair", "A crisp diamond frame with a dot. Premium."),
+    "crosshair_plasma_ring": ("Plasma Ring", "crosshair", "A glowing violet ring that pops on any map. Premium."),
+    "crosshair_royal_cross": ("Royal Cross", "crosshair", "A gold cross with a dark edge and a center gem. Premium."),
+    "cursor_gold_arrow": ("Gold Arrow", "cursor", "A gold arrow with a soft glow. Premium."),
+    "cursor_holo_ring": ("Holo Ring", "cursor", "A rainbow ring with a white center. Premium."),
+    "cursor_crown": ("Crown", "cursor", "A tiny gold crown that points at what you click. Premium."),
 }
 PACK_TARGETS = {
     "crosshair": ["content/textures/MouseLockedCursor.png"],
@@ -2817,7 +2835,7 @@ def pack_states(settings):
                                              for t in PACK_TARGETS[kind])
         mime = "audio/ogg" if kind == "sound" else "image/png"
         data = f"data:{mime};base64," + base64.b64encode(src.read_bytes()).decode() if src.exists() else ""
-        out.append({"id": pid, "name": name, "kind": kind, "desc": desc, "installed": installed, "data": data})
+        out.append({"id": pid, "name": name, "kind": kind, "desc": desc, "installed": installed, "data": data, "premium": pid in PREMIUM_PACKS})
     return out
 
 
@@ -3900,7 +3918,8 @@ def find_player(text):
         pres = post_json("https://presence.roblox.com/v1/presence/users", {"userIds": [user["id"]]})["userPresences"][0]
         status = {0: "Offline", 1: "Online", 2: "In a game", 3: "In Studio", 4: "Offline"}.get(pres.get("userPresenceType"), "Unknown")
         if pres.get("placeId") or (status == "In a game" and pres.get("lastLocation")):
-            game = {"place_id": str(pres["placeId"]) if pres.get("placeId") else None, "name": pres.get("lastLocation")}
+            game = {"place_id": str(pres["placeId"]) if pres.get("placeId") else None, "name": pres.get("lastLocation"),
+                    "job_id": pres.get("gameId")}
     except Exception as e:
         log(f"Presence lookup failed: {e}")
     try:
@@ -5888,6 +5907,258 @@ def universe_icons(ids):
         except Exception as e:
             log(f"Game icons failed: {e}")
     return out
+
+
+TIMER_FILE = DATA_DIR / "timer.json"
+PB_FILE = DATA_DIR / "timer_pbs.json"
+TIMER_FLAG = "--timer"
+TIMER_PID = DATA_DIR / "timer_overlay.json"
+
+
+def fmt_time(sec):
+    sec = max(0.0, float(sec or 0))
+    m, s_ = divmod(sec, 60)
+    h_, m = divmod(int(m), 60)
+    return (f"{h_}:{m:02d}:{s_:05.2f}" if h_ else f"{m}:{s_:05.2f}")
+
+
+def timer_action(action):
+    st = load_json(TIMER_FILE, {}) or {}
+    now = time.time()
+    cur = load_json(CURRENT_FILE, None) or {}
+    out = {}
+    if action == "go":
+        if st.get("state") == "running":
+            total = now - st["start"]
+            st.update(state="done", end=now)
+            place = st.get("place") or "any"
+            pbs = load_json(PB_FILE, {}) or {}
+            old = pbs.get(place)
+            if not old or total < old.get("best", 1e12):
+                pbs[place] = {"best": round(total, 2), "splits": st.get("splits") or [], "name": st.get("name"), "at": int(now)}
+                save_json(PB_FILE, pbs)
+                out = {"pb": True}
+            out.update(total=total, name=st.get("name"))
+            log(f"Speedrun finished: {fmt_time(total)}{' (new PB)' if out.get('pb') else ''}")
+        else:
+            st = {"state": "running", "start": now, "splits": [], "place": str(cur.get("place_id") or "any"), "name": cur.get("name")}
+    elif action == "split" and st.get("state") == "running":
+        st.setdefault("splits", []).append(round(now - st["start"], 2))
+    elif action == "reset":
+        st = {"state": "idle"}
+    save_json(TIMER_FILE, st)
+    return out
+
+
+def start_timer_overlay():
+    close_timer_overlay()
+    proc = spawn_self(TOAST_FLAG, "timer", "", TIMER_FLAG)
+    if proc:
+        save_json(TIMER_PID, {"pid": proc.pid})
+
+
+def close_timer_overlay():
+    data = load_json(TIMER_PID, {}) or {}
+    if data.get("pid") and IS_WINDOWS:
+        kill_tree(data["pid"])
+    TIMER_PID.unlink(missing_ok=True)
+
+
+def show_timer_window():
+    import tkinter as tk
+    import tkinter.font as tkfont
+    settings = load_settings()
+    ov = settings.get("overlay") or {}
+    pos = ov.get("timer_pos") or "Top right"
+    c = theme_colors(settings["appearance"])
+    a1, a2 = accent_pair(settings["appearance"])
+    key = "#010203"
+    W, H = 250, 96
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.configure(bg=key)
+    try:
+        root.attributes("-topmost", True)
+        root.attributes("-transparentcolor", key)
+    except tk.TclError:
+        pass
+    cv = tk.Canvas(root, width=W, height=H, bg=key, highlightthickness=0, bd=0)
+    cv.pack()
+    f_big = tkfont.Font(family="Consolas", size=26, weight="bold")
+    f_small = tkfont.Font(family="Segoe UI Semibold", size=9)
+    state = {"shown": False, "xy": None}
+
+    def draw():
+        cv.delete("all")
+        st = load_json(TIMER_FILE, {}) or {}
+        pbs = load_json(PB_FILE, {}) or {}
+        cur = load_json(CURRENT_FILE, None) or {}
+        place = st.get("place") or str(cur.get("place_id") or "any")
+        pb = pbs.get(place) or {}
+        run = st.get("state")
+        if run == "running":
+            t = time.time() - st["start"]
+        elif run == "done":
+            t = st["end"] - st["start"]
+        else:
+            t = 0
+        col = a2 if run == "running" else "#4ade80" if run == "done" and pb.get("best") and t <= pb["best"] + 0.01 else c["fg"]
+        txt = fmt_time(t)
+        cv.create_text(W - 12 + 2, 34 + 2, text=txt, font=f_big, fill="#05030a", anchor="e")
+        cv.create_text(W - 12, 34, text=txt, font=f_big, fill=col, anchor="e")
+        line = f"PB {fmt_time(pb['best'])}" if pb.get("best") else "No PB yet"
+        splits = st.get("splits") or []
+        if splits and pb.get("splits") and len(pb["splits"]) >= len(splits):
+            d = splits[-1] - pb["splits"][len(splits) - 1]
+            line += f"   split {len(splits)}: {'+' if d >= 0 else '-'}{abs(d):.2f}"
+            dcol = "#fb7185" if d > 0 else "#4ade80"
+        else:
+            dcol = c["muted"]
+            if splits:
+                line += f"   split {len(splits)}: {fmt_time(splits[-1])}"
+        cv.create_text(W - 12, 70, text=line, font=f_small, fill=dcol if splits else c["muted"], anchor="e")
+        if run in (None, "idle"):
+            cv.create_text(W - 12, 88, text="Ctrl+Alt+T to start", font=f_small, fill=c["muted"], anchor="e")
+
+    root.geometry(f"{W}x{H}+-400+-400")
+    root.deiconify()
+    root.update_idletasks()
+    hwnd = _no_activate(root)
+    if hwnd and IS_WINDOWS:
+        try:
+            u = ctypes.windll.user32
+            u.SetWindowLongW(hwnd, -20, u.GetWindowLongW(hwnd, -20) | 0x00000020 | 0x00080000)
+        except Exception:
+            pass
+    overlay_show(hwnd, False)
+    log(f"Speedrun timer ready ({pos})")
+
+    def tick():
+        try:
+            rect = roblox_rect() if roblox_in_front() else None
+            if rect:
+                L, T, R, B = rect
+                xy = {"Top left": (L + 16, T + 40), "Top right": (R - W - 16, T + 40), "Bottom left": (L + 16, B - H - 16),
+                      "Bottom right": (R - W - 16, B - H - 16)}.get(pos, (R - W - 16, T + 40))
+                if xy != state["xy"]:
+                    state["xy"] = xy
+                    root.geometry(f"+{xy[0]}+{xy[1]}")
+                draw()
+                if not state["shown"]:
+                    overlay_show(hwnd, True)
+                    state["shown"] = True
+            elif state["shown"]:
+                overlay_show(hwnd, False)
+                state["shown"] = False
+        except tk.TclError:
+            return
+        except Exception:
+            if not state.get("logged"):
+                state["logged"] = True
+                log("Timer overlay error:\n" + traceback.format_exc())
+        root.after(50 if state["shown"] else 300, tick)
+
+    tick()
+    root.mainloop()
+
+
+def find_server(place_id, job_id, pages=5):
+    cursor = ""
+    for _ in range(pages):
+        url = (f"https://games.roblox.com/v1/games/{int(place_id)}/servers/Public?sortOrder=Desc&limit=100"
+               + (f"&cursor={cursor}" if cursor else ""))
+        data = fetch_json(url, timeout=10)
+        for sv in data.get("data", []):
+            if sv.get("id") == job_id:
+                return {"playing": sv.get("playing", 0), "max": sv.get("maxPlayers", 0)}
+        cursor = data.get("nextPageCursor")
+        if not cursor:
+            break
+    return None
+
+
+class SpotWaiter:
+    current = None
+
+    def __init__(self, place_id, job_id, name=None):
+        self.place, self.job, self.name = str(place_id), str(job_id), name or "that server"
+        self.state, self.tries, self.started, self.info, self.stop_flag, self.missing = "waiting", 0, time.time(), None, False, 0
+
+    def status(self):
+        return {"active": self.state == "waiting", "state": self.state, "place_id": self.place, "job_id": self.job, "name": self.name,
+                "tries": self.tries, "started": int(self.started), "playing": (self.info or {}).get("playing"), "max": (self.info or {}).get("max")}
+
+    def run(self):
+        log(f"Waiting for a spot in {self.name} ({self.job})")
+        while not self.stop_flag and time.time() - self.started < 30 * 60:
+            self.tries += 1
+            delay = 6
+            try:
+                info = find_server(self.place, self.job)
+                self.info = info
+                if info is None:
+                    self.missing += 1
+                    if self.missing >= 12:
+                        self.state = "gone"
+                        spawn_toast("That server closed", f"{self.name} isn't running anymore, so Orbit stopped waiting.")
+                        return
+                else:
+                    self.missing = 0
+                    if info["playing"] < info["max"]:
+                        self.state = "joined"
+                        log(f"Spot opened in {self.name} ({info['playing']}/{info['max']})")
+                        spawn_toast("A spot opened!", f"Joining {self.name} now.")
+                        spawn_self(LAUNCH_FLAG, rejoin_uri(self.place, self.job))
+                        return
+            except urllib.error.HTTPError as e:
+                delay = 20 if e.code == 429 else 10
+            except Exception:
+                delay = 10
+            for _ in range(delay * 2):
+                if self.stop_flag:
+                    break
+                time.sleep(0.5)
+        if not self.stop_flag and self.state == "waiting":
+            self.state = "timeout"
+            spawn_toast("Stopped waiting", f"No spot opened in {self.name} for 30 minutes.")
+        elif self.stop_flag:
+            self.state = "cancelled"
+
+    @classmethod
+    def start(cls, place_id, job_id, name=None):
+        if cls.current and cls.current.state == "waiting":
+            cls.current.stop_flag = True
+        cls.current = cls(place_id, job_id, name)
+        threading.Thread(target=cls.current.run, daemon=True).start()
+        return cls.current
+
+
+def shrink_clip(name, target_mb=9.5):
+    src = clip_path(name)
+    if not FFMPEG.exists():
+        raise ValueError("Shrinking needs Orbit's video tool. Get it in Boost > Capture.")
+    if src.stat().st_size <= 10 * 1024 * 1024:
+        raise ValueError("That clip is already small enough for Discord.")
+    dur = clip_info(src).get("duration")
+    if not dur:
+        raise ValueError("Orbit couldn't read how long that clip is.")
+    dest = src.with_name(f"{src.stem} (small){src.suffix}")
+    budget = target_mb * 8 * 1024 * 1024 / dur
+    for factor in (1.0, 0.75, 0.55):
+        vbit = max(250_000, int((budget - 96_000) * 0.94 * factor))
+        scale = ["-vf", "scale=-2:720"] if vbit < 2_500_000 else []
+        r = _ffmpeg(["-loglevel", "error", "-y", "-i", str(src), *scale, "-c:v", "libx264", "-preset", "veryfast", "-b:v", str(vbit),
+                     "-maxrate", str(int(vbit * 1.2)), "-bufsize", str(vbit * 2), "-c:a", "aac", "-b:a", "96k", str(dest)], 600)
+        if r.returncode == 0 and dest.exists() and dest.stat().st_size <= 10 * 1024 * 1024:
+            log(f"Shrunk {src.name} to {dest.stat().st_size // 1024} KB")
+            return dest
+    dest.unlink(missing_ok=True)
+    raise ValueError("That clip is too long to fit in 10 MB. Trim it shorter first.")
+
+
+PREMIUM_PACKS = {"crosshair_gold_halo", "crosshair_diamond_sight", "crosshair_plasma_ring", "crosshair_royal_cross",
+                 "cursor_gold_arrow", "cursor_holo_ring", "cursor_crown"}
 
 
 def premium_reminder():
@@ -8230,6 +8501,8 @@ class Api:
         return pack_states(self._settings)
 
     def install_pack(self, pack_id, on=True):
+        if on and pack_id in PREMIUM_PACKS and not has_premium(self._settings):
+            return {"error": "That pack is for Premium players. Put in a premium key on the Premium page to use it."}
         try:
             install_pack(self._settings, pack_id, bool(on))
             if on and not self._settings.get("apply_mods", True):
@@ -8998,6 +9271,50 @@ class Api:
         except Exception as e:
             return self._err(e)
 
+    def timer_pbs(self):
+        pbs = load_json(PB_FILE, {}) or {}
+        return {"items": sorted([{"place": k, "name": v.get("name") or ("Any game" if k == "any" else k), "best": v.get("best"),
+                                  "text": fmt_time(v.get("best")), "splits": len(v.get("splits") or []), "at": v.get("at")}
+                                 for k, v in pbs.items()], key=lambda x: -(x["at"] or 0))}
+
+    def clear_pb(self, place):
+        pbs = load_json(PB_FILE, {}) or {}
+        pbs.pop(str(place), None)
+        save_json(PB_FILE, pbs)
+        return self.timer_pbs()
+
+    def wait_for_spot(self, place_id, job_id, name=None):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        if not str(place_id).isdigit() or not re.fullmatch(r"[0-9a-fA-F-]{20,40}", str(job_id or "")):
+            return {"error": "Orbit needs a specific server to wait for."}
+        return SpotWaiter.start(place_id, job_id, name).status()
+
+    def wait_for_link(self, link):
+        m1 = re.search(r"placeId=(\d+)", link or "")
+        m2 = re.search(r"gameInstanceId=([0-9a-fA-F-]{20,40})", link or "")
+        if not (m1 and m2):
+            return {"error": "Paste a join link with a server in it, like the ones Orbit's Copy join link makes."}
+        return self.wait_for_spot(m1.group(1), m2.group(1), game_info(m1.group(1)).get("name") if m1 else None)
+
+    def spot_status(self):
+        w = SpotWaiter.current
+        return w.status() if w else {"active": False, "state": "none"}
+
+    def cancel_spot(self):
+        if SpotWaiter.current:
+            SpotWaiter.current.stop_flag = True
+            SpotWaiter.current.state = "cancelled"
+        return {"active": False}
+
+    def shrink_clip(self, name):
+        if not has_premium(self._settings):
+            return {"error": PREMIUM_LOCKED}
+        try:
+            return {"item": clip_info(shrink_clip(name))}
+        except Exception as e:
+            return self._err(e)
+
     def owner_issue_many(self, text, days=0):
         if not is_owner():
             return {"error": "Owner only."}
@@ -9627,6 +9944,8 @@ def main():
                 show_crosshair_window()
             elif STATS_FLAG in args:
                 show_stats_window()
+            elif TIMER_FLAG in args:
+                show_timer_window()
             elif "--badge" in args:
                 def opt(flag):
                     return args[args.index(flag) + 1] if flag in args and len(args) > args.index(flag) + 1 else None

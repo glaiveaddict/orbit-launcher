@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.12.0
+- **Speedrun timer (Premium):** an on-screen timer over Roblox with splits and a personal best for every game. Ctrl+Alt+T starts and stops it, Ctrl+Alt+Y splits, Ctrl+Alt+U resets (Boost page).
+- **Join when space opens (Premium):** pick a full server and Orbit keeps checking it, then joins you the moment a spot frees up. Works from a join link, a server in the list, or a player's card when Roblox shows which server they're in.
+- **Shrink for Discord (Premium):** one click turns a clip into a copy under 10 MB so it fits in a Discord message.
+- **10 new Premium themes:** Galaxy, Firefly Night, Ruby, Ocean Deep, Vaporwave, Toxic, Candy, Midnight Rose, Arctic and Sunset Drive.
+- **New Premium backgrounds:** Fireflies and Holo.
+- **New Premium sound packs:** Arcade and Crystal.
+- **Premium crosshairs and cursors:** Gold Halo, Diamond Sight, Plasma Ring, Royal Cross, Gold Arrow, Holo Ring and Crown.
+- A welcome screen when you activate Premium, and a shiny Premium badge.
+
 ## v2.11.0
 - **Custom skies fixed:** installing a sky now turns off Plain gray sky, which was replacing it with a flat light sky (it was on for BedWars). There's also a new **Hide Roblox's clouds** switch in the Pack store, so custom skies aren't covered by clouds. Orbit also warns you when your texture quality is on Lowest, which makes skies blurry.
 - **Discover:** a new page with what's trending on Roblox and a game search. Play in one click or add games to your Library.

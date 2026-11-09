@@ -260,6 +260,15 @@ jobs:
           print("CHECK stats overlay:", "alive", sp.poll() is None, "ready" if "Stats overlay ready" in lt else "no ready line", "ERROR" if "Stats overlay error" in lt else "")
           ok &= sp.poll() is None and "Stats overlay error" not in lt
           ol.kill_tree(sp.pid); fake2.destroy()
+          ol.save_json(ol.TIMER_FILE, {"state": "running", "start": time.time() - 65, "place": "1", "name": "CI", "splits": [30.0]})
+          fake3 = tk.Tk(); fake3.title("Roblox"); fake3.geometry("900x600+80+80")
+          tp = subprocess.Popen([sys.executable, "orbit_launcher.py", ol.TOAST_FLAG, "timer", "", ol.TIMER_FLAG], env=dict(os.environ, ORBIT_BADGE_ALWAYS="1"))
+          for _ in range(80): fake3.update(); time.sleep(0.05)
+          lt = ol.LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+          print("CHECK timer overlay:", "alive", tp.poll() is None, "ready" if "Speedrun timer ready" in lt else "no ready line", "ERROR" if "Toast failed" in lt else "")
+          ok &= tp.poll() is None and "Speedrun timer ready" in lt
+          ol.kill_tree(tp.pid); fake3.destroy()
+          print("CHECK fmt_time:", ol.fmt_time(83.456))
           hw = ol.hardware_info(); print("CHECK hardware:", hw, "->", ol.autotune_plan(hw)["tier"]); ok &= bool(hw["cores"])
           try:
               srt = ol.explore_sorts(); print("CHECK discover sorts:", [(x["name"], len(x["games"])) for x in srt][:6])
