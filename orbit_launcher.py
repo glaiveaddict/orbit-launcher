@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.12.0"
+APP_VERSION = "2.13.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -202,6 +202,7 @@ DEFAULT_SETTINGS = {
         "background": "Starfield",
         "bg_file": "",
         "bg_dim": 0.55,
+        "idle_hide": True,
         "tray": True,
         "close_to_tray": False,
         "custom_colors": ["#9d6bff", "#d946ef"],

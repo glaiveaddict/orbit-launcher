@@ -254,6 +254,11 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 #bgImage { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: center/cover no-repeat; opacity: 0; transition: opacity .8s var(--ease); }
 #bgImage.show { opacity: 1; }
+body.waking #app, body.waking #spotBar, body.waking #toasts { transition: opacity .6s var(--ease); }
+body.idle > :not(#bgImage, #aurora, #holo, #flies, #stars, .nebula, #fx, script) { opacity: 0 !important; pointer-events: none !important; transition: opacity 1.2s var(--ease); }
+body.idle, body.idle * { cursor: none !important; }
+body.idle #bgImage::after { opacity: calc(var(--dim, .55) * .35); transition: opacity 1.2s; }
+#bgImage::after { transition: opacity .6s; }
 #bgImage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 #aurora { position: fixed; inset: -12%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .9s; filter: blur(70px) saturate(1.25);
   background: radial-gradient(38% 32% at 22% 30%, var(--accent), transparent 70%), radial-gradient(34% 40% at 78% 22%, var(--accent2), transparent 70%), radial-gradient(44% 34% at 58% 86%, #22d3ee, transparent 70%);
@@ -2079,6 +2084,7 @@ function renderAppearance() {
   const spc = $("#splashCard"); spc.innerHTML = "";
   renderShare(); renderGallery(); renderThemeMaker(); renderLang();
   spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
+  spc.append(toggleRow("Hide the menu when idle", "If you don't touch the mouse or keyboard for 30 seconds, the menu fades away and only the background shows. Move the mouse to bring it back.", a.idle_hide !== false, (v) => { a.idle_hide = v; save(); idleWake(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
   const bgSeg = $("#bgSeg"); bgSeg.innerHTML = "";
@@ -3913,6 +3919,27 @@ function renderSetup() {
 }
 window.setupProgress = (f, text) => { $("#setupBar").style.width = (f * 100).toFixed(1) + "%"; $("#setupText").textContent = text; };
 
+let idleTimer = null;
+function idleBusy() {
+  return !!document.querySelector(".modal-wrap.show") || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && document.hasFocus();
+}
+function idleWake() {
+  if (document.body.classList.contains("idle")) { document.body.classList.add("waking"); setTimeout(() => document.body.classList.remove("waking"), 700); }
+  document.body.classList.remove("idle");
+  clearTimeout(idleTimer);
+  if (cfg?.appearance?.idle_hide === false) return;
+  idleTimer = setTimeout(function check() {
+    if (idleBusy()) { idleTimer = setTimeout(check, 5000); return; }
+    document.body.classList.add("idle");
+  }, 30000);
+}
+function idleWatch() {
+  let lx = -1, ly = -1;
+  document.addEventListener("mousemove", (e) => { if (Math.abs(e.screenX - lx) + Math.abs(e.screenY - ly) < 3) return; lx = e.screenX; ly = e.screenY; idleWake(); }, { passive: true });
+  const wasIdle = (e) => { if (document.body.classList.contains("idle")) { e.preventDefault(); e.stopPropagation(); } idleWake(); };
+  ["mousedown", "keydown", "wheel", "touchstart"].forEach((t) => document.addEventListener(t, wasIdle, { capture: true, passive: false }));
+  idleWake();
+}
 async function init() {
   S = await api.get_state();
   cfg = S.settings;
@@ -3924,6 +3951,7 @@ async function init() {
   buildNav(); wire(); wireUpdates(); wireExtras(); wireClips(); wireWrapped(); renderCredits(); startI18n();
   $("#spotCancel").onclick = async () => { await api.cancel_spot(); toast("Stopped waiting.", "ok"); pollSpot(); };
   pollSpot();
+  idleWatch();
   $("#discGo").onclick = () => renderDiscover($("#discQ").value.trim()); $("#discQ").onkeydown = (e) => { if (e.key === "Enter") $("#discGo").click(); };
   $("#discReset").onclick = () => { $("#discQ").value = ""; discData = null; renderDiscover(""); };
   setPremPill(S.premium);

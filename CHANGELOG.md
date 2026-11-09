@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.13.0
+- **Idle screen:** if you don't touch the mouse or keyboard for 30 seconds, Orbit's menu fades away and only your background shows. Move the mouse and everything comes back. It waits while a window is open or you're typing, and you can turn it off on the Appearance page.
+
 ## v2.12.0
 - **Speedrun timer (Premium):** an on-screen timer over Roblox with splits and a personal best for every game. Ctrl+Alt+T starts and stops it, Ctrl+Alt+Y splits, Ctrl+Alt+U resets (Boost page).
 - **Join when space opens (Premium):** pick a full server and Orbit keeps checking it, then joins you the moment a spot frees up. Works from a join link, a server in the list, or a player's card when Roblox shows which server they're in.
