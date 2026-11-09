@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.14.0"
+APP_VERSION = "2.14.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -132,6 +132,7 @@ DEFAULT_SETTINGS = {
     "smart_join": False,
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
+    "new_spots": [],
     "saved_servers": [],
     "game_crosshairs": {},
     "font": "",
@@ -7019,6 +7020,26 @@ def update_repo():
     return (build_info().get("repo") or os.environ.get("ORBIT_UPDATE_REPO") or "").strip()
 
 
+NEW_SPOTS = {
+    "2.14.0": ["mods:storeCard"],
+    "2.13.3": ["boost:statsOvCard"],
+    "2.13.0": ["appearance:splashCard"],
+    "2.12.0": ["boost:timerCard", "servers:spotCard", "appearance:galleryCard", "mods:packGrid", "screens"],
+    "2.11.0": ["discover", "stats", "boost", "appearance:themeMakerCard", "library"],
+}
+
+
+def new_spots_since(seen):
+    if not seen:
+        return []
+    old, cur = parse_version(seen), parse_version(APP_VERSION)
+    out = []
+    for ver, spots in NEW_SPOTS.items():
+        if old < parse_version(ver) <= cur:
+            out += [x for x in spots if x not in out]
+    return out
+
+
 def parse_version(v):
     nums = [int(n) for n in re.findall(r"\d+", str(v))[:3]]
     return tuple(nums + [0] * (3 - len(nums)))
@@ -8407,7 +8428,7 @@ class Api:
         seen = self._settings.get("last_seen_version") or ""
         if seen == APP_VERSION:
             return None
-        return {"version": APP_VERSION, "notes": changelog_section(APP_VERSION), "first": not seen}
+        return {"version": APP_VERSION, "notes": changelog_section(APP_VERSION), "first": not seen, "new": new_spots_since(seen)}
 
     def mark_seen(self):
         self._settings["last_seen_version"] = APP_VERSION

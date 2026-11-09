@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.14.1
+- **NEW! tags:** after an update, the sections with new stuff get a NEW! tag in the menu. Open the section and the tag goes away, and the new part is highlighted so you can spot it.
+- **Menu highlight fixed:** the highlight on the selected menu item no longer spills onto the item below it.
+
 ## v2.14.0
 - **6 new Premium skies:** Aurora Night, Deep Space Nebula, Cotton Candy, Blood Moon, Golden Hour and Synthwave. They're full detail, with clouds, nebulas, northern lights and a neon grid (Mods page, Pack store).
 - **New Premium suns and moons:** Black Hole Sun, Neon Sun, Frost Sun, Ringed Planet, Blood Moon and Crescent Moon. These swap Roblox's normal sun and moon, which lots of games keep even when they have their own sky.
