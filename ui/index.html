@@ -614,6 +614,9 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .store-item { border: 1px solid var(--line); border-radius: 13px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,.02); animation: rise .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 40ms); }
 .store-item .pv { height: 64px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
 .store-item .pv img { width: 44px; height: 44px; }
+.store-item { position: relative; }
+.store-item > .ptag2 { position: absolute; top: 18px; right: 18px; margin: 0; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.store-item.prem { border-color: rgba(251,191,36,.45); background: linear-gradient(180deg, rgba(251,191,36,.07), rgba(255,255,255,.02)); }
 .store-item b { font-size: 13.5px; } .store-item .small { flex: 1; }
 .level-card { display: flex; align-items: center; gap: 18px; }
 .level-badge { width: 74px; height: 74px; border-radius: 22px; background: var(--grad); display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 850; box-shadow: 0 10px 30px -10px var(--accent); flex: none; }
@@ -733,7 +736,7 @@ body.bg-fireflies #flies { opacity: 1; }
 #spotBar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 39; display: none; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--panel-solid); border: 1px solid var(--line2); box-shadow: 0 20px 50px -20px #000; font-size: 13px; }
 #spotBar.show { display: flex; }
 #spotBar .spinner { color: var(--accent); }
-.pack .ptag2 { margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; vertical-align: 2px; }
+.pack .ptag2, .store-item .ptag2 { margin-left: 8px; font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 2px 7px; border-radius: 99px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; vertical-align: 2px; }
 .pb-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 .pb-row:first-child { border-top: 0; } .pb-row b { flex: 1; } .pb-row .t { font-family: "DejaVu Mono", monospace; font-weight: 700; color: var(--accent2); }
 .code-box { font-family: "DejaVu Mono", monospace; font-size: 11.5px; word-break: break-all; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid var(--line); line-height: 1.5; max-height: 92px; overflow: auto; flex: 1; user-select: all; }
@@ -2746,7 +2749,7 @@ async function runRepair(kind, btn) {
 
 let packAudio = null;
 let packKind = "crosshair";
-const PACK_KINDS = { crosshair: "Shift-lock crosshair", cursor: "Cursor", sound: "Death sound", charsound: "Jump, land and footsteps", sky: "Sky", font: "Font" };
+const PACK_KINDS = { crosshair: "Shift-lock crosshair", cursor: "Cursor", sound: "Death sound", charsound: "Jump, land and footsteps", sky: "Sky", celestial: "Sun or moon", font: "Font" };
 async function renderPacks() {
   const grid = $("#packGrid"), all = await api.packs(); grid.innerHTML = "";
   const tabs = $("#packTabs");
@@ -3286,7 +3289,7 @@ async function renderStore(refresh) {
   const box = $("#storeCard"); if (!box) return;
   box.innerHTML = "";
   box.append(h("div", { class: "row", style: "margin-bottom:10px" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Pack store"),
-    h("p", { class: "sub", style: "margin:4px 0 0" }, "New crosshairs, cursors, skies, sounds and fonts, added by the Orbit team without needing an update.")),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "New crosshairs, cursors, skies, suns and moons, sounds and fonts, added by the Orbit team without needing an update.")),
     h("button", { class: "btn ghost", onclick: () => { storeCache = null; renderStore(true); } }, "Refresh")));
   if (!storeCache || refresh) storeCache = await api.store();
   const items = storeCache.items || [], have = new Set(storeCache.installed || []);
@@ -3294,15 +3297,19 @@ async function renderStore(refresh) {
   const grid = h("div", { class: "store-grid" });
   items.forEach((it, i) => {
     const on = have.has(it.id);
-    const get = h("button", { class: "btn " + (on ? "danger" : "primary") }, on ? "Remove" : "Get");
+    const locked = it.premium && !hasPrem() && !on;
+    const get = h("button", { class: "btn " + (on ? "danger" : "primary") }, on ? "Remove" : locked ? "🔒 Premium" : "Get");
     get.onclick = async () => {
+      if (locked) return premiumNeeded("Premium skies, suns and moons");
       get.disabled = true;
       if (on) { const r = await api.remove_store_item(it.id); get.disabled = false; if (r.error) return toast(r.error, "err"); storeCache.installed = r.installed; toast(`${it.name} removed.`, "ok"); renderStore(); renderPacks(); return; }
       get.textContent = "Getting..."; const r = await api.install_store_item(it.id); get.disabled = false; get.textContent = "Get";
-      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed.` + (it.kind === "sky" ? " Plain gray sky is off so it can show. Games with their own sky, like BedWars, keep theirs." : "") + (r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok");
+      if (r.error) return toast(r.error, "err"); syncSettings(r); sfx("ready"); toast(`${it.name} installed.` + (it.kind === "sky" ? " Plain gray sky is off so it can show. Games with their own sky, like BedWars, keep theirs." : it.kind === "celestial" ? " It shows in games that use Roblox's normal sun and moon." : "") + (r.running ? " Roblox is open, so it shows after you restart Roblox." : " It's in Roblox now."), "ok");
       storeCache = null; renderStore(); renderPacks(); if (it.kind === "font") renderFonts(); };
-    const pv = it.kind === "sky" && it.preview_url ? h("div", { class: "pv", style: `background:url("${it.preview_url}") center/cover` }) : h("div", { class: "pv" }, it.preview_url ? h("img", { src: it.preview_url, alt: "" }) : h("span", { class: "muted small" }, it.kind));
-    grid.append(h("div", { class: "store-item", style: `--i:${i}` }, pv,
+    const pv = it.kind === "celestial" && it.preview_url ? h("div", { class: "pv", style: "background:radial-gradient(circle at 50% 60%, #1a1238, #06040e)" }, h("img", { src: it.preview_url, alt: "", style: "width:56px;height:56px;border-radius:50%" }))
+      : it.kind === "sky" && it.preview_url ? h("div", { class: "pv", style: `background:url("${it.preview_url}") center/cover` }) : h("div", { class: "pv" }, it.preview_url ? h("img", { src: it.preview_url, alt: "" }) : h("span", { class: "muted small" }, it.kind));
+    grid.append(h("div", { class: "store-item" + (it.premium ? " prem" : ""), style: `--i:${i}` }, pv,
+      it.premium ? h("span", { class: "ptag2" }, hasPrem() ? "PREMIUM" : "🔒 PREMIUM") : "",
       h("div", {}, h("b", {}, it.name), h("div", { class: "muted small" }, (PACK_KINDS[it.kind] || it.kind) + (it.author ? " · " + it.author : ""))),
       h("div", { class: "small muted" }, it.desc || ""), get));
   });

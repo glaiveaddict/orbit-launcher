@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.13.3"
+APP_VERSION = "2.14.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -4635,7 +4635,7 @@ def fetch_news():
         return load_json(NEWS_FILE, {"posts": []})
 
 
-STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font", "sky"}
+STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font", "sky", "celestial"}
 STORE_INSTALLED = DATA_DIR / "store_installed.json"
 STORE_ROOTS = ("content/", "PlatformContent/", "ExtraContent/")
 
@@ -4666,6 +4666,8 @@ def install_store_item(settings, item_id):
     it = next((x for x in items if x.get("id") == item_id), None)
     if not it:
         raise ValueError("That item isn't in the store anymore.")
+    if it.get("premium") and not has_premium(settings):
+        raise ValueError("That one is for Premium players. Put in a premium key on the Premium page to get it.")
     folder = mods_dir(settings)
     count = 0
     for target, src in it["files"].items():
@@ -4684,7 +4686,7 @@ def install_store_item(settings, item_id):
         else:
             download_file(url, folder / target)
         count += 1
-    if it["kind"] == "sky":
+    if it["kind"] in ("sky", "celestial"):
         changed = settings["presets"].get("gray_sky")
         settings["presets"]["gray_sky"] = False
         for prof in (settings.get("game_profiles") or {}).values():
@@ -4713,6 +4715,19 @@ def remove_store_item(settings, item_id):
             (folder / target).unlink(missing_ok=True)
     save_json(STORE_INSTALLED, mine)
     log(f"Removed store item {item_id}")
+
+
+def drop_premium_store(settings):
+    mine = load_json(STORE_INSTALLED, {}) or {}
+    if not mine:
+        return 0
+    prem = {x.get("id") for x in (load_json(STORE_FILE, {}) or {}).get("items") or [] if x.get("premium")}
+    gone = [k for k in mine if k in prem]
+    for k in gone:
+        remove_store_item(settings, k)
+    if gone:
+        log(f"Removed Premium store items: {', '.join(gone)}")
+    return len(gone)
 
 
 def store_installed(settings):
@@ -6557,6 +6572,10 @@ def has_premium(settings, fetch=False):
 def enforce_premium(settings):
     if has_premium(settings):
         return False
+    try:
+        drop_premium_store(settings)
+    except Exception as e:
+        log(f"Couldn't remove Premium store items: {e}")
     perf = settings.setdefault("performance", {})
     if not perf.get("boost") and all(perf.get(k) == v for k, v in PERF_PREMIUM.items()):
         return False

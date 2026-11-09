@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.14.0
+- **6 new Premium skies:** Aurora Night, Deep Space Nebula, Cotton Candy, Blood Moon, Golden Hour and Synthwave. They're full detail, with clouds, nebulas, northern lights and a neon grid (Mods page, Pack store).
+- **New Premium suns and moons:** Black Hole Sun, Neon Sun, Frost Sun, Ringed Planet, Blood Moon and Crescent Moon. These swap Roblox's normal sun and moon, which lots of games keep even when they have their own sky.
+- **Skies fixed:** the sides of custom skies now line up exactly the way Roblox expects, so there are no seams. If you have Starry Night, Sunset or Clear Day, press Remove and then Get to download the fixed version.
+- Premium items in the Pack store have a gold Premium tag. If Premium runs out, they're removed and Roblox's normal ones come back.
+
 ## v2.13.3
 - **FPS counter fixed:** the FPS overlay showed "-- FPS" unless FPS tracking was also set up separately. Turning on Show FPS now sets everything up for you, and the overlay card tells you if a step is left (a one-time Windows permission, then signing out and back in once).
 - If the FPS counter can't read your FPS in game, the overlay now says why instead of just showing "--".

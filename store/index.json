@@ -1,6 +1,180 @@
 {
   "items": [
     {
+      "id": "aurora-night",
+      "name": "Aurora Night",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Northern lights rippling green and purple across a starry night. Shows in games that use Roblox's default sky.",
+      "preview": "skies/aurora-night/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/aurora-night/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/aurora-night/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/aurora-night/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/aurora-night/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/aurora-night/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/aurora-night/sky512_up.tex"
+      }
+    },
+    {
+      "id": "deep-nebula",
+      "name": "Deep Space Nebula",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Glowing pink, purple and blue nebula clouds with thousands of stars, all the way around. Shows in games that use Roblox's default sky.",
+      "preview": "skies/deep-nebula/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/deep-nebula/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/deep-nebula/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/deep-nebula/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/deep-nebula/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/deep-nebula/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/deep-nebula/sky512_up.tex"
+      }
+    },
+    {
+      "id": "cotton-candy",
+      "name": "Cotton Candy",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "A soft pastel sky with fluffy pink clouds. Shows in games that use Roblox's default sky.",
+      "preview": "skies/cotton-candy/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/cotton-candy/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/cotton-candy/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/cotton-candy/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/cotton-candy/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/cotton-candy/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/cotton-candy/sky512_up.tex"
+      }
+    },
+    {
+      "id": "blood-moon",
+      "name": "Blood Moon",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "A dark crimson night with a huge red moon hanging over the horizon. Shows in games that use Roblox's default sky.",
+      "preview": "skies/blood-moon/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/blood-moon/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/blood-moon/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/blood-moon/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/blood-moon/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/blood-moon/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/blood-moon/sky512_up.tex"
+      }
+    },
+    {
+      "id": "golden-hour",
+      "name": "Golden Hour",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Warm sunset light glowing through golden clouds. Shows in games that use Roblox's default sky.",
+      "preview": "skies/golden-hour/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/golden-hour/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/golden-hour/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/golden-hour/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/golden-hour/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/golden-hour/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/golden-hour/sky512_up.tex"
+      }
+    },
+    {
+      "id": "synthwave",
+      "name": "Synthwave",
+      "kind": "sky",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Retro 80s sky: a striped neon sun, purple haze and a glowing grid on the ground. Shows in games that use Roblox's default sky.",
+      "preview": "skies/synthwave/preview.png",
+      "files": {
+        "PlatformContent/pc/textures/sky/sky512_bk.tex": "skies/synthwave/sky512_bk.tex",
+        "PlatformContent/pc/textures/sky/sky512_dn.tex": "skies/synthwave/sky512_dn.tex",
+        "PlatformContent/pc/textures/sky/sky512_ft.tex": "skies/synthwave/sky512_ft.tex",
+        "PlatformContent/pc/textures/sky/sky512_lf.tex": "skies/synthwave/sky512_lf.tex",
+        "PlatformContent/pc/textures/sky/sky512_rt.tex": "skies/synthwave/sky512_rt.tex",
+        "PlatformContent/pc/textures/sky/sky512_up.tex": "skies/synthwave/sky512_up.tex"
+      }
+    },
+    {
+      "id": "sun-black-hole",
+      "name": "Black Hole Sun",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Swaps the sun for a glowing black hole with a fiery disk. Shows in games that use Roblox's normal sun.",
+      "preview": "celestial/sun-black-hole/preview.png",
+      "files": {
+        "content/sky/sun.jpg": "celestial/sun-black-hole/sun.jpg"
+      }
+    },
+    {
+      "id": "sun-neon",
+      "name": "Neon Sun",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "A hot pink and gold sun with a neon glow. Shows in games that use Roblox's normal sun.",
+      "preview": "celestial/sun-neon/preview.png",
+      "files": {
+        "content/sky/sun.jpg": "celestial/sun-neon/sun.jpg"
+      }
+    },
+    {
+      "id": "sun-frost",
+      "name": "Frost Sun",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "An icy blue-white sun with sparkle rays. Shows in games that use Roblox's normal sun.",
+      "preview": "celestial/sun-frost/preview.png",
+      "files": {
+        "content/sky/sun.jpg": "celestial/sun-frost/sun.jpg"
+      }
+    },
+    {
+      "id": "moon-ringed-planet",
+      "name": "Ringed Planet",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "Swaps the moon for a pastel gas giant with rings. Shows in games that use Roblox's normal moon.",
+      "preview": "celestial/moon-ringed-planet/preview.png",
+      "files": {
+        "content/sky/moon.jpg": "celestial/moon-ringed-planet/moon.jpg"
+      }
+    },
+    {
+      "id": "moon-blood",
+      "name": "Blood Moon",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "A deep red moon with a soft crimson glow. Shows in games that use Roblox's normal moon.",
+      "preview": "celestial/moon-blood/preview.png",
+      "files": {
+        "content/sky/moon.jpg": "celestial/moon-blood/moon.jpg"
+      }
+    },
+    {
+      "id": "moon-crescent",
+      "name": "Crescent Moon",
+      "kind": "celestial",
+      "author": "@stabzane",
+      "premium": true,
+      "desc": "A thin, glowing crescent moon. Shows in games that use Roblox's normal moon.",
+      "preview": "celestial/moon-crescent/preview.png",
+      "files": {
+        "content/sky/moon.jpg": "celestial/moon-crescent/moon.jpg"
+      }
+    },
+    {
       "id": "neon-square",
       "name": "Neon Square",
       "kind": "crosshair",
