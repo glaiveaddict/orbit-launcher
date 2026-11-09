@@ -3706,7 +3706,8 @@ async function showWhatsNew() {
   $("#wnTitle").textContent = r.first ? "Welcome to Orbit" : "What's new";
   $("#wnNotes").innerHTML = r.notes ? mdToHtml(r.notes) : "<p>Fresh update installed.</p>";
   $("#wn").classList.add("show"); if (!r.first) burst(innerWidth / 2, 160, 70);
-  $("#wnOk").onclick = () => { $("#wn").classList.remove("show"); api.mark_seen(); };
+  cfg.last_seen_version = r.version; api.mark_seen();
+  $("#wnOk").onclick = () => $("#wn").classList.remove("show");
 }
 
 function wireExtras() {

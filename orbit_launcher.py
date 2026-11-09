@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.13.0"
+APP_VERSION = "2.13.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -8046,6 +8046,8 @@ class Api:
             merged = _merge(DEFAULT_SETTINGS, new if isinstance(new, dict) else {})
             merged["registration"] = self._settings["registration"]
             merged["premium_key"] = self._settings.get("premium_key", "")
+            merged["last_seen_version"] = max(str(self._settings.get("last_seen_version") or ""), str(merged.get("last_seen_version") or ""),
+                                              key=parse_version)
             if not has_premium(merged):
                 perf = merged.setdefault("performance", {})
                 perf.update(PERF_PREMIUM)

@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.13.1
+- **"What's new" only shows once:** it pops up the first time you open Orbit after an update, then stays away until the next update. Before, changing any setting could make it come back every time you opened Orbit.
+
 ## v2.13.0
 - **Idle screen:** if you don't touch the mouse or keyboard for 30 seconds, Orbit's menu fades away and only your background shows. Move the mouse and everything comes back. It waits while a window is open or you're typing, and you can turn it off on the Appearance page.
 
