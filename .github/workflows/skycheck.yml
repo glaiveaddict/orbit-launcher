@@ -1,4 +1,4 @@
-name: sky-list
+name: live-accounts
 on:
   push:
     branches: [sky-check]
@@ -10,8 +10,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pillow && python run3.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: skyimgs
-          path: out
+      - run: python live.py
+        env:
+          PYTHONUTF8: "1"

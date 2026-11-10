@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.13.2"
+APP_VERSION = "2.14.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -132,6 +132,7 @@ DEFAULT_SETTINGS = {
     "smart_join": False,
     "sounds": {"pack": "Warp", "volume": 0.6},
     "last_seen_version": "",
+    "new_spots": [],
     "saved_servers": [],
     "game_crosshairs": {},
     "font": "",
@@ -4635,7 +4636,7 @@ def fetch_news():
         return load_json(NEWS_FILE, {"posts": []})
 
 
-STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font", "sky"}
+STORE_KINDS = {"crosshair", "cursor", "sound", "charsound", "font", "sky", "celestial"}
 STORE_INSTALLED = DATA_DIR / "store_installed.json"
 STORE_ROOTS = ("content/", "PlatformContent/", "ExtraContent/")
 
@@ -4666,6 +4667,8 @@ def install_store_item(settings, item_id):
     it = next((x for x in items if x.get("id") == item_id), None)
     if not it:
         raise ValueError("That item isn't in the store anymore.")
+    if it.get("premium") and not has_premium(settings):
+        raise ValueError("That one is for Premium players. Put in a premium key on the Premium page to get it.")
     folder = mods_dir(settings)
     count = 0
     for target, src in it["files"].items():
@@ -4684,7 +4687,7 @@ def install_store_item(settings, item_id):
         else:
             download_file(url, folder / target)
         count += 1
-    if it["kind"] == "sky":
+    if it["kind"] in ("sky", "celestial"):
         changed = settings["presets"].get("gray_sky")
         settings["presets"]["gray_sky"] = False
         for prof in (settings.get("game_profiles") or {}).values():
@@ -4713,6 +4716,19 @@ def remove_store_item(settings, item_id):
             (folder / target).unlink(missing_ok=True)
     save_json(STORE_INSTALLED, mine)
     log(f"Removed store item {item_id}")
+
+
+def drop_premium_store(settings):
+    mine = load_json(STORE_INSTALLED, {}) or {}
+    if not mine:
+        return 0
+    prem = {x.get("id") for x in (load_json(STORE_FILE, {}) or {}).get("items") or [] if x.get("premium")}
+    gone = [k for k in mine if k in prem]
+    for k in gone:
+        remove_store_item(settings, k)
+    if gone:
+        log(f"Removed Premium store items: {', '.join(gone)}")
+    return len(gone)
 
 
 def store_installed(settings):
@@ -6447,6 +6463,249 @@ def revoked_premium_ids(refresh=False, fetch=True):
     return ids
 
 
+ACCOUNT_URL = os.environ.get("ORBIT_ACCOUNT_URL") or "https://jyoriqaedpeusebziqzc.supabase.co"
+ACCOUNT_KEY = os.environ.get("ORBIT_ACCOUNT_KEY") or "sb_publishable_4fSD4wknEdve5Twlb2N-Bg_fuMOJ-3a"
+ACCOUNT_DOMAIN = "players.orbit.invalid"
+ACCOUNT_FILE = DATA_DIR / "account.json"
+KEYCHECK_FILE = DATA_DIR / "keycheck.json"
+USERNAME_RE = re.compile(r"[A-Za-z0-9_]{3,20}")
+
+
+class AccountError(Exception):
+    pass
+
+
+class AccountOffline(AccountError):
+    pass
+
+
+def accounts_on():
+    return bool(ACCOUNT_URL and ACCOUNT_KEY)
+
+
+def _sb(method, path, body=None, token=None, timeout=12):
+    req = urllib.request.Request(ACCOUNT_URL.rstrip("/") + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"apikey": ACCOUNT_KEY, "Content-Type": "application/json", "Accept": "application/json",
+                                          "User-Agent": APP_ID + "/" + APP_VERSION, **({"Authorization": "Bearer " + token} if token else {})})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read().decode("utf-8")
+            return json.loads(raw) if raw.strip() else None
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read().decode("utf-8") or "{}")
+        except ValueError:
+            err = {}
+        text = str(err.get("msg") or err.get("error_description") or err.get("message") or err.get("error") or e.reason)
+        raise AccountError(f"{e.code}|{err.get('error_code') or err.get('code') or ''}|{text}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise AccountOffline(str(e)) from None
+
+
+def _friendly(err, during="login"):
+    text = str(err)
+    low = text.lower()
+    if isinstance(err, AccountOffline):
+        return "Couldn't reach Orbit's servers. Check your internet and try again."
+    if "already registered" in low or "already exists" in low or "user_already_exists" in low or "database error saving" in low:
+        return "That username is taken. Try another one."
+    if "invalid login" in low or "invalid_credentials" in low or "invalid_grant" in low:
+        return "Wrong username or password."
+    if "weak" in low or "password should" in low:
+        return "Pick a longer password (at least 6 characters)."
+    if "rate limit" in low or "|429|" in low or text.startswith("429"):
+        return "Too many tries. Wait a minute and try again."
+    if "signups not allowed" in low or "signup_disabled" in low:
+        return "New sign-ups are closed right now."
+    if "email not confirmed" in low:
+        return "This account isn't switched on yet. The owner needs to turn off email confirmation in Supabase."
+    if "owner only" in low:
+        return "Your Orbit account isn't marked as the owner yet. Run the owner line from supabase/setup.md once."
+    log(f"Account {during} error: {text[:300]}")
+    return "Something went wrong with your Orbit account. Try again in a minute."
+
+
+def _account_email(username):
+    return f"{username.lower()}@{ACCOUNT_DOMAIN}"
+
+
+def _load_account():
+    return load_json(ACCOUNT_FILE, {}) or {}
+
+
+def _protect(text):
+    return base64.b64encode(_dpapi(text.encode(), True)).decode()
+
+
+def _unprotect(blob):
+    try:
+        return _dpapi(base64.b64decode(blob), False).decode()
+    except Exception:
+        return None
+
+
+def _store_session(sess, user=None):
+    data = _load_account()
+    data.update({"refresh": _protect(sess["refresh_token"]), "access": _protect(sess["access_token"]),
+                 "exp": int(time.time()) + int(sess.get("expires_in") or 3600) - 60})
+    if user:
+        data["user"] = user
+    save_json(ACCOUNT_FILE, data)
+    return data
+
+
+def account_token(force=False):
+    data = _load_account()
+    if not data.get("refresh"):
+        return None
+    if not force and data.get("access") and time.time() < data.get("exp", 0):
+        tok = _unprotect(data["access"])
+        if tok:
+            return tok
+    refresh = _unprotect(data["refresh"])
+    if not refresh:
+        ACCOUNT_FILE.unlink(missing_ok=True)
+        return None
+    try:
+        sess = _sb("POST", "/auth/v1/token?grant_type=refresh_token", {"refresh_token": refresh})
+    except AccountOffline:
+        raise
+    except AccountError as e:
+        if str(e).startswith("400") or str(e).startswith("401"):
+            log("Orbit login expired, signing out")
+            ACCOUNT_FILE.unlink(missing_ok=True)
+            _PREM_MEMO.clear()
+            return None
+        raise
+    _store_session(sess)
+    return sess["access_token"]
+
+
+def account_rpc(name, args=None):
+    tok = account_token()
+    if not tok:
+        raise AccountError("401||log in first")
+    try:
+        return _sb("POST", f"/rest/v1/rpc/{name}", args or {}, tok)
+    except AccountError as e:
+        if "jwt" in str(e).lower() or str(e).startswith("401"):
+            tok = account_token(force=True)
+            if not tok:
+                raise
+            return _sb("POST", f"/rest/v1/rpc/{name}", args or {}, tok)
+        raise
+
+
+def _finish_login(sess):
+    _store_session(sess)
+    me = account_rpc("me")
+    _store_session(sess, {"id": me["id"], "username": me["username"], "owner": bool(me.get("owner"))})
+    KEYCHECK_FILE.unlink(missing_ok=True)
+    _PREM_MEMO.clear()
+    log(f"Logged in to Orbit as {me['username']}")
+    return account_state()
+
+
+def account_signup(username, password):
+    username = (username or "").strip()
+    if not USERNAME_RE.fullmatch(username):
+        raise ValueError("Pick a username with 3 to 20 letters, numbers or underscores.")
+    if len(password or "") < 6:
+        raise ValueError("Pick a password with at least 6 characters.")
+    try:
+        sess = _sb("POST", "/auth/v1/signup", {"email": _account_email(username), "password": password,
+                                                "data": {"username": username}})
+    except AccountError as e:
+        raise ValueError(_friendly(e, "sign-up")) from None
+    if not sess or not sess.get("access_token"):
+        raise ValueError("Your account was made, but Supabase wants an email confirmation. "
+                         "The owner needs to turn off Confirm email in Supabase.")
+    return _finish_login(sess)
+
+
+def account_login(username, password):
+    username = (username or "").strip().lstrip("@")
+    if not USERNAME_RE.fullmatch(username) or not password:
+        raise ValueError("Type your Orbit username and password.")
+    try:
+        sess = _sb("POST", "/auth/v1/token?grant_type=password", {"email": _account_email(username), "password": password})
+        return _finish_login(sess)
+    except AccountError as e:
+        raise ValueError(_friendly(e)) from None
+
+
+def account_logout():
+    data = _load_account()
+    tok = _unprotect(data["access"]) if data.get("access") else None
+    if tok:
+        try:
+            _sb("POST", "/auth/v1/logout", {}, tok, timeout=5)
+        except AccountError:
+            pass
+    ACCOUNT_FILE.unlink(missing_ok=True)
+    KEYCHECK_FILE.unlink(missing_ok=True)
+    _PREM_MEMO.clear()
+    log("Logged out of Orbit")
+
+
+def account_state(check=False):
+    if not accounts_on():
+        return {"enabled": False, "logged_in": False}
+    data = _load_account()
+    if not data.get("user") or not data.get("refresh"):
+        return {"enabled": True, "logged_in": False}
+    st = {"enabled": True, "logged_in": True, "user": data["user"], "offline": False}
+    if check:
+        try:
+            if not account_token():
+                return {"enabled": True, "logged_in": False, "expired": True}
+            me = account_rpc("me")
+            if me.get("username") != data["user"].get("username") or bool(me.get("owner")) != data["user"].get("owner"):
+                data["user"] = {"id": me["id"], "username": me["username"], "owner": bool(me.get("owner"))}
+                save_json(ACCOUNT_FILE, data)
+                st["user"] = data["user"]
+        except AccountOffline:
+            st["offline"] = True
+        except AccountError as e:
+            log(f"Account check failed: {e}")
+            st["offline"] = True
+    return st
+
+
+def account_key_check(key, refresh=False, fetch=True):
+    acct = _load_account()
+    user = acct.get("user")
+    if not user:
+        return {"ok": False, "reason": "login"}
+    cache = load_json(KEYCHECK_FILE, {}) or {}
+    same = cache.get("key") == key["id"] and cache.get("user") == user["id"]
+    if same and not refresh and time.time() - cache.get("at", 0) < 3600:
+        return cache["result"]
+    if not fetch:
+        return cache["result"] if same else {"ok": True, "unchecked": True}
+    try:
+        st = account_rpc("key_status", {"p_key_id": key["id"]})
+        if st.get("state") == "none":
+            exp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(key["exp"])) if key.get("exp") else None
+            r = account_rpc("redeem_key", {"p_key_id": key["id"], "p_key_for": key.get("for"), "p_expires_at": exp, "p_carried": True})
+            st = {"state": "mine", "disabled": bool(r.get("disabled"))} if r.get("ok") else {"state": "taken"}
+            if r.get("ok"):
+                log(f"Carried premium key {key['id']} over to {user['username']}")
+        if st.get("state") == "taken":
+            result = {"ok": False, "reason": "taken"}
+        elif st.get("disabled"):
+            result = {"ok": False, "reason": "revoked"}
+        else:
+            result = {"ok": True}
+    except AccountError as e:
+        if not isinstance(e, AccountOffline):
+            log(f"Key check failed: {e}")
+        return cache["result"] if same else {"ok": True, "unchecked": True}
+    save_json(KEYCHECK_FILE, {"key": key["id"], "user": user["id"], "at": int(time.time()), "result": result})
+    return result
+
+
 def premium_status(settings, refresh=False, fetch=True):
     code = settings.get("premium_key") or ""
     if not code:
@@ -6460,6 +6719,10 @@ def premium_status(settings, refresh=False, fetch=True):
         return {"active": False, "reason": "revoked", "for": data.get("for")}
     if data.get("uid") and current_roblox_uid() != data["uid"]:
         return {"active": False, "reason": "account", "for": data.get("for")}
+    if accounts_on():
+        chk = account_key_check(data, refresh, fetch)
+        if not chk["ok"]:
+            return {"active": False, "reason": chk["reason"], "for": data.get("for")}
     return {"active": True, "for": data.get("for"), "exp": data.get("exp") or 0, "id": data["id"], "since": data.get("iat")}
 
 
@@ -6479,7 +6742,7 @@ def _dpapi(data, protect=True):
     crypt = ctypes.windll.crypt32
     fn = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
     if not fn(ctypes.byref(src), None, None, None, None, 0x1, ctypes.byref(out)):
-        raise OSError("Windows couldn't protect the GitHub token.")
+        raise OSError("Windows couldn't protect the saved sign-in details.")
     try:
         return ctypes.string_at(out.pbData, out.cbData)
     finally:
@@ -6557,6 +6820,10 @@ def has_premium(settings, fetch=False):
 def enforce_premium(settings):
     if has_premium(settings):
         return False
+    try:
+        drop_premium_store(settings)
+    except Exception as e:
+        log(f"Couldn't remove Premium store items: {e}")
     perf = settings.setdefault("performance", {})
     if not perf.get("boost") and all(perf.get(k) == v for k, v in PERF_PREMIUM.items()):
         return False
@@ -6998,6 +7265,26 @@ def build_info():
 
 def update_repo():
     return (build_info().get("repo") or os.environ.get("ORBIT_UPDATE_REPO") or "").strip()
+
+
+NEW_SPOTS = {
+    "2.14.0": ["mods:storeCard"],
+    "2.13.3": ["boost:statsOvCard"],
+    "2.13.0": ["appearance:splashCard"],
+    "2.12.0": ["boost:timerCard", "servers:spotCard", "appearance:galleryCard", "mods:packGrid", "screens"],
+    "2.11.0": ["discover", "stats", "boost", "appearance:themeMakerCard", "library"],
+}
+
+
+def new_spots_since(seen):
+    if not seen:
+        return []
+    old, cur = parse_version(seen), parse_version(APP_VERSION)
+    out = []
+    for ver, spots in NEW_SPOTS.items():
+        if old < parse_version(ver) <= cur:
+            out += [x for x in spots if x not in out]
+    return out
 
 
 def parse_version(v):
@@ -8038,6 +8325,7 @@ class Api:
             "regions": list(REGIONS),
             "owner": is_owner(),
             "premium": premium_status(self._settings, fetch=False),
+            "account": account_state(),
             "game_updated": game_updated_times(self._settings),
             "packs_ready": (resource_dir() / "ui" / "packs").is_dir(),
             "credits": [{"role": r, "handle": h, "roblox_id": uid} for r, h, uid in CREDITS],
@@ -8388,7 +8676,7 @@ class Api:
         seen = self._settings.get("last_seen_version") or ""
         if seen == APP_VERSION:
             return None
-        return {"version": APP_VERSION, "notes": changelog_section(APP_VERSION), "first": not seen}
+        return {"version": APP_VERSION, "notes": changelog_section(APP_VERSION), "first": not seen, "new": new_spots_since(seen)}
 
     def mark_seen(self):
         self._settings["last_seen_version"] = APP_VERSION
@@ -9594,7 +9882,90 @@ class Api:
             st = {**st, "settings": self._settings}
         return st
 
+    def account(self, check=False):
+        return account_state(bool(check))
+
+    def account_login(self, username, password):
+        try:
+            st = account_login(username, password)
+            return {"account": st, "premium": premium_status(self._settings, True)}
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return self._err(e)
+
+    def account_signup(self, username, password):
+        try:
+            st = account_signup(username, password)
+            return {"account": st, "premium": premium_status(self._settings, True)}
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return self._err(e)
+
+    def account_logout(self):
+        account_logout()
+        return {"account": account_state()}
+
+    def _owner_acct(self):
+        if not is_owner():
+            raise PermissionError("Owner only.")
+        if not accounts_on():
+            raise PermissionError("Orbit accounts aren't set up yet.")
+        if not account_state()["logged_in"]:
+            raise PermissionError("Log in to your Orbit account first.")
+
+    def _owner_call(self, fn, args=None):
+        try:
+            self._owner_acct()
+            return {"data": account_rpc(fn, args or {})}
+        except AccountError as e:
+            return {"error": _friendly(e, "owner")}
+        except Exception as e:
+            return self._err(e)
+
+    def owner_keylog(self, search=""):
+        search = (search or "").strip()[:40]
+        log_r = self._owner_call("owner_log", {"p_search": search, "p_limit": 300})
+        if "error" in log_r:
+            return log_r
+        users_r = self._owner_call("owner_users", {"p_search": search})
+        if "error" in users_r:
+            return users_r
+        return {"log": log_r["data"] or [], "users": users_r["data"] or []}
+
+    def owner_set_key(self, key_id, disabled):
+        r = self._owner_call("owner_set_key", {"p_key_id": str(key_id), "p_disabled": bool(disabled)})
+        if "error" in r:
+            return r
+        issued = load_json(OWNER_ISSUED_FILE, []) or []
+        for x in issued:
+            if x.get("id") == key_id:
+                x["revoked"] = bool(disabled)
+        save_json(OWNER_ISSUED_FILE, issued)
+        token = owner_gh_token()
+        if token:
+            try:
+                push_revoked(str(key_id), bool(disabled), token)
+            except Exception as e:
+                log(f"Couldn't mirror key change to GitHub: {e}")
+        _PREM_MEMO.clear()
+        KEYCHECK_FILE.unlink(missing_ok=True)
+        return {"ok": True, "disabled": bool(disabled)}
+
+    def owner_clear_log(self):
+        r = self._owner_call("owner_clear_log")
+        return r if "error" in r else {"cleared": r["data"]}
+
+    def owner_reset_password(self, username, password):
+        if len(password or "") < 6:
+            return {"error": "Pick a password with at least 6 characters."}
+        r = self._owner_call("owner_reset_password", {"p_username": (username or "").strip(), "p_password": password})
+        return r if "error" in r else {"ok": True}
+
     def activate_premium(self, code):
+        if accounts_on() and not account_state()["logged_in"]:
+            return {"error": "Log in to your Orbit account first."}
         data = read_premium_key(code)
         if not data:
             return {"error": "That premium key isn't valid. Copy the whole key, starting with ORBIT-PREMIUM-."}
@@ -9608,8 +9979,20 @@ class Api:
                 return {"error": "Orbit can't tell which Roblox account you use yet. Join any Roblox game once, then try again."}
             if uid != data["uid"]:
                 return {"error": f"This key belongs to {data.get('for') or 'someone else'}. It only works on their Roblox account."}
+        if accounts_on():
+            exp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(data["exp"])) if data.get("exp") else None
+            try:
+                r = account_rpc("redeem_key", {"p_key_id": data["id"], "p_key_for": data.get("for"), "p_expires_at": exp, "p_carried": False})
+            except AccountError as e:
+                return {"error": _friendly(e, "redeem")}
+            if not r.get("ok"):
+                return {"error": "That key was already used by another Orbit account. Each key works for one account."}
+            if r.get("disabled"):
+                return {"error": "That premium key has been turned off by the owner."}
+            KEYCHECK_FILE.unlink(missing_ok=True)
         self._settings["premium_key"] = code.strip()
         save_settings(self._settings)
+        _PREM_MEMO.clear()
         log(f"Premium activated ({data['id']})")
         return {"status": premium_status(self._settings), "settings": self._settings}
 
