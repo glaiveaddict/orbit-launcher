@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.16.2"
+APP_VERSION = "2.18.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -154,7 +154,8 @@ DEFAULT_SETTINGS = {
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True, "crosshair": "",
                 "crosshair_mode": "locked", "crosshair_size": 100, "stats_fps": False, "stats_ping": False, "stats_pos": "Top left", "stats_tilt": True, "timer": False, "timer_pos": "Top right"},
     "hotkeys": {"enabled": True},
-    "social": {"bio": "", "public_profile": True, "on_leaderboard": True, "share_activity": True},
+    "social": {"bio": "", "public_profile": True, "on_leaderboard": True, "share_activity": True, "showcase": [], "banner": "", "name_style": ""},
+    "beta_updates": False,
     "mod_profile": "Default",
     "discord": {
         "enabled": False,
@@ -1271,7 +1272,7 @@ def should_claim_links(current):
         return False
     low = (current or "").lower()
     if "orbithelper" in low or "orbitlauncher" in low:
-        m = re.search(r"helper-(\d+(?:\.\d+)*)", low)
+        m = re.search(r"helper-(\d+(?:\.\d+)*(?:-[a-z]+\.?\d*)?)", low)
         path = re.match(r'\s*"([^"]+)"', current or "")
         if path and not Path(path.group(1)).exists():
             return True
@@ -6806,10 +6807,37 @@ def account_rpc(name, args=None):
         raise
 
 
+def _apply_me(data, me):
+    data["user"] = {"id": me["id"], "username": me["username"], "owner": bool(me.get("owner")), "tester": bool(me.get("tester"))}
+    if me.get("banned"):
+        data["ban"] = {"until": me.get("banned_until"), "reason": me.get("ban_reason")}
+    else:
+        data.pop("ban", None)
+    return data
+
+
+def _ban_info(data):
+    ban = data.get("ban")
+    if not ban:
+        return None
+    until = str(ban.get("until") or "")
+    forever = not until or until.lower().startswith("infinity")
+    if not forever:
+        try:
+            ts = calendar.timegm(time.strptime(until[:19], "%Y-%m-%dT%H:%M:%S"))
+            if ts <= time.time():
+                return None
+            return {"until": ts, "forever": False, "reason": ban.get("reason")}
+        except ValueError:
+            pass
+    return {"until": None, "forever": True, "reason": ban.get("reason")}
+
+
 def _finish_login(sess):
     _store_session(sess)
     me = account_rpc("me")
-    _store_session(sess, {"id": me["id"], "username": me["username"], "owner": bool(me.get("owner"))})
+    _store_session(sess)
+    save_json(ACCOUNT_FILE, _apply_me(_load_account(), me))
     KEYCHECK_FILE.unlink(missing_ok=True)
     _PREM_MEMO.clear()
     log(f"Logged in to Orbit as {me['username']}")
@@ -6876,15 +6904,15 @@ def account_state(check=False):
             if not account_token():
                 return {"enabled": True, "logged_in": False, "expired": True}
             me = account_rpc("me")
-            if me.get("username") != data["user"].get("username") or bool(me.get("owner")) != data["user"].get("owner"):
-                data["user"] = {"id": me["id"], "username": me["username"], "owner": bool(me.get("owner"))}
-                save_json(ACCOUNT_FILE, data)
-                st["user"] = data["user"]
+            data = _apply_me(_load_account(), me)
+            save_json(ACCOUNT_FILE, data)
+            st["user"] = data["user"]
         except AccountOffline:
             st["offline"] = True
         except AccountError as e:
             log(f"Account check failed: {e}")
             st["offline"] = True
+    st["ban"] = _ban_info(_load_account())
     return st
 
 
@@ -6962,6 +6990,24 @@ def _week_start_ts():
     return midnight - t.tm_wday * 86400
 
 
+def _month_start_ts():
+    t = time.localtime()
+    return time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, -1))
+
+
+def month_stats():
+    start = _month_start_ts()
+    total, games = 0, {}
+    for x in _sessions():
+        if x.get("start", 0) >= start:
+            sec = int(x.get("seconds", 0))
+            total += sec
+            g = games.setdefault(str(x.get("place_id")), {"name": x.get("name") or "Game", "seconds": 0})
+            g["seconds"] += sec
+    top = sorted(((pid, g) for pid, g in games.items() if pid.isdigit()), key=lambda kv: -kv[1]["seconds"])[:5]
+    return total, [{"pid": pid, "name": g["name"], "seconds": g["seconds"]} for pid, g in top]
+
+
 def week_seconds():
     start = _week_start_ts()
     total = sum(int(x.get("seconds", 0)) for x in _sessions() if x.get("start", 0) >= start)
@@ -7006,13 +7052,43 @@ def social_payload(settings=None):
         log(f"Level for profile failed: {e}")
         lvl = {"level": 1, "title": "Stargazer"}
     uid = current_roblox_uid()
+    month = month_stats()
     return {"roblox_id": uid, "roblox_name": roblox_name_for(uid), "bio": (soc.get("bio") or "")[:120],
             "total_seconds": total, "week_seconds": week_seconds(),
             "week_start": time.strftime("%Y-%m-%d", time.localtime(_week_start_ts())),
             "level": lvl["level"], "level_title": lvl["title"],
             "top_games": [{"pid": str(pid), "name": e.get("name") or "Game", "seconds": int(e.get("seconds", 0))} for pid, e in top],
             "now_playing": playing, "public_profile": bool(soc.get("public_profile", True)),
+            "showcase": showcase_items(soc.get("showcase") or []), "banner": soc.get("banner") or "", "name_style": soc.get("name_style") or "",
+            "status": (soc.get("status") or "")[:60], "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
+            "month_seconds": month[0], "month_games": month[1],
             "on_leaderboard": bool(soc.get("on_leaderboard", True)), "share_activity": bool(soc.get("share_activity", True))}
+
+
+def showcase_items(ids):
+    """Turns picked achievement ids into what the profile shows. Only achievements you've actually unlocked count."""
+    try:
+        unlocked = {a["id"]: a for a in achievements_state()["list"] if a["unlocked"]}
+    except Exception:
+        unlocked = {}
+    return [{"id": i, "title": unlocked[i]["title"], "icon": unlocked[i]["icon"]} for i in list(ids)[:3] if i in unlocked]
+
+
+def feedback_log_tail(max_chars=60000):
+    """The end of the launcher log for a bug report, with your Windows user name and folders taken out."""
+    try:
+        text = LOG_FILE.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+    text = "\n".join(text.splitlines()[-600:])
+    home = str(Path.home())
+    for h in (home, home.replace("\\", "/")):
+        if len(h) > 3:
+            text = re.sub(re.escape(h), "~", text, flags=re.I)
+    user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
+    if len(user) >= 3:
+        text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(user) + r"(?![A-Za-z0-9])", "<user>", text, flags=re.I)
+    return text[-max_chars:]
 
 
 def social_sync(settings=None, force=False):
@@ -7873,6 +7949,8 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.18.0": ["social"],
+    "2.17.0": ["social", "owner:ownerReports", "owner:ownerBans", "owner:ownerFeedback", "health:feedbackCard", "credits:betaCard"],
     "2.16.2": ["owner:ownerNames"],
     "2.16.1": ["social:unameCard"],
     "2.16.0": ["social", "accounts"],
@@ -7897,25 +7975,48 @@ def new_spots_since(seen):
 
 
 def parse_version(v):
-    nums = [int(n) for n in re.findall(r"\d+", str(v))[:3]]
-    return tuple(nums + [0] * (3 - len(nums)))
+    """(major, minor, patch, pre): a beta like 2.17.0-beta.2 sorts after 2.16.x and before 2.17.0."""
+    v = str(v or "")
+    main, _, pre = v.partition("-")
+    nums = [int(n) for n in re.findall(r"\d+", main)[:3]]
+    beta = re.search(r"(\d+)", pre)
+    return tuple(nums + [0] * (3 - len(nums))) + ((int(beta.group(1)) if beta else 0) if pre else 1_000_000,)
+
+
+def is_beta_version(v=APP_VERSION):
+    return "-" in str(v or "")
 
 
 def is_frozen():
     return bool(getattr(sys, "frozen", False))
 
 
-def check_app_update():
+def beta_updates_on(settings=None):
+    """Beta builds are for the owner and players with the Beta Tester badge, and only when they switch them on."""
+    settings = settings or load_settings()
+    user = _load_account().get("user") or {}
+    return bool(settings.get("beta_updates")) and bool(user.get("tester") or user.get("owner"))
+
+
+def check_app_update(settings=None):
     repo = update_repo()
     if not repo:
         return {"error": "no_source"}
+    beta = beta_updates_on(settings)
     try:
-        rel = fetch_json(f"https://api.github.com/repos/{repo}/releases/latest", timeout=10)
+        if beta:
+            rels = [r for r in fetch_json(f"https://api.github.com/repos/{repo}/releases?per_page=20", timeout=10) or []
+                    if not r.get("draft") and r.get("tag_name")]
+            if not rels:
+                raise OSError("no releases")
+            rel = max(rels, key=lambda r: parse_version(str(r["tag_name"]).lstrip("vV")))
+        else:
+            rel = fetch_json(f"https://api.github.com/repos/{repo}/releases/latest", timeout=10)
     except Exception as e:
         log(f"Update check failed: {e}")
         return {"error": "Couldn't reach GitHub to check for updates."}
     version = str(rel.get("tag_name", "")).lstrip("vV")
-    info = {"current": APP_VERSION, "version": version, "page": rel.get("html_url"),
+    info = {"current": APP_VERSION, "version": version, "page": rel.get("html_url"), "beta": is_beta_version(version), "beta_channel": beta,
             "notes": (rel.get("body") or "")[:2000], "available": parse_version(version) > parse_version(APP_VERSION)}
     assets = {a.get("name", "").lower(): a for a in rel.get("assets", [])}
     exe = assets.get("orbitlauncher.exe")
@@ -10561,6 +10662,20 @@ class Api:
         for k in ("public_profile", "on_leaderboard", "share_activity"):
             if k in (changes or {}):
                 soc[k] = bool(changes[k])
+        if "showcase" in (changes or {}):
+            soc["showcase"] = [str(x) for x in (changes["showcase"] or [])][:3]
+        for k in ("banner", "name_style"):
+            if k in (changes or {}):
+                soc[k] = re.sub(r"[^a-z]", "", str(changes[k] or ""))[:12]
+        if "status" in (changes or {}):
+            st = re.sub(r"\s+", " ", str(changes["status"] or "")).strip()[:60]
+            if st:
+                try:
+                    if account_rpc("check_bio", {"p_bio": st}).get("ok") is False:
+                        return {"error": "Your status has a word that isn't allowed."}
+                except AccountError:
+                    pass
+            soc["status"] = st
         if "bio" in (changes or {}):
             bio = re.sub(r"\s+", " ", str(changes["bio"] or "")).strip()[:120]
             if bio:
@@ -10575,6 +10690,110 @@ class Api:
 
     def social_friends(self):
         return self._social(social_friends)
+
+    def social_report(self, username, reason, note=""):
+        def run():
+            r = account_rpc("report_player", {"p_username": str(username or ""), "p_reason": str(reason or ""), "p_note": str(note or "")[:300]})
+            if r.get("ok"):
+                return {"ok": True, "already": bool(r.get("already"))}
+            return {"error": {"too_many": "You've sent a lot of reports today. Try again tomorrow.", "self": "You can't report yourself.",
+                              "no_user": "That player doesn't exist anymore."}.get(r.get("reason"), "Couldn't send the report.")}
+        return self._social(run)
+
+    def send_feedback(self, kind, message, attach_log=True):
+        def run():
+            r = account_rpc("send_feedback", {"p_kind": kind if kind in ("bug", "idea", "other", "appeal") else "other",
+                                              "p_message": str(message or "")[:2000],
+                                              "p_log": feedback_log_tail() if attach_log else None, "p_version": APP_VERSION})
+            if r.get("ok"):
+                return {"ok": True}
+            return {"error": {"too_many": "You've sent a lot of feedback this hour. Try again later.",
+                              "empty": "Write a little more so the owner knows what happened."}.get(r.get("reason"), "Couldn't send it.")}
+        try:
+            if not account_state()["logged_in"]:
+                return {"error": "Log in to your Orbit account first."}
+            return run()
+        except AccountOffline:
+            return {"error": "Couldn't reach Orbit's servers. Check your internet and try again."}
+        except AccountError as e:
+            return {"error": _friendly(e, "feedback")}
+        except Exception as e:
+            return self._err(e)
+
+    CREW_CALLS = {"crew_create", "crew_join", "crew_leave", "crew_kick", "crew_new_code", "crew_disband", "crew_info", "crew_board",
+                  "crew_wrapped", "crew_chat_send", "crew_chat_list", "crew_chat_delete", "crew_chat_report"}
+    CREW_REASONS = {"in_crew": "You're already in a crew. Leave it first.", "name": "Crew names are 3 to 24 letters, numbers or spaces.",
+                    "tag": "Tags are 2 to 5 letters or numbers.", "blocked": "That name or tag isn't allowed. Pick something else.",
+                    "taken": "Another crew already has that name or tag.", "no_crew": "No crew has that code. Check it and try again.",
+                    "full": "That crew is full (50 members).", "not_member": "They're not in your crew.",
+                    "empty": "Type a message first.", "long": "Messages can be up to 300 characters.",
+                    "slow": "Slow down a little. Try again in a few seconds.", "no_crew": "You're not in a crew.",
+                    "gone": "That message was deleted.", "self": "You can't report your own message.",
+                    "too_many": "You've sent a lot of reports today. Try again tomorrow."}
+
+    def crew(self, fn, args=None):
+        if fn not in self.CREW_CALLS:
+            return {"error": "Unknown crew action."}
+
+        def run():
+            r = account_rpc(fn, args or {})
+            if isinstance(r, dict) and r.get("ok") is False:
+                return {"error": self.CREW_REASONS.get(r.get("reason"), "That didn't work.")}
+            if fn == "crew_chat_send" and r.get("ok") is False and r.get("reason") == "blocked":
+                return {"error": "That message has a word that isn't allowed."}
+            if fn == "crew_wrapped" and r.get("found"):
+                pics = avatar_urls([m["roblox_id"] for m in r.get("top") or [] if m.get("roblox_id")], "420x420")
+                for m in r.get("top") or []:
+                    m["avatar"] = pics.get(str(m.get("roblox_id")))
+                icons = {}
+                for g in r.get("games") or []:
+                    try:
+                        icons[g["pid"]] = game_info(g["pid"]).get("icon")
+                    except Exception:
+                        pass
+                    g["icon"] = icons.get(g["pid"])
+            if fn == "crew_info" and r.get("found"):
+                pics = avatar_urls([m["roblox_id"] for m in r.get("members") or [] if m.get("roblox_id")])
+                for m in r.get("members") or []:
+                    m["avatar"] = pics.get(str(m.get("roblox_id")))
+            return r
+        return self._social(run)
+
+    def save_card_png(self, data_url, name):
+        try:
+            m = re.match(r"data:image/png;base64,(.+)$", data_url or "", re.S)
+            if not m:
+                return {"error": "That image didn't come through."}
+            raw = base64.b64decode(m.group(1))
+            if raw[:8] != b"\x89PNG\r\n\x1a\n" or len(raw) > 12_000_000:
+                return {"error": "That image didn't come through."}
+            clean = re.sub(r"[^A-Za-z0-9 _\-\[\]]", "", str(name or "Orbit card")).strip()[:60] or "Orbit card"
+            dest = pictures_dir() / "Orbit" / f"{clean}.png"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(raw)
+            open_path(dest)
+            return {"path": str(dest)}
+        except Exception as e:
+            return self._err(e)
+
+    def achievements_unlocked(self):
+        try:
+            return [{"id": a["id"], "title": a["title"], "icon": a["icon"]} for a in achievements_state()["list"] if a["unlocked"]]
+        except Exception as e:
+            return self._err(e)
+
+    def set_beta(self, on):
+        self._settings["beta_updates"] = bool(on)
+        save_settings(self._settings)
+        return {"on": beta_updates_on(self._settings)}
+
+    OWNER_RPCS = {"owner_reports", "owner_report_set", "owner_clear_bio", "owner_crew_delete", "owner_ban", "owner_unban", "owner_bans",
+                  "owner_feedback", "owner_feedback_log", "owner_feedback_set"}
+
+    def owner_rpc(self, fn, args=None):
+        if fn not in self.OWNER_RPCS:
+            return {"error": "Unknown owner action."}
+        return self._owner_call(fn, args or {})
 
     def social_leaderboard(self, period="all"):
         return self._social(social_leaderboard, period)

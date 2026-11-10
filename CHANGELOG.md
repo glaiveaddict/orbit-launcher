@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.18.0
+- **Crew chat:** talk with your crew right on the Crew page. Only crew members can see it, bad words are blocked, and you can report or delete messages (crew leaders can delete any message).
+- **Weekly crew wars:** the crew with the most hours each week (Monday to Sunday) wins a 🏆 for its crew page. See the countdown and last week's winner on the crew leaderboard.
+- **Crew Wrapped:** a shareable card with your crew's month: hours played together, crew MVPs, favorite game, rank and war wins. Save it as an image (Crew page).
+- **Status messages:** set a short status like "🎮 Grinding" or "👋 Looking for a squad". It shows on your profile, in Friends and on your crew page.
+- **Profile views:** see how many people looked at your profile this week.
+
+## v2.17.0
+- **Crews:** start a crew with your friends, with a name and a 2 to 5 letter tag that shows next to your name on profiles, Friends and the leaderboard. Friends join with a 6 letter code. There's a crew page with everyone's play time, and a crew leaderboard (Social > Crew).
+- **Profile look:** pick a banner for your profile, show off 3 achievements, and (Premium) give your name a Gold, Rainbow, Aurora or Fire effect. Premium also unlocks the Gold, Galaxy and Holo banners.
+- **Report players:** a Report button on every profile for bad names, bios, crews or cheating.
+- **Send feedback:** found a bug or have an idea? Send it from the Health page, with your launcher log attached if you want (your Windows name is taken out).
+- **Bans:** the Orbit owner can ban accounts that break the rules. Banned players can send an appeal.
+- **Beta updates:** Beta Testers can turn on beta updates (Credits > About & updates) to get new versions before everyone else.
+- **Owner panel:** new Reports, Bans and Feedback cards.
+
 ## v2.16.2
 - **Username automod:** usernames with bad words, or that pretend to be Orbit staff (owner, admin, mod, official and so on), are blocked when you sign up or change your name. It catches tricks like Adm1n, M0D and xXAdminXx, while normal names like Modern or Classic still work. Bios get the bad-word check too.
 - **Owner panel:** a new Username rules card to add or remove blocked words, test any name, and rename accounts that already break the rules.

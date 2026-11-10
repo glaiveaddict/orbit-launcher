@@ -75,7 +75,9 @@ begin
   if not found then
     raise exception 'no account';
   end if;
-  return json_build_object('id', p.id, 'username', p.username, 'owner', p.is_owner);
+  return json_build_object('id', p.id, 'username', p.username, 'owner', p.is_owner,
+    'banned', coalesce(p.banned_until > now(), false), 'banned_until', p.banned_until, 'ban_reason', p.ban_reason,
+    'tester', p.is_owner or 'beta' = any (coalesce(p.badges, '{}')));
 end
 $$;
 
@@ -279,6 +281,9 @@ begin
   if me is null then
     raise exception 'log in first';
   end if;
+  if public._is_banned(me) then
+    return json_build_object('ok', false, 'banned', true);
+  end if;
   for g in select value from jsonb_array_elements(case when jsonb_typeof(p -> 'top_games') = 'array' then p -> 'top_games' else '[]'::jsonb end) limit 5 loop
     if (g ->> 'pid') ~ '^[0-9]{1,15}$' then
       games := games || jsonb_build_array(jsonb_build_object('pid', g ->> 'pid', 'name', left(coalesce(g ->> 'name', 'Game'), 60),
@@ -307,14 +312,28 @@ begin
     public_profile = coalesce((p ->> 'public_profile')::boolean, public_profile),
     on_leaderboard = coalesce((p ->> 'on_leaderboard')::boolean, on_leaderboard),
     share_activity = coalesce((p ->> 'share_activity')::boolean, share_activity),
+    showcase = case when p ? 'showcase' then public._clean_showcase(p -> 'showcase') else showcase end,
+    status_at = case when p ? 'status' and nullif(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60), '') is distinct from status then now() else status_at end,
+    status = case when p ? 'status' then nullif(trim(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60)), '') else status end,
+    banner = case when p ? 'banner' then public._clean_banner(me, p ->> 'banner') else banner end,
+    name_style = case when p ? 'name_style' then public._clean_name_style(me, p ->> 'name_style') else name_style end,
     last_seen = now()
   where id = me;
+  if ws is not null then
+    insert into public.profile_weeks (user_id, week, seconds) values (me, ws, least(greatest(coalesce((p ->> 'week_seconds')::numeric, 0), 0), 604800)::int)
+    on conflict (user_id, week) do update set seconds = excluded.seconds;
+  end if;
+  if (p ->> 'month_start') ~ '^\d{4}-\d{2}-01$' and (p ->> 'month_start')::date between (current_date - 40) and (current_date + 1) then
+    insert into public.profile_months (user_id, month, seconds, games)
+    values (me, (p ->> 'month_start')::date, least(greatest(coalesce((p ->> 'month_seconds')::numeric, 0), 0), 2678400)::int, public._clean_games(p -> 'month_games'))
+    on conflict (user_id, month) do update set seconds = excluded.seconds, games = excluded.games;
+  end if;
   return json_build_object('ok', true);
 end
 $$;
 
 create or replace function public.get_profile(p_username text) returns json
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $$
 declare
   p public.profiles;
   mine boolean;
@@ -328,11 +347,18 @@ begin
     return json_build_object('found', false);
   end if;
   mine := p.id = auth.uid();
+  if public._is_banned(p.id) and not (mine or public.is_owner()) then
+    return json_build_object('found', true, 'private', true, 'banned', true, 'username', p.username);
+  end if;
   if not (p.public_profile or mine or public.is_owner()) then
     return json_build_object('found', true, 'private', true, 'username', p.username);
   end if;
   select count(*) + 1 into rank_all from public.profiles q
-   where q.on_leaderboard and q.total_seconds > p.total_seconds;
+   where q.on_leaderboard and q.total_seconds > p.total_seconds and not public._is_banned(q.id);
+  if not mine and not public._is_banned(auth.uid()) then
+    insert into public.profile_views (viewer, target, day) values (auth.uid(), p.id, current_date) on conflict do nothing;
+    if random() < 0.02 then delete from public.profile_views where day < current_date - 30; end if;
+  end if;
   return json_build_object(
     'found', true, 'private', false, 'mine', mine, 'username', p.username, 'created_at', p.created_at,
     'last_seen', p.last_seen, 'online', p.last_seen > now() - interval '5 minutes',
@@ -342,7 +368,12 @@ begin
     'level', p.level, 'level_title', p.level_title, 'top_games', p.top_games,
     'rank', case when p.on_leaderboard and p.total_seconds > 0 then rank_all end,
     'now_playing', case when p.share_activity and p.playing_at > now() - interval '5 minutes' then p.now_playing end,
-    'public_profile', p.public_profile, 'on_leaderboard', p.on_leaderboard, 'share_activity', p.share_activity);
+    'public_profile', p.public_profile, 'on_leaderboard', p.on_leaderboard, 'share_activity', p.share_activity,
+    'crew', public._crew_tag(p.id), 'banner', p.banner, 'name_style', p.name_style, 'showcase', coalesce(p.showcase, '[]'::jsonb),
+    'banned', public._is_banned(p.id), 'ban_reason', case when public.is_owner() then p.ban_reason end,
+    'status', p.status, 'status_at', p.status_at,
+    'visitors_week', case when mine then (select count(distinct viewer) from public.profile_views v where v.target = p.id and v.day > current_date - 7) end,
+    'visitors_total', case when mine then (select count(distinct viewer) from public.profile_views v where v.target = p.id) end);
 end
 $$;
 
@@ -359,24 +390,26 @@ begin
   with board as (
     select p.*, case when p_period = 'week' then (case when p.week_start = wk then p.week_seconds else 0 end)::bigint
                      else p.total_seconds end as secs
-    from public.profiles p where p.on_leaderboard
+    from public.profiles p where p.on_leaderboard and not public._is_banned(p.id)
   ), ranked as (
     select b.*, rank() over (order by b.secs desc) as pos from board b where b.secs > 0
   )
   select coalesce(json_agg(json_build_object('rank', r.pos, 'username', r.username, 'roblox_id', r.roblox_id, 'level', r.level,
-                                             'seconds', r.secs, 'badges', public._badges(r.id, r.is_owner, r.badges), 'me', r.id = auth.uid()) order by r.pos, r.username), '[]'::json)
+                                             'seconds', r.secs, 'badges', public._badges(r.id, r.is_owner, r.badges), 'me', r.id = auth.uid(),
+                                             'crew', public._crew_tag(r.id), 'name_style', r.name_style) order by r.pos, r.username), '[]'::json)
     into rows
     from (select * from ranked order by pos, username limit least(greatest(coalesce(p_limit, 50), 1), 100)) r;
   with board as (
     select p.*, case when p_period = 'week' then (case when p.week_start = wk then p.week_seconds else 0 end)::bigint
                      else p.total_seconds end as secs
-    from public.profiles p where p.on_leaderboard
+    from public.profiles p where p.on_leaderboard and not public._is_banned(p.id)
   )
   select json_build_object('rank', (select count(*) + 1 from board b2 where b2.secs > b.secs), 'username', b.username,
-                           'roblox_id', b.roblox_id, 'level', b.level, 'seconds', b.secs, 'badges', public._badges(b.id, b.is_owner, b.badges), 'me', true)
+                           'roblox_id', b.roblox_id, 'level', b.level, 'seconds', b.secs, 'badges', public._badges(b.id, b.is_owner, b.badges), 'me', true,
+                           'crew', public._crew_tag(b.id), 'name_style', b.name_style)
     into mine from board b where b.id = auth.uid() and b.secs > 0;
   return json_build_object('period', p_period, 'rows', rows, 'me', mine,
-                           'players', (select count(*) from public.profiles where on_leaderboard and total_seconds > 0));
+                           'players', (select count(*) from public.profiles q where q.on_leaderboard and q.total_seconds > 0 and not public._is_banned(q.id)));
 end
 $$;
 
@@ -390,10 +423,11 @@ begin
     select json_agg(json_build_object(
       'username', p.username, 'roblox_id', p.roblox_id, 'level', p.level, 'badges', public._badges(p.id, p.is_owner, p.badges),
       'last_seen', p.last_seen, 'online', p.last_seen > now() - interval '5 minutes',
-      'now_playing', case when p.share_activity and p.playing_at > now() - interval '5 minutes' then p.now_playing end)
+      'now_playing', case when p.share_activity and p.playing_at > now() - interval '5 minutes' then p.now_playing end,
+      'crew', public._crew_tag(p.id), 'name_style', p.name_style, 'status', p.status)
       order by p.playing_at desc nulls last, p.last_seen desc)
     from public.profiles p
-    where p.roblox_id = any (p_roblox_ids[1:300]) and p.id <> auth.uid() and p.public_profile
+    where p.roblox_id = any (p_roblox_ids[1:300]) and p.id <> auth.uid() and p.public_profile and not public._is_banned(p.id)
   ), '[]'::json);
 end
 $$;
@@ -739,3 +773,744 @@ revoke execute on function public._leet(text), public._name_rule(text, text[]), 
 grant execute on function public.signup_check(text) to anon, authenticated;
 grant execute on function public.check_bio(text), public.owner_words(), public.owner_word_set(text, text, text, boolean),
   public.owner_name_test(text), public.owner_bad_names(), public.owner_force_rename(text) to authenticated;
+
+-- ============================================================================
+-- v2.17.0: reports, account bans, feedback, crews, profile showcase.
+-- Safe to run again.
+-- ============================================================================
+alter table public.profiles add column if not exists banned_until timestamptz;
+alter table public.profiles add column if not exists ban_reason text;
+alter table public.profiles add column if not exists banner text;
+alter table public.profiles add column if not exists name_style text;
+alter table public.profiles add column if not exists showcase jsonb not null default '[]';
+
+create or replace function public._is_banned(p_uid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = p_uid and banned_until is not null and banned_until > now())
+$$;
+
+create or replace function public._active() returns uuid
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then raise exception 'log in first'; end if;
+  if public._is_banned(me) then raise exception 'account banned'; end if;
+  return me;
+end
+$$;
+
+-- ---------- Profile showcase ----------
+create or replace function public._clean_showcase(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare
+  out jsonb := '[]'::jsonb;
+  a jsonb;
+begin
+  if jsonb_typeof(p) <> 'array' then return out; end if;
+  for a in select value from jsonb_array_elements(p) loop
+    exit when jsonb_array_length(out) >= 3;
+    if (a ->> 'id') ~ '^[a-z0-9_]{2,30}$' then
+      out := out || jsonb_build_array(jsonb_build_object('id', a ->> 'id', 'title', left(coalesce(a ->> 'title', ''), 30),
+                                                         'icon', left(coalesce(a ->> 'icon', ''), 8)));
+    end if;
+  end loop;
+  return out;
+end
+$$;
+
+create or replace function public._clean_banner(p_uid uuid, p_banner text) returns text
+language sql stable security definer set search_path = public as $$
+  select case when p_banner in ('nebula', 'aurora', 'sunset', 'ocean', 'void', 'crimson', 'forest') then p_banner
+              when p_banner in ('gold', 'galaxy', 'holo') and (public._has_premium(p_uid) or exists (select 1 from public.profiles where id = p_uid and is_owner)) then p_banner
+              else null end
+$$;
+
+create or replace function public._clean_name_style(p_uid uuid, p_style text) returns text
+language sql stable security definer set search_path = public as $$
+  select case when p_style in ('gold', 'rainbow', 'aurora', 'fire')
+                   and (public._has_premium(p_uid) or exists (select 1 from public.profiles where id = p_uid and is_owner)) then p_style
+              else null end
+$$;
+
+-- ---------- Crews ----------
+create table if not exists public.crews (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  tag text not null,
+  code text not null,
+  leader uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists crews_tag_key on public.crews (lower(tag));
+create unique index if not exists crews_name_key on public.crews (lower(name));
+create unique index if not exists crews_code_key on public.crews (code);
+create table if not exists public.crew_members (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  crew_id uuid not null references public.crews (id) on delete cascade,
+  joined_at timestamptz not null default now()
+);
+create index if not exists crew_members_crew on public.crew_members (crew_id);
+alter table public.crews enable row level security;
+alter table public.crew_members enable row level security;
+revoke all on public.crews, public.crew_members from anon, authenticated;
+
+create or replace function public._crew_tag(p_uid uuid) returns text
+language sql stable security definer set search_path = public as $$
+  select c.tag from public.crew_members m join public.crews c on c.id = m.crew_id where m.user_id = p_uid
+$$;
+
+create or replace function public._crew_code() returns text
+language sql volatile as $$
+  select string_agg(substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1), '') from generate_series(1, 6)
+$$;
+
+create or replace function public._crew_name_problem(p_name text, p_tag text) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare
+  kinds text[] := case when public.is_owner() then array['bad'] else array['bad', 'reserved'] end;
+begin
+  if p_name is null or p_name !~ '^[A-Za-z0-9][A-Za-z0-9 ]{1,22}[A-Za-z0-9]$' then return 'name'; end if;
+  if p_tag is null or p_tag !~ '^[A-Za-z0-9]{2,5}$' then return 'tag'; end if;
+  if public._name_rule(replace(p_name, ' ', '_'), kinds) is not null or public._bio_rule(p_name) is not null
+     or public._name_rule(p_tag, kinds) is not null then
+    return 'blocked';
+  end if;
+  return null;
+end
+$$;
+
+create or replace function public.crew_create(p_name text, p_tag text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  problem text;
+  cid uuid;
+begin
+  p_name := regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  p_tag := upper(trim(coalesce(p_tag, '')));
+  if exists (select 1 from public.crew_members where user_id = me) then
+    return json_build_object('ok', false, 'reason', 'in_crew');
+  end if;
+  problem := public._crew_name_problem(p_name, p_tag);
+  if problem is not null then
+    return json_build_object('ok', false, 'reason', problem);
+  end if;
+  begin
+    insert into public.crews (name, tag, code, leader) values (p_name, p_tag, public._crew_code(), me) returning id into cid;
+  exception when unique_violation then
+    return json_build_object('ok', false, 'reason', 'taken');
+  end;
+  insert into public.crew_members (user_id, crew_id) values (me, cid);
+  return json_build_object('ok', true, 'tag', p_tag);
+end
+$$;
+
+create or replace function public.crew_join(p_code text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  c public.crews;
+begin
+  if exists (select 1 from public.crew_members where user_id = me) then
+    return json_build_object('ok', false, 'reason', 'in_crew');
+  end if;
+  select * into c from public.crews where code = upper(trim(coalesce(p_code, '')));
+  if not found then
+    return json_build_object('ok', false, 'reason', 'no_crew');
+  end if;
+  if (select count(*) from public.crew_members where crew_id = c.id) >= 50 then
+    return json_build_object('ok', false, 'reason', 'full');
+  end if;
+  insert into public.crew_members (user_id, crew_id) values (me, c.id);
+  return json_build_object('ok', true, 'tag', c.tag, 'name', c.name);
+end
+$$;
+
+create or replace function public.crew_leave() returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  c public.crews;
+  heir uuid;
+begin
+  if me is null then raise exception 'log in first'; end if;
+  select c2.* into c from public.crews c2 join public.crew_members m on m.crew_id = c2.id where m.user_id = me;
+  if not found then return json_build_object('ok', true); end if;
+  delete from public.crew_members where user_id = me;
+  if c.leader = me then
+    select user_id into heir from public.crew_members where crew_id = c.id order by joined_at limit 1;
+    if heir is null then
+      delete from public.crews where id = c.id;
+      return json_build_object('ok', true, 'disbanded', true);
+    end if;
+    update public.crews set leader = heir where id = c.id;
+  end if;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public._my_led_crew() returns uuid
+language plpgsql stable security definer set search_path = public as $$
+declare
+  cid uuid;
+begin
+  select id into cid from public.crews where leader = public._active();
+  if cid is null then raise exception 'crew leader only'; end if;
+  return cid;
+end
+$$;
+
+create or replace function public.crew_kick(p_username text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  cid uuid := public._my_led_crew();
+  target uuid;
+begin
+  select p.id into target from public.profiles p join public.crew_members m on m.user_id = p.id
+   where lower(p.username) = lower(p_username) and m.crew_id = cid and p.id <> auth.uid();
+  if target is null then return json_build_object('ok', false, 'reason', 'not_member'); end if;
+  delete from public.crew_members where user_id = target;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.crew_new_code() returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  cid uuid := public._my_led_crew();
+  c text;
+begin
+  loop
+    c := public._crew_code();
+    exit when not exists (select 1 from public.crews where code = c);
+  end loop;
+  update public.crews set code = c where id = cid;
+  return json_build_object('ok', true, 'code', c);
+end
+$$;
+
+create or replace function public.crew_disband() returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.crews where id = public._my_led_crew();
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.crew_info(p_tag text default null) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  c public.crews;
+  wk date := public._this_week();
+  members json;
+  tot bigint;
+  wsum bigint;
+  pos int;
+begin
+  if me is null then raise exception 'log in first'; end if;
+  perform public._settle_crew_wars();
+  if p_tag is null then
+    select c2.* into c from public.crews c2 join public.crew_members m on m.crew_id = c2.id where m.user_id = me;
+  else
+    select * into c from public.crews where lower(tag) = lower(p_tag);
+  end if;
+  if not found then return json_build_object('found', false); end if;
+  select coalesce(json_agg(json_build_object('username', p.username, 'roblox_id', p.roblox_id, 'level', p.level,
+           'seconds', p.total_seconds, 'week_seconds', case when p.week_start = wk then p.week_seconds else 0 end,
+           'leader', p.id = c.leader, 'badges', public._badges(p.id, p.is_owner, p.badges), 'name_style', p.name_style,
+           'online', p.last_seen > now() - interval '5 minutes', 'status', p.status) order by (p.id = c.leader) desc, p.total_seconds desc), '[]'::json),
+         coalesce(sum(p.total_seconds), 0), coalesce(sum(case when p.week_start = wk then p.week_seconds else 0 end), 0)
+    into members, tot, wsum
+    from public.crew_members m join public.profiles p on p.id = m.user_id
+   where m.crew_id = c.id and not public._is_banned(p.id);
+  select count(*) + 1 into pos from (
+    select m.crew_id, sum(p.total_seconds) s from public.crew_members m join public.profiles p on p.id = m.user_id
+     where not public._is_banned(p.id) group by m.crew_id) x where x.s > tot;
+  return json_build_object('found', true, 'name', c.name, 'tag', c.tag, 'created_at', c.created_at,
+    'leader', (select username from public.profiles where id = c.leader), 'is_leader', c.leader = me,
+    'mine', exists (select 1 from public.crew_members where user_id = me and crew_id = c.id),
+    'code', case when c.leader = me or public.is_owner() then c.code end,
+    'members', members, 'member_count', json_array_length(members), 'total_seconds', tot, 'week_seconds', wsum, 'rank', pos,
+    'trophies', (select count(*) from public.crew_wars w where w.crew_id = c.id),
+    'wins', coalesce((select json_agg(json_build_object('week', w.week, 'seconds', w.seconds) order by w.week desc) from (select * from public.crew_wars w where w.crew_id = c.id order by week desc limit 8) w), '[]'::json));
+end
+$$;
+
+create or replace function public.crew_board(p_period text default 'all') returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  wk date := public._this_week();
+  mine uuid;
+  rows json;
+begin
+  if auth.uid() is null then raise exception 'log in first'; end if;
+  perform public._settle_crew_wars();
+  select crew_id into mine from public.crew_members where user_id = auth.uid();
+  with t as (
+    select c.id, c.name, c.tag, count(*) as n,
+           sum(case when p_period = 'week' then (case when p.week_start = wk then p.week_seconds else 0 end) else p.total_seconds end) as secs
+      from public.crews c join public.crew_members m on m.crew_id = c.id join public.profiles p on p.id = m.user_id
+     where not public._is_banned(p.id) group by c.id
+  ), r as (select t.*, rank() over (order by secs desc) as pos from t where secs > 0)
+  select coalesce(json_agg(json_build_object('rank', pos, 'name', name, 'tag', tag, 'members', n, 'seconds', secs, 'mine', id = mine,
+           'trophies', (select count(*) from public.crew_wars w where w.crew_id = z.id)) order by pos, name), '[]'::json)
+    into rows from (select * from r order by pos limit 50) z;
+  return json_build_object('period', p_period, 'rows', rows, 'crews', (select count(*) from public.crews),
+    'war_ends', (wk + 7)::timestamp at time zone 'UTC',
+    'last_winner', (select json_build_object('tag', w.tag, 'name', w.name, 'seconds', w.seconds, 'week', w.week) from public.crew_wars w
+                     where w.crew_id is not null or w.tag is not null order by w.week desc limit 1));
+end
+$$;
+
+-- ---------- Reports ----------
+create table if not exists public.reports (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  reporter uuid references auth.users (id) on delete set null,
+  reporter_name text,
+  target uuid references auth.users (id) on delete cascade,
+  target_name text,
+  reason text not null check (reason in ('name', 'bio', 'crew', 'cheating', 'other')),
+  note text,
+  status text not null default 'open' check (status in ('open', 'done', 'dismissed')),
+  handled_at timestamptz
+);
+create index if not exists reports_open on public.reports (status, at desc);
+alter table public.reports enable row level security;
+revoke all on public.reports from anon, authenticated;
+
+create or replace function public.report_player(p_username text, p_reason text, p_note text default null) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  t public.profiles;
+begin
+  select * into t from public.profiles where lower(username) = lower(p_username);
+  if not found then return json_build_object('ok', false, 'reason', 'no_user'); end if;
+  if t.id = me then return json_build_object('ok', false, 'reason', 'self'); end if;
+  if p_reason not in ('name', 'bio', 'crew', 'cheating', 'other') then return json_build_object('ok', false, 'reason', 'bad_reason'); end if;
+  if exists (select 1 from public.reports where reporter = me and target = t.id and reason = p_reason and status = 'open') then
+    return json_build_object('ok', true, 'already', true);
+  end if;
+  if (select count(*) from public.reports where reporter = me and at > now() - interval '1 day') >= 15 then
+    return json_build_object('ok', false, 'reason', 'too_many');
+  end if;
+  insert into public.reports (reporter, reporter_name, target, target_name, reason, note)
+  values (me, (select username from public.profiles where id = me), t.id, t.username, p_reason, nullif(left(trim(coalesce(p_note, '')), 300), ''));
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_reports(p_status text default 'open') returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((
+    select json_agg(json_build_object('id', r.id, 'at', r.at, 'reporter', r.reporter_name, 'reason', r.reason, 'note', r.note, 'status', r.status,
+             'target', coalesce(p.username, r.target_name), 'reported_name', r.target_name, 'bio', p.bio, 'crew', public._crew_tag(p.id),
+             'banned', public._is_banned(p.id), 'reports_on_target', (select count(*) from public.reports r2 where r2.target = r.target and r2.status = 'open'))
+             order by r.at desc)
+    from (select * from public.reports where status = coalesce(p_status, 'open') order by at desc limit 200) r
+    left join public.profiles p on p.id = r.target
+  ), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_report_set(p_id bigint, p_status text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  t uuid;
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  if p_status not in ('open', 'done', 'dismissed') then raise exception 'bad status'; end if;
+  select target into t from public.reports where id = p_id;
+  -- Handling one report closes every open report about the same player.
+  update public.reports set status = p_status, handled_at = now()
+   where (id = p_id or (p_status <> 'open' and target = t and status = 'open'));
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_clear_bio(p_username text) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  update public.profiles set bio = null where lower(username) = lower(p_username);
+  return json_build_object('ok', found);
+end
+$$;
+
+create or replace function public.owner_crew_delete(p_tag text) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  delete from public.crews where lower(tag) = lower(p_tag);
+  insert into public.key_log (event, username, detail) values ('crew_deleted', null, 'crew [' || p_tag || ']');
+  return json_build_object('ok', found);
+end
+$$;
+
+-- ---------- Bans ----------
+create or replace function public.owner_ban(p_username text, p_days int, p_reason text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  t public.profiles;
+  until timestamptz := case when coalesce(p_days, 0) > 0 then now() + make_interval(days => p_days) else 'infinity'::timestamptz end;
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  select * into t from public.profiles where lower(username) = lower(p_username);
+  if not found then raise exception 'no such user'; end if;
+  if t.is_owner then raise exception 'you can''t ban the owner'; end if;
+  update public.profiles set banned_until = until, ban_reason = nullif(left(trim(coalesce(p_reason, '')), 200), ''),
+         now_playing = null where id = t.id;
+  insert into public.key_log (event, username, detail)
+  values ('banned', t.username, case when coalesce(p_days, 0) > 0 then p_days || ' days' else 'forever' end || coalesce(': ' || nullif(trim(p_reason), ''), ''));
+  return json_build_object('ok', true, 'until', until);
+end
+$$;
+
+create or replace function public.owner_unban(p_username text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  n text;
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  update public.profiles set banned_until = null, ban_reason = null where lower(username) = lower(p_username) returning username into n;
+  if n is null then raise exception 'no such user'; end if;
+  insert into public.key_log (event, username, detail) values ('unbanned', n, null);
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_bans() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(json_build_object('username', username, 'until', banned_until, 'forever', banned_until = 'infinity'::timestamptz,
+                    'reason', ban_reason) order by banned_until)
+                   from public.profiles where banned_until > now()), '[]'::json);
+end
+$$;
+
+-- ---------- Feedback ----------
+create table if not exists public.feedback (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  user_id uuid references auth.users (id) on delete set null,
+  username text,
+  kind text not null check (kind in ('bug', 'idea', 'other', 'appeal')),
+  message text not null,
+  log text,
+  version text,
+  status text not null default 'new' check (status in ('new', 'seen', 'done'))
+);
+create index if not exists feedback_status on public.feedback (status, at desc);
+alter table public.feedback enable row level security;
+revoke all on public.feedback from anon, authenticated;
+
+create or replace function public.send_feedback(p_kind text, p_message text, p_log text default null, p_version text default null) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then raise exception 'log in first'; end if;
+  if public._is_banned(me) and p_kind <> 'appeal' then raise exception 'account banned'; end if;
+  if p_kind not in ('bug', 'idea', 'other', 'appeal') then return json_build_object('ok', false, 'reason', 'bad_kind'); end if;
+  if length(trim(coalesce(p_message, ''))) < 3 then return json_build_object('ok', false, 'reason', 'empty'); end if;
+  if (select count(*) from public.feedback where user_id = me and at > now() - interval '1 hour') >= 5 then
+    return json_build_object('ok', false, 'reason', 'too_many');
+  end if;
+  insert into public.feedback (user_id, username, kind, message, log, version)
+  values (me, (select username from public.profiles where id = me), p_kind, left(trim(p_message), 2000), left(p_log, 60000), left(p_version, 20));
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_feedback(p_status text default 'new') returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(json_build_object('id', id, 'at', at, 'username', username, 'kind', kind, 'message', message,
+                    'version', version, 'status', status, 'has_log', log is not null and log <> '') order by at desc)
+                   from (select * from public.feedback where p_status = 'all' or status = p_status order by at desc limit 150) f), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_feedback_log(p_id bigint) returns text
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return (select log from public.feedback where id = p_id);
+end
+$$;
+
+create or replace function public.owner_feedback_set(p_id bigint, p_status text) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  update public.feedback set status = p_status where id = p_id;
+  return json_build_object('ok', found);
+end
+$$;
+
+revoke execute on function public._is_banned(uuid), public._active(), public._clean_showcase(jsonb), public._clean_banner(uuid, text),
+  public._clean_name_style(uuid, text), public._crew_tag(uuid), public._crew_code(), public._crew_name_problem(text, text),
+  public._my_led_crew(), public.crew_create(text, text), public.crew_join(text), public.crew_leave(), public.crew_kick(text),
+  public.crew_new_code(), public.crew_disband(), public.crew_info(text), public.crew_board(text), public.report_player(text, text, text),
+  public.owner_reports(text), public.owner_report_set(bigint, text), public.owner_clear_bio(text), public.owner_crew_delete(text),
+  public.owner_ban(text, int, text), public.owner_unban(text), public.owner_bans(), public.send_feedback(text, text, text, text),
+  public.owner_feedback(text), public.owner_feedback_log(bigint), public.owner_feedback_set(bigint, text) from public, anon;
+grant execute on function public.crew_create(text, text), public.crew_join(text), public.crew_leave(), public.crew_kick(text),
+  public.crew_new_code(), public.crew_disband(), public.crew_info(text), public.crew_board(text), public.report_player(text, text, text),
+  public.owner_reports(text), public.owner_report_set(bigint, text), public.owner_clear_bio(text), public.owner_crew_delete(text),
+  public.owner_ban(text, int, text), public.owner_unban(text), public.owner_bans(), public.send_feedback(text, text, text, text),
+  public.owner_feedback(text), public.owner_feedback_log(bigint), public.owner_feedback_set(bigint, text) to authenticated;
+
+-- ============================================================================
+-- v2.18.0: status messages, profile visitors, weekly crew wars, crew Wrapped, crew chat.
+-- Safe to run again.
+-- ============================================================================
+alter table public.profiles add column if not exists status text;
+alter table public.profiles add column if not exists status_at timestamptz;
+
+create table if not exists public.profile_weeks (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  week date not null,
+  seconds int not null default 0,
+  primary key (user_id, week)
+);
+create table if not exists public.profile_months (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  month date not null,
+  seconds int not null default 0,
+  games jsonb not null default '[]',
+  primary key (user_id, month)
+);
+create table if not exists public.profile_views (
+  viewer uuid not null references auth.users (id) on delete cascade,
+  target uuid not null references auth.users (id) on delete cascade,
+  day date not null default current_date,
+  primary key (viewer, target, day)
+);
+create index if not exists profile_views_target on public.profile_views (target, day);
+create table if not exists public.crew_wars (
+  week date primary key,
+  crew_id uuid references public.crews (id) on delete set null,
+  tag text,
+  name text,
+  seconds bigint not null default 0,
+  settled_at timestamptz not null default now()
+);
+create table if not exists public.crew_messages (
+  id bigint generated always as identity primary key,
+  crew_id uuid not null references public.crews (id) on delete cascade,
+  user_id uuid references auth.users (id) on delete set null,
+  username text,
+  body text not null,
+  at timestamptz not null default now(),
+  deleted boolean not null default false
+);
+create index if not exists crew_messages_crew on public.crew_messages (crew_id, id desc);
+alter table public.profile_weeks enable row level security;
+alter table public.profile_months enable row level security;
+alter table public.profile_views enable row level security;
+alter table public.crew_wars enable row level security;
+alter table public.crew_messages enable row level security;
+revoke all on public.profile_weeks, public.profile_months, public.profile_views, public.crew_wars, public.crew_messages from anon, authenticated;
+
+alter table public.reports drop constraint if exists reports_reason_check;
+alter table public.reports add constraint reports_reason_check check (reason in ('name', 'bio', 'crew', 'cheating', 'chat', 'status', 'other'));
+
+-- Bad words are kept out of statuses the same way as bios.
+create or replace function public._enforce_bio() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.bio is distinct from old.bio and new.bio is not null and public._bio_rule(new.bio) is not null then
+    new.bio := old.bio;
+  end if;
+  if new.status is distinct from old.status and new.status is not null and public._bio_rule(new.status) is not null then
+    new.status := old.status;
+    new.status_at := old.status_at;
+  end if;
+  return new;
+end
+$$;
+drop trigger if exists profiles_bio_automod on public.profiles;
+create trigger profiles_bio_automod before update of bio, status on public.profiles for each row execute function public._enforce_bio();
+
+create or replace function public._clean_games(p jsonb) returns jsonb
+language plpgsql immutable as $$
+declare
+  out jsonb := '[]'::jsonb;
+  g jsonb;
+begin
+  if jsonb_typeof(p) <> 'array' then return out; end if;
+  for g in select value from jsonb_array_elements(p) loop
+    exit when jsonb_array_length(out) >= 5;
+    if (g ->> 'pid') ~ '^[0-9]{1,15}$' then
+      out := out || jsonb_build_array(jsonb_build_object('pid', g ->> 'pid', 'name', left(coalesce(g ->> 'name', 'Game'), 60),
+                                                         'seconds', least(greatest(coalesce((g ->> 'seconds')::numeric, 0), 0), 2678400)::int));
+    end if;
+  end loop;
+  return out;
+end
+$$;
+
+-- ---------- Weekly crew wars ----------
+-- The crew with the most hours in a week (Monday to Sunday, UTC) wins a trophy. Settled the first time anyone
+-- looks at crews after the week ends.
+create or replace function public._settle_crew_wars() returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  last_week date := public._this_week() - 7;
+  w record;
+begin
+  if exists (select 1 from public.crew_wars where week = last_week) then return; end if;
+  select c.id, c.tag, c.name, sum(pw.seconds) as s into w
+    from public.crews c join public.crew_members m on m.crew_id = c.id
+    join public.profile_weeks pw on pw.user_id = m.user_id and pw.week = last_week
+   where not public._is_banned(m.user_id)
+   group by c.id having sum(pw.seconds) > 0 order by s desc limit 1;
+  insert into public.crew_wars (week, crew_id, tag, name, seconds)
+  values (last_week, w.id, w.tag, w.name, coalesce(w.s, 0)) on conflict (week) do nothing;
+end
+$$;
+
+-- ---------- Crew Wrapped ----------
+create or replace function public.crew_wrapped(p_which text default 'last', p_tag text default null) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  c public.crews;
+  mon date := (date_trunc('month', now()) - case when p_which = 'this' then interval '0' else interval '1 month' end)::date;
+  tot bigint;
+  pos int;
+begin
+  if me is null then raise exception 'log in first'; end if;
+  if p_tag is null then
+    select c2.* into c from public.crews c2 join public.crew_members m on m.crew_id = c2.id where m.user_id = me;
+  else
+    select * into c from public.crews where lower(tag) = lower(p_tag);
+  end if;
+  if not found then return json_build_object('found', false); end if;
+  select coalesce(sum(pm.seconds), 0) into tot from public.crew_members m join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon
+   where m.crew_id = c.id and not public._is_banned(m.user_id);
+  select count(*) + 1 into pos from (
+    select m.crew_id, sum(pm.seconds) s from public.crew_members m join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon
+     where not public._is_banned(m.user_id) group by m.crew_id) x where x.s > tot;
+  return json_build_object('found', true, 'tag', c.tag, 'name', c.name, 'month', mon, 'total_seconds', tot,
+    'rank', case when tot > 0 then pos end,
+    'crews', (select count(distinct m.crew_id) from public.crew_members m join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon where pm.seconds > 0),
+    'members', (select count(*) from public.crew_members where crew_id = c.id),
+    'active', (select count(*) from public.crew_members m join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon where m.crew_id = c.id and pm.seconds > 0),
+    'top', coalesce((select json_agg(x order by x.seconds desc) from (
+        select p.username, p.roblox_id, p.name_style, pm.seconds from public.crew_members m join public.profiles p on p.id = m.user_id
+          join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon
+         where m.crew_id = c.id and pm.seconds > 0 and not public._is_banned(p.id) order by pm.seconds desc limit 3) x), '[]'::json),
+    'games', coalesce((select json_agg(g order by g.seconds desc) from (
+        select gg ->> 'pid' as pid, max(gg ->> 'name') as name, sum((gg ->> 'seconds')::bigint) as seconds, count(distinct m.user_id) as players
+          from public.crew_members m join public.profile_months pm on pm.user_id = m.user_id and pm.month = mon,
+               jsonb_array_elements(pm.games) gg
+         where m.crew_id = c.id and not public._is_banned(m.user_id)
+         group by gg ->> 'pid' order by sum((gg ->> 'seconds')::bigint) desc limit 3) g), '[]'::json),
+    'war_wins', (select count(*) from public.crew_wars w where w.crew_id = c.id and w.week >= mon and w.week < (mon + interval '1 month')::date));
+end
+$$;
+
+-- ---------- Crew chat ----------
+create or replace function public._my_crew() returns uuid
+language sql stable security definer set search_path = public as $$
+  select crew_id from public.crew_members where user_id = auth.uid()
+$$;
+
+create or replace function public.crew_chat_send(p_body text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  cid uuid := public._my_crew();
+  body text := trim(regexp_replace(coalesce(p_body, ''), '\r', '', 'g'));
+  m public.crew_messages;
+begin
+  if cid is null then return json_build_object('ok', false, 'reason', 'no_crew'); end if;
+  body := regexp_replace(body, '\n{3,}', E'\n\n', 'g');
+  if length(body) < 1 then return json_build_object('ok', false, 'reason', 'empty'); end if;
+  if length(body) > 300 then return json_build_object('ok', false, 'reason', 'long'); end if;
+  if public._bio_rule(body) is not null then return json_build_object('ok', false, 'reason', 'blocked'); end if;
+  if (select count(*) from public.crew_messages where user_id = me and at > now() - interval '30 seconds') >= 6 then
+    return json_build_object('ok', false, 'reason', 'slow');
+  end if;
+  insert into public.crew_messages (crew_id, user_id, username, body)
+  values (cid, me, (select username from public.profiles where id = me), body) returning * into m;
+  delete from public.crew_messages where crew_id = cid and id < (select id from public.crew_messages where crew_id = cid order by id desc offset 500 limit 1);
+  return json_build_object('ok', true, 'id', m.id);
+end
+$$;
+
+create or replace function public.crew_chat_list(p_sig text default null) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  cid uuid := public._my_crew();
+  sig text;
+  leader uuid;
+begin
+  if me is null then raise exception 'log in first'; end if;
+  if cid is null then return json_build_object('found', false); end if;
+  select coalesce(max(id), 0) || ':' || count(*) filter (where deleted) into sig
+    from (select id, deleted from public.crew_messages where crew_id = cid order by id desc limit 80) x;
+  if sig = p_sig then return json_build_object('found', true, 'same', true, 'sig', sig); end if;
+  select c.leader into leader from public.crews c where c.id = cid;
+  return json_build_object('found', true, 'sig', sig, 'is_leader', leader = me, 'messages', coalesce((
+    select json_agg(json_build_object('id', m.id, 'username', coalesce(p.username, m.username), 'at', m.at, 'body', m.body,
+             'mine', m.user_id = me, 'leader', m.user_id = leader, 'name_style', p.name_style) order by m.id)
+      from (select * from public.crew_messages where crew_id = cid and not deleted order by id desc limit 80) m
+      left join public.profiles p on p.id = m.user_id), '[]'::json));
+end
+$$;
+
+create or replace function public.crew_chat_delete(p_id bigint) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  m public.crew_messages;
+begin
+  select * into m from public.crew_messages where id = p_id;
+  if not found then return json_build_object('ok', true); end if;
+  if not (m.user_id = auth.uid() or public.is_owner()
+          or exists (select 1 from public.crews c where c.id = m.crew_id and c.leader = auth.uid())) then
+    raise exception 'not allowed';
+  end if;
+  update public.crew_messages set deleted = true, body = '' where id = p_id;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.crew_chat_report(p_id bigint) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  m public.crew_messages;
+  tag text;
+begin
+  select * into m from public.crew_messages where id = p_id and crew_id = public._my_crew() and not deleted;
+  if not found then return json_build_object('ok', false, 'reason', 'gone'); end if;
+  if m.user_id = me then return json_build_object('ok', false, 'reason', 'self'); end if;
+  if exists (select 1 from public.reports where reporter = me and reason = 'chat' and note like '%#' || p_id) then
+    return json_build_object('ok', true, 'already', true);
+  end if;
+  if (select count(*) from public.reports where reporter = me and at > now() - interval '1 day') >= 15 then
+    return json_build_object('ok', false, 'reason', 'too_many');
+  end if;
+  select c.tag into tag from public.crews c where c.id = m.crew_id;
+  insert into public.reports (reporter, reporter_name, target, target_name, reason, note)
+  values (me, (select username from public.profiles where id = me), m.user_id, m.username, 'chat',
+          left('[' || tag || '] chat: "' || m.body || '"', 290) || ' #' || p_id);
+  return json_build_object('ok', true);
+end
+$$;
+
+revoke execute on function public._clean_games(jsonb), public._settle_crew_wars(), public.crew_wrapped(text, text), public._my_crew(),
+  public.crew_chat_send(text), public.crew_chat_list(text), public.crew_chat_delete(bigint), public.crew_chat_report(bigint) from public, anon;
+grant execute on function public.crew_wrapped(text, text), public.crew_chat_send(text), public.crew_chat_list(text),
+  public.crew_chat_delete(bigint), public.crew_chat_report(bigint) to authenticated;

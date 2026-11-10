@@ -961,6 +961,88 @@ body.idle #glow { opacity: 0; }
 .word-chip.hide i { filter: blur(4px); transition: filter .2s; } .word-chip.hide:hover i { filter: none; }
 .word-chip.reserved { border-color: rgba(251,191,36,.3); }
 .word-chip button { width: 20px; height: 20px; border-radius: 50%; font-size: 10px; color: var(--faint); } .word-chip button:hover { background: rgba(251,113,133,.15); color: var(--bad); }
+
+/* ===== v2.17 ===== */
+.crew-tag { display: inline-grid; place-items: center; height: 18px; padding: 0 6px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  color: #fff; background: linear-gradient(135deg, #0ea5e9, #6366f1); box-shadow: 0 0 10px -3px #6366f1; flex: none; }
+.crew-tag.big { display: inline-flex; align-items: center; gap: 1px; height: 26px; padding: 0 9px; font-size: 13px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.crew-tag.big::before { content: "["; opacity: .6; } .crew-tag.big::after { content: "]"; opacity: .6; }
+.crew-badge { display: grid; place-items: center; min-width: 74px; height: 74px; padding: 0 10px; border-radius: 20px; font-size: 22px; font-weight: 900; letter-spacing: .06em; color: #fff;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1 55%, var(--accent2)); box-shadow: 0 14px 34px -12px #6366f1, inset 0 1px 0 rgba(255,255,255,.35); }
+.crew-badge.sm { min-width: 48px; height: 26px; border-radius: 8px; font-size: 11.5px; box-shadow: none; }
+.crew-hero { background: radial-gradient(70% 140% at 0% 0%, rgba(99,102,241,.22), transparent 60%), var(--panel); }
+.crew-hero h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
+.crew-code { display: flex; flex-direction: column; padding: 6px 14px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px dashed var(--line2); }
+.crew-code small { font-size: 9.5px; font-weight: 800; letter-spacing: .16em; color: var(--faint); } .crew-code b { font-size: 18px; letter-spacing: .25em; font-family: Consolas, monospace; }
+.crew-row { grid-template-columns: 36px 1fr auto auto auto 28px; } .crew-lb { grid-template-columns: 44px auto 1fr auto auto; }
+.crew-row .kick { width: 26px; height: 26px; border-radius: 8px; color: var(--faint); } .crew-row .kick:hover { background: rgba(251,113,133,.15); color: var(--bad); }
+.showcase { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+.show-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius); background: linear-gradient(135deg, rgba(var(--accent-rgb),.16), transparent 70%), var(--panel);
+  border: 1px solid rgba(var(--accent-rgb),.3); box-shadow: 0 0 30px -18px rgba(var(--accent-rgb),1); }
+.show-item .ic { font-size: 26px; filter: drop-shadow(0 0 10px rgba(var(--accent-rgb),.8)); } .show-item b { font-size: 13.5px; }
+.look-label { margin: 14px 0 8px; font-size: 10.5px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.banner-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.bn-swatch { position: relative; height: 46px; border-radius: 12px; border: 2px solid transparent; overflow: hidden; display: flex; align-items: flex-end; padding: 5px 8px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); transition: transform .25s var(--spring), border-color .2s; }
+.bn-swatch:hover { transform: translateY(-2px); } .bn-swatch.on { border-color: #fff; box-shadow: 0 0 18px -4px rgba(var(--accent-rgb),1); }
+.bn-swatch.none { background: var(--panel2); color: var(--muted); text-shadow: none; border-color: var(--line); } .bn-swatch.none.on { border-color: var(--text); }
+.bn-swatch i { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: 11px; } .bn-swatch.locked { opacity: .65; }
+.bn-nebula { background: radial-gradient(80% 120% at 20% 20%, #7c3aed, transparent 60%), radial-gradient(70% 100% at 90% 90%, #db2777, transparent 60%), #120a24 !important; }
+.bn-aurora { background: linear-gradient(120deg, #064e3b, #10b981 35%, #22d3ee 60%, #6366f1) !important; }
+.bn-sunset { background: linear-gradient(160deg, #f97316, #db2777 55%, #4c1d95) !important; }
+.bn-ocean { background: linear-gradient(160deg, #0ea5e9, #1e3a8a 70%) !important; }
+.bn-void { background: radial-gradient(60% 100% at 50% 50%, #312e81, #000 75%) !important; }
+.bn-crimson { background: linear-gradient(140deg, #7f1d1d, #e11d48 55%, #1c0a0a) !important; }
+.bn-forest { background: linear-gradient(150deg, #14532d, #65a30d 60%, #052e16) !important; }
+.bn-gold { background: linear-gradient(120deg, #78350f, #f59e0b 30%, #fde68a 50%, #f59e0b 70%, #78350f) !important; background-size: 200% 100% !important; animation: flow 6s ease infinite; }
+.bn-galaxy { background: radial-gradient(2px 2px at 20% 30%, #fff, transparent), radial-gradient(1.5px 1.5px at 70% 60%, #fff, transparent), radial-gradient(1px 1px at 40% 80%, #fff, transparent),
+  radial-gradient(80% 120% at 80% 20%, #c026d3, transparent 60%), radial-gradient(70% 100% at 10% 90%, #2563eb, transparent 60%), #050314 !important; }
+.bn-holo { background: linear-gradient(115deg, #a5f3fc, #f0abfc, #fde68a, #a7f3d0, #c4b5fd) !important; background-size: 300% 100% !important; animation: flow 8s ease infinite; }
+.prof-hero[class*="bn-"] .who h2:not(.ns) { -webkit-text-fill-color: #fff; color: #fff; background: none; text-shadow: 0 2px 16px rgba(0,0,0,.6); }
+.prof-hero[class*="bn-"] .who .rb, .prof-hero[class*="bn-"] .bio, .prof-hero[class*="bn-"] .muted { color: rgba(255,255,255,.88) !important; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+.prof-hero[class*="bn-"]::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.05)); opacity: 1 !important; }
+.ns { background-clip: text !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent; color: transparent; background-size: 200% 100% !important; animation: flow 4s linear infinite; }
+.ns-gold { background-image: linear-gradient(90deg, #f59e0b, #fde68a, #f59e0b) !important; filter: drop-shadow(0 0 8px rgba(245,158,11,.5)); }
+.ns-rainbow { background-image: linear-gradient(90deg, #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #f43f5e) !important; }
+.ns-aurora { background-image: linear-gradient(90deg, #22d3ee, #a78bfa, #34d399, #22d3ee) !important; }
+.ns-fire { background-image: linear-gradient(90deg, #ef4444, #f97316, #facc15, #ef4444) !important; filter: drop-shadow(0 0 8px rgba(249,115,22,.5)); }
+.sheet.mini { width: min(480px, calc(100vw - 80px)); padding: 22px; }
+.btn.dangerfill { background: var(--bad); box-shadow: 0 8px 22px -10px var(--bad); }
+.btn.ghost.danger:hover { color: var(--bad); }
+#banGate { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: radial-gradient(60% 60% at 50% 40%, rgba(225,29,72,.18), transparent 70%), rgba(4,2,10,.92); backdrop-filter: blur(14px); animation: fadeIn .3s; }
+.ban-card { width: min(460px, calc(100vw - 60px)); padding: 30px; border-radius: 22px; text-align: center; background: var(--panel-solid); border: 1px solid rgba(251,113,133,.35); box-shadow: 0 40px 100px -30px rgba(0,0,0,.9), 0 0 80px -40px #e11d48; }
+.ban-card h2 { margin: 6px 0 8px; font-size: 22px; } .ban-icon { font-size: 44px; filter: drop-shadow(0 0 18px rgba(225,29,72,.8)); }
+.ban-reason { padding: 10px 12px; border-radius: 12px; background: rgba(251,113,133,.1); color: #fecdd3; }
+.ban-card textarea { margin-top: 10px; text-align: left; }
+.chk { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; } .chk input { accent-color: var(--accent); width: 16px; height: 16px; }
+.rep { padding: 12px 0; border-top: 1px solid var(--line); } .rep:first-child { border-top: 0; }
+.rep-name { cursor: pointer; } .rep-name:hover { color: var(--accent); text-decoration: underline; }
+.rep-note { margin-top: 6px; padding: 8px 12px; border-radius: 10px; background: var(--panel2); font-size: 13px; }
+.rep .btn { height: 30px; font-size: 12.5px; padding: 0 12px; }
+.fb-kind { font-size: 11px; font-weight: 750; padding: 3px 9px; border-radius: 99px; background: var(--panel3); }
+.fb-kind.bug { background: rgba(251,113,133,.14); color: var(--bad); } .fb-kind.idea { background: rgba(251,191,36,.14); color: var(--warn); } .fb-kind.appeal { background: rgba(96,165,250,.15); color: #93c5fd; }
+.log-view { max-height: 50vh; overflow: auto; margin: 0; padding: 12px; border-radius: 12px; background: rgba(0,0,0,.35); border: 1px solid var(--line); font: 11.5px/1.5 Consolas, monospace; white-space: pre-wrap; word-break: break-all; user-select: text; }
+
+/* ===== v2.18 ===== */
+.status-line { display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; padding: 4px 12px 4px 9px; border-radius: 99px; font-size: 13px; font-weight: 600;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); max-width: 100%; }
+.views-pill { display: inline-flex; align-items: center; gap: 2px; margin-top: 12px; padding: 6px 12px; border-radius: 99px; font-size: 12.5px; background: rgba(var(--accent-rgb),.12); border: 1px solid rgba(var(--accent-rgb),.35); }
+.views-pill b { margin: 0 3px; }
+.trophy-row { margin-top: 6px; font-size: 13px; color: #fde68a; } .trophies { color: #fde68a; font-size: 12px; }
+.war-card { background: linear-gradient(100deg, rgba(251,191,36,.12), transparent 60%), var(--panel); border-color: rgba(251,191,36,.3); }
+.war-ico { font-size: 30px; filter: drop-shadow(0 0 12px rgba(251,191,36,.6)); }
+.war-clock { text-align: right; } .war-clock small { display: block; font-size: 9.5px; font-weight: 800; letter-spacing: .16em; color: var(--faint); } .war-clock b { font-size: 22px; color: #fde68a; font-variant-numeric: tabular-nums; }
+.war-last { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.chat-box { height: 300px; overflow-y: auto; margin-top: 12px; padding: 8px 4px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid var(--line); user-select: text; }
+.msg { position: relative; display: flex; gap: 10px; padding: 6px 10px; border-radius: 10px; } .msg:hover { background: rgba(255,255,255,.035); }
+.msg.cont { padding-top: 1px; }
+.msg-av { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; background: var(--grad); }
+.msg-av.ghost { height: 0; background: none; }
+.msg-main { min-width: 0; flex: 1; } .msg-head { font-size: 12.5px; display: flex; align-items: baseline; gap: 8px; } .msg-head b { cursor: pointer; } .msg-head span { color: var(--faint); font-size: 11px; }
+.msg-body { font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+.msg.mine .msg-av { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
+.msg-acts { position: absolute; right: 8px; top: 4px; display: none; gap: 2px; } .msg:hover .msg-acts { display: flex; }
+.msg-acts button { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; background: var(--panel-solid); border: 1px solid var(--line); } .msg-acts button:hover { border-color: var(--line2); }
+.wrap-canvas { display: block; width: 100%; max-width: 380px; margin: 0 auto; border-radius: 18px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.8), 0 0 50px -20px rgba(var(--accent-rgb),.9); }
 </style>
 </head>
 <body>
@@ -1243,6 +1325,7 @@ body.idle #glow { opacity: 0; }
       <div class="card rise" style="--i:2" id="probCard"></div>
       <div class="card rise" style="--i:2" id="rbxUpdCard"></div>
       <div class="card rise" style="--i:2" id="storageCard"></div>
+      <div class="card rise" style="--i:2" id="feedbackCard"></div>
       <div class="card rise" style="--i:3">
         <h3>Repair Roblox</h3><p class="sub">Tools for when Roblox acts up. None of these touch your Orbit settings unless it says so.</p>
         <div class="repair-grid">
@@ -1277,6 +1360,9 @@ body.idle #glow { opacity: 0; }
       <div class="card rise" style="--i:1" id="ownerIssue"></div>
       <div class="card rise" style="--i:2" id="ownerLog"></div>
       <div class="card rise" style="--i:2" id="ownerNames"></div>
+      <div class="card rise" style="--i:2" id="ownerReports"></div>
+      <div class="card rise" style="--i:2" id="ownerBans"></div>
+      <div class="card rise" style="--i:2" id="ownerFeedback"></div>
       <div class="card rise" style="--i:2" id="ownerBulk"></div>
       <div class="card rise" style="--i:2" id="ownerKeys"></div>
       <div class="card rise" style="--i:3" id="ownerNews"></div>
@@ -1724,7 +1810,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: applyLocks, discover: () => renderDiscover(), credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     social: renderSocial, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
+     social: renderSocial, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: () => { renderHealth(); renderFeedbackCard(); }, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -2557,7 +2643,7 @@ let socTab = "profile";
 function renderSocial() {
   const tabs = $("#socTabs"), body = $("#socBody");
   tabs.innerHTML = "";
-  tabs.append(segmented([["profile", "Profile"], ["friends", "Friends"], ["leaderboard", "Leaderboard"]], socTab, (v) => { socTab = v; renderSocialTab(); }));
+  tabs.append(segmented([["profile", "Profile"], ["friends", "Friends"], ["crew", "Crew"], ["leaderboard", "Leaderboard"]], socTab, (v) => { socTab = v; renderSocialTab(); }));
   if (!(S.account || {}).enabled) { body.replaceChildren(h("div", { class: "card" }, emptyState("social", "Orbit accounts aren't set up", "Profiles, friends and the leaderboard need Orbit accounts."))); return; }
   renderSocialTab();
 }
@@ -2565,7 +2651,7 @@ function socLoading(body, n = 2) { body.replaceChildren(...Array.from({ length: 
 async function renderSocialTab() {
   const body = $("#socBody"), tab = socTab;
   socLoading(body);
-  const fn = { profile: socProfile, friends: socFriends, leaderboard: socBoard }[tab];
+  const fn = { profile: socProfile, friends: socFriends, crew: socCrew, leaderboard: socBoard }[tab];
   const out = await fn();
   if (page !== "social" || socTab !== tab) return;
   body.replaceChildren(...out);
@@ -2578,14 +2664,17 @@ function profileView(p, { mine = false, local = null } = {}) {
   const rb = p.roblox_name ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); api.open_url(`https://www.roblox.com/users/${p.roblox_id}/profile`); } }, "@" + p.roblox_name + " on Roblox") : (mine ? "Play a game through Orbit to link your Roblox account" : "");
   const since = p.created_at ? "Joined " + new Date(p.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
   const seen = p.now_playing ? "" : p.online ? " · Online now" : p.last_seen ? " · Seen " + fmtAgo(Date.parse(p.last_seen) / 1000) : "";
-  const hero = h("div", { class: "card prof-hero tilt" },
+  const hero = h("div", { class: "card prof-hero tilt" + (p.banner ? " bn-" + p.banner : "") },
     avatarEl(p.avatar, p.username, 104, { ring: true, status }),
     h("div", { class: "who", style: "min-width:0" },
-      h("div", { class: "row", style: "gap:10px" }, h("h2", {}, p.username), h("span", { class: "lvl", style: "height:22px;font-size:12px" }, "LV " + (p.level || 1)), p.level_title ? h("span", { class: "muted small" }, p.level_title) : null),
+      h("div", { class: "row", style: "gap:10px" }, p.crew ? h("button", { class: "crew-tag big", title: "Open crew", onclick: () => openCrew(p.crew) }, p.crew) : null,
+        h("h2", { class: p.name_style ? "ns ns-" + p.name_style : "" }, p.username), h("span", { class: "lvl", style: "height:22px;font-size:12px" }, "LV " + (p.level || 1)), p.level_title ? h("span", { class: "muted small" }, p.level_title) : null),
       h("div", { class: "rb" }, rb, h("span", {}, (rb && since ? " · " : "") + since + seen)),
+      p.status ? h("div", { class: "status-line" }, h("span", {}, "💬"), p.status) : null,
       (p.badges || []).length ? h("div", { class: "badges" }, (p.badges || []).map((b) => badgeEl(b))) : null,
       p.bio ? h("p", { class: "bio" }, p.bio) : mine ? h("p", { class: "bio muted" }, "Add a bio below so people know what you're about.") : null,
-      p.now_playing ? h("div", { class: "playing-pill" }, h("i"), "Playing " + p.now_playing.name) : null));
+      h("div", { class: "row", style: "gap:8px" }, p.now_playing ? h("div", { class: "playing-pill" }, h("i"), "Playing " + p.now_playing.name) : null,
+        mine && p.visitors_week != null ? h("div", { class: "views-pill", title: `${p.visitors_total || 0} people have viewed your profile in the last 30 days` }, "👀 ", h("b", {}, String(p.visitors_week)), ` profile view${p.visitors_week === 1 ? "" : "s"} this week`) : null)));
   const week = mine && local ? local.week_seconds : p.week_seconds, total = mine && local ? Math.max(local.total_seconds, p.total_seconds || 0) : p.total_seconds;
   const tiles = h("div", { class: "stat-tiles" },
     h("div", { class: "stat-tile" }, h("small", {}, "Total time"), h("b", {}, fmtHrs(total)), h("span", {}, "on Orbit")),
@@ -2599,7 +2688,8 @@ function profileView(p, { mine = false, local = null } = {}) {
       h("div", { style: "min-width:0" }, h("div", { style: "font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, g.name), h("div", { class: "bar" }, h("i", { style: `width:${Math.max(4, 100 * (g.seconds || 0) / max)}%` }))),
       h("div", { class: "muted", style: "font-weight:700;font-variant-numeric:tabular-nums" }, fmtHrs(g.seconds)))))
       : h("p", { class: "sub", style: "margin:6px 0 0" }, mine ? "Play some games through Orbit and your favorites show up here." : "Nothing played yet."));
-  return [hero, tiles, top];
+  const shows = (p.showcase || []).length ? h("div", { class: "showcase" }, (p.showcase || []).map((a) => h("div", { class: "show-item" }, h("span", { class: "ic" }, a.icon || "🏆"), h("b", {}, a.title || a.id)))) : null;
+  return [hero, shows, tiles, top].filter(Boolean);
 }
 async function socProfile() {
   const r = await api.social_me();
@@ -2609,17 +2699,24 @@ async function socProfile() {
   const saveSoc = async (changes, msg) => { cfg.social = Object.assign(cfg.social || {}, changes); const res = await api.social_save(changes); if (res && res.error) toast(res.error, "err"); else if (msg) toast(msg, "ok"); };
   const saveBio = h("button", { class: "btn", onclick: async () => { await saveSoc({ bio: bio.value }, "Bio saved."); renderSocialTab(); } }, "Save bio");
   bio.onkeydown = (e) => { if (e.key === "Enter") saveBio.click(); };
+  const status = h("input", { class: "input", maxlength: 60, placeholder: "Status, like \"grinding BedWars wins\"", style: "flex:1", value: set.status || "" });
+  const saveStatus = h("button", { class: "btn", onclick: async () => { const r = await api.social_save({ status: status.value }); if (r && r.error) return toast(r.error, "err"); cfg.social = Object.assign(cfg.social || {}, { status: status.value.trim() }); toast(status.value.trim() ? "Status set." : "Status cleared.", "ok"); renderSocialTab(); } }, "Set status");
+  status.onkeydown = (e) => { if (e.key === "Enter") saveStatus.click(); };
+  const quick = h("div", { class: "row", style: "gap:6px;margin:6px 0 10px" }, ["🎮 Grinding", "😴 AFK", "🏆 Tryharding", "👋 Looking for a squad", "🚫 Do not disturb"].map((q) =>
+    h("button", { class: "chip", style: "height:28px;font-size:12px;padding:0 11px", onclick: () => { status.value = q; saveStatus.click(); } }, q)));
   const edit = h("div", { class: "card" }, h("h3", {}, "Edit profile"), h("p", { class: "sub" }, "Your playtime, level and favorite games update by themselves while you play."),
+    h("div", { class: "row" }, status, saveStatus), quick,
     h("div", { class: "row", style: "margin-bottom:6px" }, bio, saveBio),
     toggleRow("Public profile", "Other Orbit players can open your profile and see you in their Friends tab.", set.public_profile !== false, (v) => saveSoc({ public_profile: v })),
     toggleRow("Show me on the leaderboard", "Turn this off to keep your playtime off the rankings.", set.on_leaderboard !== false, (v) => saveSoc({ on_leaderboard: v })),
     toggleRow("Show friends what I'm playing", "Friends on Orbit see which game you're in. Streamer mode always hides it.", set.share_activity !== false, (v) => saveSoc({ share_activity: v })));
   const uname = usernameCard();
+  const lookC = await lookCard(set);
   const q = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, spellcheck: "false", style: "flex:1" });
   const look = h("button", { class: "btn primary", onclick: () => q.value.trim() && openProfile(q.value.trim()) }, "View profile");
   q.onkeydown = (e) => { if (e.key === "Enter") look.click(); };
   const lookup = h("div", { class: "card" }, h("h3", {}, "Look up a player"), h("p", { class: "sub" }, "See anyone's Orbit profile by their Orbit username."), h("div", { class: "row" }, q, look));
-  return [...profileView(r.profile, { mine: true, local: r.local }), uname, edit, lookup];
+  return [...profileView(r.profile, { mine: true, local: r.local }), lookC, uname, edit, lookup];
 }
 function usernameCard() {
   const current = (S.account && S.account.user && S.account.user.username) || "";
@@ -2671,6 +2768,8 @@ async function openProfile(username) {
   sheet.replaceChildren(h("button", { class: "x", title: "Close (Esc)", onclick: close }, "✕"));
   if (p.error) { sheet.append(socError(p)); return; }
   sheet.append(...profileView(p, { mine: p.mine }));
+  if (p.found && !p.mine && !p.banned) sheet.append(h("div", { class: "row", style: "justify-content:flex-end;margin-top:-2px" },
+    h("button", { class: "btn ghost danger", onclick: () => reportPlayer(p.username, !!p.crew) }, "⚑ Report")));
   if (S.owner && p.found && !p.private) {
     const have = new Set((p.badges || []).filter((b) => GIVABLE.includes(b)));
     const chips = h("div", { class: "row", style: "gap:8px" }, GIVABLE.map((b) => {
@@ -2697,35 +2796,456 @@ async function socFriends() {
   if (!list.length) return [head];
   const grid = h("div", { class: "friend-grid" }, list.map((f) => {
     const status = f.now_playing ? "play" : f.online ? "on" : "";
-    const line = f.now_playing ? "Playing " + f.now_playing.name : f.online ? "Online on Orbit" : "Seen " + fmtAgo(Date.parse(f.last_seen) / 1000);
+    const line = f.now_playing ? "Playing " + f.now_playing.name : f.status ? "💬 " + f.status : f.online ? "Online on Orbit" : "Seen " + fmtAgo(Date.parse(f.last_seen) / 1000);
     const join = f.now_playing && f.roblox_id ? h("button", { class: "btn primary", onclick: async (e) => { e.stopPropagation(); const res = await api.social_join(f.roblox_id); if (res && res.error) toast(res.error, "err"); else toast(`Joining ${f.username}...`, "ok"); } }, "Join") : null;
     return h("div", { class: "card friend tilt", onclick: () => openProfile(f.username) }, avatarEl(f.avatar, f.username, 46, { status }),
-      h("div", { style: "flex:1;min-width:0" }, h("div", { class: "nm" }, f.username, h("span", { class: "lvl" }, f.level || 1), (f.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
+      h("div", { style: "flex:1;min-width:0" }, h("div", { class: "nm" }, f.crew ? h("span", { class: "crew-tag" }, f.crew) : null, h("span", { class: f.name_style ? "ns ns-" + f.name_style : "" }, f.username), h("span", { class: "lvl" }, f.level || 1), (f.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
         h("div", { class: "ln" + (f.now_playing ? " play" : "") }, line)), join);
   }));
   return [head, grid];
 }
-let lbPeriod = "week";
+let lbPeriod = "week", lbKind = "players";
 async function socBoard() {
+  if (lbKind === "crews") return crewBoard();
   const r = await api.social_leaderboard(lbPeriod);
   if (r.error) return [socError(r, renderSocialTab)];
-  const seg = segmented([["week", "This week"], ["all", "All time"]], lbPeriod, (v) => { lbPeriod = v; renderSocialTab(); });
+  const seg = h("div", { class: "row", style: "gap:8px" }, lbKindSeg(), segmented([["week", "This week"], ["all", "All time"]], lbPeriod, (v) => { lbPeriod = v; renderSocialTab(); }));
   const head = h("div", { class: "card" }, h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Leaderboard"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, `Most time played through Orbit${lbPeriod === "week" ? " since Monday" : ""}. ${r.players || 0} players ranked.`)), seg));
-  requestAnimationFrame(() => seg._remeasure && seg._remeasure());
+  requestAnimationFrame(() => seg.querySelectorAll(".seg").forEach((x) => x._remeasure && x._remeasure()));
   const rows = r.rows || [];
   if (!rows.length) return [head, h("div", { class: "card" }, emptyState("achievements", "Nobody's on the board yet", "Play a game through Orbit and claim first place."))];
   const pod = (x, n) => x ? h("div", { class: `card pod p${n} tilt`, onclick: () => openProfile(x.username) }, h("span", { class: "medal" }, n), avatarEl(x.avatar, x.username, n === 1 ? 84 : 68),
-    h("div", { class: "nm" }, x.username), h("div", { class: "row", style: "justify-content:center;gap:4px;margin-top:4px" }, h("span", { class: "lvl" }, "LV " + (x.level || 1)), (x.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
+    h("div", { class: "nm" }, x.crew ? h("span", { class: "crew-tag" }, x.crew) : null, h("span", { class: x.name_style ? "ns ns-" + x.name_style : "" }, x.username)), h("div", { class: "row", style: "justify-content:center;gap:4px;margin-top:4px" }, h("span", { class: "lvl" }, "LV " + (x.level || 1)), (x.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
     h("div", { class: "tm" }, fmtHrs(x.seconds))) : h("div");
   const podium = h("div", { class: "podium" }, pod(rows[1], 2), pod(rows[0], 1), pod(rows[2], 3));
   const row = (x) => h("div", { class: "lb-row" + (x.me ? " me" : ""), onclick: () => openProfile(x.username) }, h("div", { class: "rk" }, "#" + x.rank), avatarEl(x.avatar, x.username, 32),
-    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, x.username, (x.badges || []).slice(0, 3).map((b) => badgeEl(b, true))), h("span", { class: "lvl" }, x.level || 1), h("div", { class: "tm" }, fmtHrs(x.seconds)));
+    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, x.crew ? h("span", { class: "crew-tag" }, x.crew) : null, h("span", { class: x.name_style ? "ns ns-" + x.name_style : "" }, x.username), (x.badges || []).slice(0, 3).map((b) => badgeEl(b, true))), h("span", { class: "lvl" }, x.level || 1), h("div", { class: "tm" }, fmtHrs(x.seconds)));
   const rest = rows.slice(3);
   const listCard = h("div", { class: "card", style: "padding:10px" }, rest.length ? rest.map(row) : h("p", { class: "sub", style: "margin:8px" }, "Only the top 3 so far."));
   const out = [head, podium, listCard];
   if (r.me && !rows.some((x) => x.me)) out.push(h("div", { class: "card lb-pin", style: "padding:8px" }, row(r.me)));
   return out;
+}
+
+// ===== v2.17: look (banner, name effect, showcase) =====
+const BANNERS = [["", "None"], ["nebula", "Nebula"], ["aurora", "Aurora"], ["sunset", "Sunset"], ["ocean", "Ocean"], ["void", "Void"], ["crimson", "Crimson"], ["forest", "Forest"],
+                 ["gold", "Gold", 1], ["galaxy", "Galaxy", 1], ["holo", "Holo", 1]];
+const NAME_STYLES = [["", "Normal"], ["gold", "Gold", 1], ["rainbow", "Rainbow", 1], ["aurora", "Aurora", 1], ["fire", "Fire", 1]];
+async function lookCard(set) {
+  const prem = hasPrem() || (S.account && S.account.user && S.account.user.owner);
+  const me = (S.account && S.account.user && S.account.user.username) || "You";
+  const saveLook = async (changes, msg) => { cfg.social = Object.assign(cfg.social || {}, changes); const r = await api.social_save(changes); if (r && r.error) toast(r.error, "err"); else { if (msg) toast(msg, "ok"); } };
+  const banners = h("div", { class: "banner-pick" }, BANNERS.map(([id, label, pr]) => {
+    const locked = pr && !prem;
+    const b = h("button", { class: "bn-swatch" + (id ? " bn-" + id : " none") + ((set.banner || "") === id ? " on" : "") + (locked ? " locked" : ""), title: label + (locked ? " (Premium)" : "") },
+      h("span", {}, label), locked ? h("i", {}, "🔒") : null);
+    b.onclick = async () => { if (locked) return toast("That banner is a Premium perk.", "err"); $$(".bn-swatch", banners).forEach((x) => x.classList.remove("on")); b.classList.add("on"); await saveLook({ banner: id }, "Banner saved."); renderSocialTab(); };
+    return b;
+  }));
+  const styles = h("div", { class: "row", style: "gap:8px" }, NAME_STYLES.map(([id, label, pr]) => {
+    const locked = pr && !prem;
+    const c = h("button", { class: "chip" + ((set.name_style || "") === id ? " on" : "") }, h("span", { class: id ? "ns ns-" + id : "" }, label), locked ? " 🔒" : "");
+    c.onclick = async () => { if (locked) return toast("Name effects are a Premium perk.", "err"); await saveLook({ name_style: id }, id ? `Your name is ${label.toLowerCase()} now.` : "Name effect off."); renderSocialTab(); };
+    return c;
+  }));
+  const unlocked = await api.achievements_unlocked();
+  let picked = (set.showcase || []).filter((id) => (unlocked || []).some((a) => a.id === id));
+  const showRow = h("div", { class: "row", style: "gap:8px" });
+  const drawShow = () => {
+    showRow.replaceChildren(...((unlocked || []).length ? unlocked.map((a) => {
+      const on = picked.includes(a.id);
+      const c = h("button", { class: "chip" + (on ? " on" : "") }, `${a.icon} ${a.title}`);
+      c.onclick = async () => {
+        if (on) picked = picked.filter((x) => x !== a.id); else if (picked.length >= 3) return toast("You can show 3 achievements. Remove one first.", "err"); else picked = [...picked, a.id];
+        drawShow(); await saveLook({ showcase: picked });
+      };
+      return c;
+    }) : [h("span", { class: "muted small" }, "Unlock achievements by playing and they'll show up here.")]));
+  };
+  drawShow();
+  return h("div", { class: "card" }, h("h3", {}, "Look"), h("p", { class: "sub" }, `Make ${me}'s profile yours. Premium unlocks extra banners and name effects.`),
+    h("div", { class: "look-label" }, "Banner"), banners,
+    h("div", { class: "look-label" }, "Name effect"), styles,
+    h("div", { class: "look-label" }, `Showcase (pick up to 3 achievements)`), showRow);
+}
+
+// ===== v2.17: reports =====
+function miniSheet(title, sub, bodyEls, okLabel, onOk, danger = false) {
+  const wrap = h("div", { class: "sheet-wrap" }), sheet = h("div", { class: "sheet mini" });
+  const close = () => { wrap.remove(); document.removeEventListener("keydown", esc); };
+  const esc = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", esc);
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  const ok = h("button", { class: "btn primary" + (danger ? " dangerfill" : "") }, okLabel);
+  ok.onclick = async () => { ok.disabled = true; const keep = await onOk(); ok.disabled = false; if (keep !== true) close(); };
+  sheet.append(h("h3", { style: "margin:0 0 6px" }, title), sub ? h("p", { class: "sub" }, sub) : null, ...bodyEls,
+    h("div", { class: "row", style: "justify-content:flex-end;margin-top:14px" }, okLabel === "Close" ? null : h("button", { class: "btn ghost", onclick: close }, "Cancel"), ok));
+  wrap.append(sheet); document.body.append(wrap);
+  requestAnimationFrame(() => sheet.querySelectorAll(".seg").forEach((x) => x._remeasure && x._remeasure()));
+  return close;
+}
+function reportPlayer(username, hasCrew) {
+  let reason = "name";
+  const opts = [["name", "Username"], ["bio", "Bio"], ["status", "Status"], ...(hasCrew ? [["crew", "Crew"]] : []), ["cheating", "Cheating"], ["other", "Other"]];
+  const note = h("textarea", { class: "input", rows: 3, maxlength: 300, placeholder: "What's wrong? (optional)", style: "width:100%;height:auto;padding:10px 12px;margin-top:12px;resize:none" });
+  miniSheet(`Report ${username}`, "The Orbit owner reviews every report. False reports can get your account banned.",
+    [segmented(opts, reason, (v) => { reason = v; }), note], "Send report", async () => {
+      const r = await api.social_report(username, reason, note.value);
+      if (r.error) { toast(r.error, "err"); return true; }
+      toast(r.already ? "You already reported that. The owner will look at it." : "Thanks, your report was sent.", "ok");
+    });
+}
+
+// ===== v2.17: ban screen =====
+function showBanned(ban) {
+  let g = $("#banGate");
+  if (!g) { g = h("div", { id: "banGate" }); document.body.append(g); }
+  const until = ban.forever || !ban.until ? "This ban doesn't end." : `Ends ${new Date(ban.until * 1000).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`;
+  const appeal = h("textarea", { class: "input", rows: 3, maxlength: 1000, placeholder: "Think this is a mistake? Tell the owner why.", style: "width:100%;height:auto;padding:10px 12px;resize:none" });
+  const send = h("button", { class: "btn", onclick: async () => {
+    if (appeal.value.trim().length < 3) return toast("Write a little more first.", "err");
+    send.disabled = true; const r = await api.send_feedback("appeal", appeal.value, false); send.disabled = false;
+    if (r.error) return toast(r.error, "err"); appeal.value = ""; toast("Your appeal was sent to the owner.", "ok");
+  } }, "Send appeal");
+  const out = h("button", { class: "btn ghost", onclick: async () => { const r = await api.account_logout(); S.account = r.account; g.remove(); renderAccountChip(); showGate("login"); } }, "Log out");
+  g.replaceChildren(h("div", { class: "ban-card" }, h("div", { class: "ban-icon" }, "⛔"), h("h2", {}, "Your Orbit account is banned"),
+    ban.reason ? h("p", { class: "ban-reason" }, "Reason: " + ban.reason) : null, h("p", { class: "muted" }, until),
+    appeal, h("div", { class: "row", style: "justify-content:space-between;margin-top:12px" }, out, send)));
+}
+
+// ===== v2.17: feedback =====
+function renderFeedbackCard() {
+  const box = $("#feedbackCard"); if (!box || box.dataset.ready) return;
+  box.dataset.ready = "1";
+  let kind = "bug";
+  const msg = h("textarea", { class: "input", rows: 4, maxlength: 2000, placeholder: "What happened? What did you expect? Or tell us your idea.", style: "width:100%;height:auto;padding:10px 12px;resize:vertical" });
+  const attach = h("input", { type: "checkbox", checked: true });
+  const send = h("button", { class: "btn primary" }, "Send");
+  send.onclick = async () => {
+    if (msg.value.trim().length < 3) return toast("Write a little more so the owner knows what happened.", "err");
+    send.disabled = true; send.textContent = "Sending...";
+    const r = await api.send_feedback(kind, msg.value, attach.checked);
+    send.disabled = false; send.textContent = "Send";
+    if (r.error) return toast(r.error, "err");
+    msg.value = ""; sfx?.("ready"); toast("Thanks! The owner got your feedback.", "ok");
+  };
+  box.append(h("h3", {}, "Send feedback"), h("p", { class: "sub" }, "Found a bug or have an idea? It goes straight to the Orbit owner."),
+    h("div", { style: "margin-bottom:10px" }, segmented([["bug", "🐞 Bug"], ["idea", "💡 Idea"], ["other", "💬 Other"]], kind, (v) => { kind = v; attach.checked = v === "bug"; })),
+    msg, h("div", { class: "row", style: "margin-top:10px" }, h("label", { class: "chk" }, attach, h("span", {}, "Attach my launcher log (your Windows name is removed)")), h("span", { class: "spacer" }), send));
+  requestAnimationFrame(() => box.querySelectorAll(".seg").forEach((x) => x._remeasure && x._remeasure()));
+}
+
+// ===== v2.17: crews =====
+async function socCrew() {
+  const r = await api.crew("crew_info");
+  if (r.error) return [socError(r, renderSocialTab)];
+  if (!r.found) {
+    const name = h("input", { class: "input", placeholder: "Crew name (like Crown Kings)", maxlength: 24, style: "flex:2" });
+    const tag = h("input", { class: "input", placeholder: "TAG", maxlength: 5, style: "flex:1;text-transform:uppercase" });
+    const make = h("button", { class: "btn primary", onclick: async () => {
+      const x = await api.crew("crew_create", { p_name: name.value, p_tag: tag.value }); if (x.error) return toast(x.error, "err");
+      sfx?.("ready"); toast(`[${x.tag}] is ready! Share your join code with friends.`, "ok"); renderSocialTab();
+    } }, "Create crew");
+    const code = h("input", { class: "input", placeholder: "Join code", maxlength: 6, style: "flex:1;text-transform:uppercase;letter-spacing:.2em;font-weight:700" });
+    const join = h("button", { class: "btn primary", onclick: async () => {
+      const x = await api.crew("crew_join", { p_code: code.value }); if (x.error) return toast(x.error, "err");
+      sfx?.("ready"); toast(`Welcome to [${x.tag}] ${x.name}!`, "ok"); renderSocialTab();
+    } }, "Join");
+    return [h("div", { class: "card crew-empty" }, emptyState("social", "You're not in a crew yet", "Start one with your friends, or join one with a code.")),
+      h("div", { class: "grid2" },
+        h("div", { class: "card" }, h("h3", {}, "Start a crew"), h("p", { class: "sub" }, "Pick a name and a 2 to 5 letter tag. Your tag shows next to everyone's name."), h("div", { class: "row" }, name, tag), h("div", { class: "row", style: "margin-top:10px;justify-content:flex-end" }, make)),
+        h("div", { class: "card" }, h("h3", {}, "Join a crew"), h("p", { class: "sub" }, "Ask the crew leader for the 6 letter join code."), h("div", { class: "row" }, code, join)))];
+  }
+  return crewView(r, true);
+}
+function crewView(c, inTab) {
+  const leaderTools = c.is_leader ? h("div", { class: "row", style: "margin-top:14px;gap:8px" },
+    h("div", { class: "crew-code" }, h("small", {}, "JOIN CODE"), h("b", {}, c.code || "------")),
+    h("button", { class: "btn", onclick: async () => { await api.copy_text(c.code); toast("Join code copied.", "ok"); } }, "Copy code"),
+    h("button", { class: "btn", onclick: async () => { const x = await api.crew("crew_new_code"); if (x.error) return toast(x.error, "err"); toast("New code made. The old one stops working.", "ok"); renderSocialTab(); } }, "New code"),
+    h("span", { class: "spacer" }),
+    h("button", { class: "btn danger", onclick: async () => { if (!await modal({ title: `Disband [${c.tag}]?`, text: "The crew is deleted for everyone. This can't be undone.", ok: "Disband", danger: true })) return; const x = await api.crew("crew_disband"); if (x.error) return toast(x.error, "err"); toast("Crew disbanded.", "ok"); renderSocialTab(); } }, "Disband")) : null;
+  const leave = c.mine && inTab ? h("button", { class: "btn ghost danger", onclick: async () => {
+    if (!await modal({ title: `Leave [${c.tag}]?`, text: c.is_leader ? "Someone else in the crew becomes the leader. If you're the last one, the crew is deleted." : "You can join again later with a code.", ok: "Leave", danger: true })) return;
+    const x = await api.crew("crew_leave"); if (x.error) return toast(x.error, "err"); toast(x.disbanded ? "You left and the crew was deleted." : "You left the crew.", "ok"); renderSocialTab();
+  } }, "Leave crew") : null;
+  const head = h("div", { class: "card crew-hero" }, h("div", { class: "row", style: "gap:16px;align-items:center" },
+    h("div", { class: "crew-badge" }, c.tag),
+    h("div", { style: "flex:1;min-width:0" }, h("h2", {}, c.name), h("div", { class: "muted" }, `Led by ${c.leader || "nobody"} · ${c.member_count} member${c.member_count === 1 ? "" : "s"} · started ${new Date(c.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" })}`),
+      c.trophies ? h("div", { class: "trophy-row", title: (c.wins || []).map((w) => "Week of " + w.week).join("\n") }, "🏆".repeat(Math.min(c.trophies, 5)), h("b", {}, ` ${c.trophies} crew war win${c.trophies === 1 ? "" : "s"}`)) : null),
+    h("button", { class: "btn primary", onclick: () => openCrewWrapped(inTab ? null : c.tag) }, "✨ Crew Wrapped"), leave), leaderTools);
+  const tiles = h("div", { class: "stat-tiles" },
+    h("div", { class: "stat-tile" }, h("small", {}, "Crew time"), h("b", {}, fmtHrs(c.total_seconds)), h("span", {}, "all members")),
+    h("div", { class: "stat-tile" }, h("small", {}, "This week"), h("b", {}, fmtHrs(c.week_seconds)), h("span", {}, "since Monday")),
+    h("div", { class: "stat-tile" }, h("small", {}, "Members"), h("b", {}, String(c.member_count)), h("span", {}, "of 50")),
+    h("div", { class: "stat-tile" }, h("small", {}, "Crew rank"), h("b", {}, "#" + (c.rank || "—")), h("span", {}, "all crews")));
+  const list = h("div", { class: "card", style: "padding:10px" }, (c.members || []).map((m) => h("div", { class: "lb-row crew-row", onclick: () => openProfile(m.username) },
+    avatarEl(m.avatar, m.username, 32, { status: m.online ? "on" : "" }),
+    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, m.leader ? h("span", { title: "Leader" }, "👑") : null, h("span", { class: m.name_style ? "ns ns-" + m.name_style : "" }, m.username), (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)),
+      m.status ? h("span", { class: "muted small", style: "font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, "· " + m.status) : null),
+    h("span", { class: "muted small" }, fmtHrs(m.week_seconds) + " this week"), h("span", { class: "lvl" }, m.level || 1), h("div", { class: "tm" }, fmtHrs(m.seconds)),
+    c.is_leader && !m.leader && inTab ? h("button", { class: "kick", title: "Kick", onclick: async (e) => { e.stopPropagation(); if (!await modal({ title: `Kick ${m.username}?`, ok: "Kick", danger: true })) return; const x = await api.crew("crew_kick", { p_username: m.username }); if (x.error) return toast(x.error, "err"); renderSocialTab(); } }, "✕") : h("span"))));
+  const chat = c.mine && inTab ? crewChat(c) : null;
+  return [head, tiles, chat, list].filter(Boolean);
+}
+async function openCrew(tag) {
+  const wrap = h("div", { class: "sheet-wrap" }), sheet = h("div", { class: "sheet" });
+  const close = () => { wrap.remove(); document.removeEventListener("keydown", esc); };
+  const esc = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", esc);
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  sheet.append(h("button", { class: "x", onclick: close }, "✕"), h("div", { class: "skel", style: "height:140px" }));
+  wrap.append(sheet); document.body.append(wrap);
+  const c = await api.crew("crew_info", { p_tag: tag });
+  if (!wrap.isConnected) return;
+  sheet.replaceChildren(h("button", { class: "x", onclick: close }, "✕"));
+  if (c.error || !c.found) { sheet.append(h("div", { class: "card" }, emptyState("social", "That crew doesn't exist anymore", ""))); return; }
+  sheet.append(...crewView(c, false));
+  if (S.owner) sheet.append(h("div", { class: "row", style: "justify-content:flex-end" }, h("button", { class: "btn danger", onclick: async () => {
+    if (!await modal({ title: `Delete [${c.tag}] ${c.name}?`, text: "Owner action. The crew is deleted for everyone.", ok: "Delete crew", danger: true })) return;
+    const x = await api.owner_rpc("owner_crew_delete", { p_tag: c.tag }); if (x.error) return toast(x.error, "err"); toast("Crew deleted.", "ok"); close();
+  } }, "Owner: delete crew")));
+}
+function lbKindSeg() {
+  const s2 = segmented([["players", "Players"], ["crews", "Crews"]], lbKind, (v) => { lbKind = v; renderSocialTab(); });
+  return s2;
+}
+async function crewBoard() {
+  const r = await api.crew("crew_board", { p_period: lbPeriod });
+  if (r.error) return [socError(r, renderSocialTab)];
+  const seg = h("div", { class: "row", style: "gap:8px" }, lbKindSeg(), segmented([["week", "This week"], ["all", "All time"]], lbPeriod, (v) => { lbPeriod = v; renderSocialTab(); }));
+  requestAnimationFrame(() => seg.querySelectorAll(".seg").forEach((x) => x._remeasure && x._remeasure()));
+  const head = h("div", { class: "card" }, h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Crew leaderboard"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, `All members' time added up${lbPeriod === "week" ? " since Monday" : ""}. ${r.crews || 0} crews.`)), seg));
+  const rows = r.rows || [];
+  const war = warBanner(r);
+  if (!rows.length) return [head, war, h("div", { class: "card" }, emptyState("social", "No crews on the board yet", "Start one on the Crew tab."))];
+  return [head, war, h("div", { class: "card", style: "padding:10px" }, rows.map((x) => h("div", { class: "lb-row crew-lb" + (x.mine ? " me" : ""), onclick: () => openCrew(x.tag) },
+    h("div", { class: "rk" }, x.rank <= 3 ? ["🥇", "🥈", "🥉"][x.rank - 1] : "#" + x.rank), h("span", { class: "crew-badge sm" }, x.tag),
+    h("div", { style: "font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, x.name, x.trophies ? h("span", { class: "trophies", title: `${x.trophies} crew war win${x.trophies === 1 ? "" : "s"}` }, ` 🏆${x.trophies > 1 ? "×" + x.trophies : ""}`) : null), h("span", { class: "muted small" }, `${x.members} member${x.members === 1 ? "" : "s"}`), h("div", { class: "tm" }, fmtHrs(x.seconds)))))];
+}
+
+// ===== v2.18: crew wars, crew chat, crew Wrapped =====
+function warBanner(r) {
+  const ends = r.war_ends ? Date.parse(r.war_ends) : 0;
+  const left = Math.max(0, ends - Date.now()), d = Math.floor(left / 86400000), hh = Math.floor(left % 86400000 / 3600000), mm = Math.floor(left % 3600000 / 60000);
+  const lw = r.last_winner;
+  return h("div", { class: "card war-card" }, h("div", { class: "row", style: "gap:14px" }, h("div", { class: "war-ico" }, "⚔️"),
+    h("div", { style: "flex:1" }, h("b", {}, "Weekly crew war"), h("div", { class: "muted small" }, "The crew with the most hours this week (Monday to Sunday) wins a 🏆 for its crew page.")),
+    h("div", { class: "war-clock" }, h("small", {}, "ENDS IN"), h("b", {}, d ? `${d}d ${hh}h` : `${hh}h ${mm}m`))),
+    lw && lw.tag ? h("div", { class: "war-last" }, "Last week's winner: ", h("span", { class: "crew-tag" }, lw.tag), h("b", {}, " " + lw.name), h("span", { class: "muted" }, ` · ${fmtHrs(lw.seconds)}`)) : null);
+}
+let chatTimer = null;
+function crewChat(c) {
+  clearInterval(chatTimer);
+  let sig = null, lastTop = 0;
+  const box = h("div", { class: "chat-box" }, h("div", { class: "muted small", style: "text-align:center;padding:30px" }, "Loading chat..."));
+  const inp = h("input", { class: "input", maxlength: 300, placeholder: `Message [${c.tag}]`, style: "flex:1" });
+  const send = h("button", { class: "btn primary" }, "Send");
+  const card = h("div", { class: "card chat-card" }, h("div", { class: "row" }, h("h3", { style: "margin:0" }, "Crew chat"), h("span", { class: "spacer" }), h("span", { class: "muted small" }, "Only your crew can see this. Be nice, bad words are blocked.")),
+    box, h("div", { class: "row", style: "margin-top:10px" }, inp, send));
+  const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const draw = (r) => {
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    const list = r.messages || [];
+    if (!list.length) { box.replaceChildren(h("div", { class: "muted small", style: "text-align:center;padding:30px" }, "No messages yet. Say hi! 👋")); return; }
+    box.replaceChildren(...list.map((m, i) => {
+      const same = i > 0 && list[i - 1].username === m.username && Date.parse(m.at) - Date.parse(list[i - 1].at) < 300000;
+      const acts = h("span", { class: "msg-acts" },
+        m.mine || r.is_leader ? h("button", { title: "Delete", onclick: async () => { const x = await api.crew("crew_chat_delete", { p_id: m.id }); if (x.error) return toast(x.error, "err"); poll(true); } }, "🗑") : null,
+        !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. The Orbit owner will see it.`, ok: "Report" })) return; const x = await api.crew("crew_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "Already reported." : "Reported. Thanks!", "ok"); } }, "⚑") : null);
+      return h("div", { class: "msg" + (m.mine ? " mine" : "") + (same ? " cont" : "") },
+        same ? h("div", { class: "msg-av ghost" }) : h("div", { class: "msg-av" }, (m.username || "?")[0].toUpperCase()),
+        h("div", { class: "msg-main" }, same ? null : h("div", { class: "msg-head" }, m.leader ? "👑 " : "", h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username), h("span", {}, time(m.at))),
+          h("div", { class: "msg-body" }, m.body)), acts);
+    }));
+    if (atBottom || list.length && list[list.length - 1].id !== lastTop && list[list.length - 1].mine || lastTop === 0) box.scrollTop = box.scrollHeight;
+    lastTop = list.length ? list[list.length - 1].id : 0;
+  };
+  const poll = async (force) => {
+    if (!card.isConnected) { clearInterval(chatTimer); return; }
+    if (document.hidden && !force) return;
+    const r = await api.crew("crew_chat_list", { p_sig: force ? null : sig });
+    if (r.error || !r.found) return;
+    if (r.same) return;
+    sig = r.sig; draw(r);
+  };
+  const doSend = async () => {
+    const v = inp.value.trim(); if (!v) return;
+    send.disabled = true; const r = await api.crew("crew_chat_send", { p_body: v }); send.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    inp.value = ""; await poll(true); inp.focus();
+  };
+  send.onclick = doSend; inp.onkeydown = (e) => { if (e.key === "Enter") doSend(); };
+  setTimeout(() => poll(true), 50);
+  chatTimer = setInterval(poll, 4000);
+  return card;
+}
+async function openCrewWrapped(tag) {
+  let which = "this";
+  const canvas = h("canvas", { width: 1080, height: 1350, class: "wrap-canvas" });
+  const status = h("div", { class: "muted small", style: "text-align:center;margin-top:8px" });
+  const seg = segmented([["this", "This month"], ["last", "Last month"]], which, (v) => { which = v; load(); });
+  const saveBtn = h("button", { class: "btn primary" }, "Save image");
+  const close = miniSheet("✨ Crew Wrapped", "Your crew's month on Orbit. Save it and share it with your crew.", [h("div", { style: "margin-bottom:12px" }, seg), canvas, status, h("div", { class: "row", style: "justify-content:center;margin-top:10px" }, saveBtn)], "Close", () => {});
+  let data = null;
+  saveBtn.onclick = async () => {
+    if (!data) return;
+    const r = await api.save_card_png(canvas.toDataURL("image/png"), `Crew Wrapped [${data.tag}] ${data.month.slice(0, 7)}`);
+    r.error ? toast(r.error, "err") : toast("Saved to Pictures\\Orbit.", "ok");
+  };
+  async function load() {
+    status.textContent = "Adding up your crew's month...";
+    data = await api.crew("crew_wrapped", { p_which: which, p_tag: tag || null });
+    if (data.error || !data.found) { status.textContent = data.error || "Couldn't find your crew."; return; }
+    status.textContent = data.total_seconds ? "" : "Nobody in the crew has played through Orbit this month yet.";
+    drawWrapped(canvas, data);
+  }
+  load();
+}
+function drawWrapped(cv, d) {
+  const x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const cs = getComputedStyle(document.documentElement), a1 = cs.getPropertyValue("--accent").trim() || "#9d6bff", a2 = cs.getPropertyValue("--accent2").trim() || "#d946ef";
+  const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#0b0720"); g.addColorStop(.55, "#1a0f3d"); g.addColorStop(1, "#05030c");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const glow = (cx, cy, r, c) => { const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r); rg.addColorStop(0, c); rg.addColorStop(1, "transparent"); x.fillStyle = rg; x.fillRect(0, 0, W, H); };
+  glow(900, 160, 520, a1 + "88"); glow(120, 1200, 560, a2 + "66"); glow(540, 700, 380, "#6366f155");
+  let seed = d.tag.split("").reduce((s, ch) => s * 31 + ch.charCodeAt(0), 7);
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 140; i++) { x.fillStyle = `rgba(255,255,255,${.15 + rnd() * .6})`; x.beginPath(); x.arc(rnd() * W, rnd() * H, rnd() * 2.2 + .3, 0, 7); x.fill(); }
+  const font = (w, s) => `${w} ${s}px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif`;
+  const txt = (t, px, py, f, c = "#fff", al = "left") => { x.font = f; x.fillStyle = c; x.textAlign = al; x.fillText(t, px, py); };
+  const month = new Date(d.month + "T12:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  txt("ORBIT  ·  CREW WRAPPED", 80, 120, font(800, 30), "rgba(255,255,255,.75)");
+  txt(month.toUpperCase(), W - 80, 120, font(800, 30), a1, "right");
+  // tag badge
+  x.font = font(900, 72); const tw = x.measureText(d.tag).width + 70;
+  const bg = x.createLinearGradient(80, 170, 80 + tw, 280); bg.addColorStop(0, "#0ea5e9"); bg.addColorStop(.55, "#6366f1"); bg.addColorStop(1, a2);
+  x.fillStyle = bg; x.beginPath(); x.roundRect(80, 170, tw, 116, 30); x.fill();
+  txt(d.tag, 80 + tw / 2, 254, font(900, 72), "#fff", "center");
+  txt(d.name, 80, 370, font(800, 64));
+  txt(`${d.active} of ${d.members} member${d.members === 1 ? "" : "s"} played this month`, 80, 420, font(500, 30), "rgba(255,255,255,.65)");
+  // big number
+  const hrs = d.total_seconds / 3600;
+  const big = hrs >= 100 ? Math.round(hrs).toLocaleString() : hrs >= 1 ? (Math.round(hrs * 10) / 10).toString() : Math.round(d.total_seconds / 60) + "m";
+  txt("HOURS PLAYED TOGETHER", 80, 530, font(800, 28), "rgba(255,255,255,.6)");
+  const ng = x.createLinearGradient(80, 560, 700, 720); ng.addColorStop(0, "#fff"); ng.addColorStop(1, a1);
+  txt(hrs >= 1 ? big : big, 72, 690, font(900, 180), ng);
+  if (d.rank) txt(`#${d.rank} of ${d.crews} crews`, W - 80, 690, font(800, 44), "#fde68a", "right");
+  if (d.war_wins) txt(`🏆 ${d.war_wins} crew war win${d.war_wins === 1 ? "" : "s"}`, W - 80, 610, font(800, 36), "#fde68a", "right");
+  // panels
+  const panel = (py, ph) => { x.fillStyle = "rgba(255,255,255,.06)"; x.strokeStyle = "rgba(255,255,255,.12)"; x.lineWidth = 2; x.beginPath(); x.roundRect(60, py, W - 120, ph, 34); x.fill(); x.stroke(); };
+  panel(760, 300);
+  txt("CREW MVPs", 100, 815, font(800, 26), "rgba(255,255,255,.6)");
+  const medals = ["#fbbf24", "#e2e8f0", "#f59e0b"];
+  (d.top || []).forEach((m, i) => {
+    const py = 870 + i * 64;
+    x.fillStyle = medals[i]; x.beginPath(); x.arc(122, py - 12, 24, 0, 7); x.fill();
+    txt(String(i + 1), 122, py - 2, font(900, 26), "#1a1205", "center");
+    txt(m.username, 168, py, font(i ? 700 : 800, i ? 36 : 42), i ? "#fff" : "#fde68a");
+    txt(fmtHrs(m.seconds), W - 100, py, font(800, 36), "#fff", "right");
+  });
+  if (!(d.top || []).length) txt("Play through Orbit to show up here.", 100, 900, font(500, 32), "rgba(255,255,255,.6)");
+  panel(1085, 180);
+  txt("CREW'S FAVORITE GAME", 100, 1140, font(800, 26), "rgba(255,255,255,.6)");
+  const fav = (d.games || [])[0];
+  if (fav) {
+    let nm = fav.name; x.font = font(800, 46); while (x.measureText(nm).width > 640 && nm.length > 4) nm = nm.slice(0, -2);
+    txt(nm + (nm !== fav.name ? "…" : ""), 100, 1205, font(800, 46));
+    txt(`${fmtHrs(fav.seconds)} · ${fav.players} player${fav.players === 1 ? "" : "s"}`, W - 100, 1205, font(700, 34), a1, "right");
+  } else txt("—", 100, 1205, font(800, 46));
+  txt("orbit launcher", W / 2, 1315, font(700, 24), "rgba(255,255,255,.35)", "center");
+}
+
+// ===== v2.17: owner cards =====
+async function renderOwnerReports() {
+  const box = $("#ownerReports"); if (!box) return;
+  box.innerHTML = "";
+  let status = renderOwnerReports._st || "open";
+  const seg = segmented([["open", "Open"], ["done", "Handled"], ["dismissed", "Dismissed"]], status, (v) => { renderOwnerReports._st = v; renderOwnerReports(); });
+  box.append(h("div", { class: "row", style: "align-items:flex-start" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Reports"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "What players reported. Handling one closes every open report about that player.")), seg));
+  requestAnimationFrame(() => seg._remeasure());
+  const body = h("div", { style: "margin-top:10px" }, h("div", { class: "skel", style: "height:60px" })); box.append(body);
+  const r = await api.owner_rpc("owner_reports", { p_status: status });
+  if (r.error) return body.replaceChildren(h("p", { class: "muted small" }, r.error));
+  const list = r.data || [];
+  if (!list.length) return body.replaceChildren(h("p", { class: "muted small" }, status === "open" ? "No open reports. 🎉" : "Nothing here."));
+  const reasonText = { name: "Username", bio: "Bio", crew: "Crew", cheating: "Cheating", chat: "Crew chat", status: "Status", other: "Other" };
+  const act = (fn, args, msg) => async () => { const x = await api.owner_rpc(fn, args); if (x.error) return toast(x.error, "err"); if (msg) toast(msg, "ok"); renderOwnerReports(); };
+  body.replaceChildren(...list.map((x) => h("div", { class: "rep" },
+    h("div", { class: "row", style: "gap:8px" }, h("b", { class: "rep-name", onclick: () => openProfile(x.target) }, x.target), x.crew ? h("span", { class: "crew-tag" }, x.crew) : null,
+      h("span", { class: "rule-tag" }, reasonText[x.reason] || x.reason), x.reports_on_target > 1 && status === "open" ? h("span", { class: "rule-tag reserved" }, `${x.reports_on_target} reports`) : null,
+      x.banned ? h("span", { class: "rule-tag" }, "BANNED") : null, h("span", { class: "spacer" }), h("span", { class: "muted small" }, `by ${x.reporter || "someone"} · ${fmtAgo(Date.parse(x.at) / 1000)}`)),
+    x.note ? h("div", { class: "rep-note" }, "“" + x.note + "”") : null,
+    x.reason === "bio" && x.bio ? h("div", { class: "rep-note muted" }, "Bio: " + x.bio) : null,
+    x.reported_name && x.reported_name !== x.target ? h("div", { class: "muted small" }, `Reported as ${x.reported_name}, renamed since.`) : null,
+    status === "open" ? h("div", { class: "row", style: "gap:6px;margin-top:8px" },
+      x.reason === "name" ? h("button", { class: "btn", onclick: async () => { if (!await modal({ title: `Rename ${x.target}?`, text: "They get a random Player name and log in with it from now on.", ok: "Rename", danger: true })) return; const y = await api.owner_force_rename(x.target); if (y.error) return toast(y.error, "err"); await api.owner_rpc("owner_report_set", { p_id: x.id, p_status: "done" }); toast(`Renamed to ${y.data.username}.`, "ok"); renderOwnerReports(); } }, "Rename") : null,
+      x.reason === "bio" && x.bio ? h("button", { class: "btn", onclick: async () => { await api.owner_rpc("owner_clear_bio", { p_username: x.target }); act("owner_report_set", { p_id: x.id, p_status: "done" }, "Bio cleared.")(); } }, "Clear bio") : null,
+      x.crew && x.reason === "crew" ? h("button", { class: "btn", onclick: () => openCrew(x.crew) }, "View crew") : null,
+      h("button", { class: "btn danger", onclick: () => banDialog(x.target, async () => { await api.owner_rpc("owner_report_set", { p_id: x.id, p_status: "done" }); renderOwnerReports(); }) }, "Ban"),
+      h("span", { class: "spacer" }),
+      h("button", { class: "btn ghost", onclick: act("owner_report_set", { p_id: x.id, p_status: "dismissed" }, "Dismissed.") }, "Dismiss"),
+      h("button", { class: "btn primary", onclick: act("owner_report_set", { p_id: x.id, p_status: "done" }, "Marked handled.") }, "Handled")) : null)));
+}
+function banDialog(username, after) {
+  let days = "7";
+  const reason = h("input", { class: "input", placeholder: "Reason (they'll see this)", maxlength: 200, style: "width:100%;margin-top:12px" });
+  miniSheet(`Ban ${username}`, "They can't use Orbit while banned. They can still send you an appeal.",
+    [segmented([["1", "1 day"], ["7", "7 days"], ["30", "30 days"], ["0", "Forever"]], days, (v) => { days = v; }), reason], "Ban", async () => {
+      const r = await api.owner_rpc("owner_ban", { p_username: username, p_days: +days, p_reason: reason.value });
+      if (r.error) { toast(r.error, "err"); return true; }
+      toast(`${username} is banned${days === "0" ? " forever" : ` for ${days} day${days === "1" ? "" : "s"}`}.`, "ok"); renderOwnerBans(); after && after();
+    }, true);
+}
+async function renderOwnerBans() {
+  const box = $("#ownerBans"); if (!box) return;
+  box.innerHTML = "";
+  const who = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, spellcheck: "false", style: "flex:1" });
+  box.append(h("h3", {}, "Bans"), h("p", { class: "sub" }, "Banned players see a ban screen instead of Orbit, drop off the leaderboard and Friends, and their profile is hidden. You can ban from a report too."),
+    h("div", { class: "row" }, who, h("button", { class: "btn danger", onclick: () => who.value.trim() && banDialog(who.value.trim()) }, "Ban player")));
+  const body = h("div", { style: "margin-top:10px" }); box.append(body);
+  const r = await api.owner_rpc("owner_bans");
+  if (r.error) return body.append(h("p", { class: "muted small" }, r.error));
+  const list = r.data || [];
+  if (!list.length) return body.append(h("p", { class: "muted small" }, "Nobody is banned."));
+  body.append(...list.map((b) => h("div", { class: "rules-row" }, h("b", { class: "rep-name", onclick: () => openProfile(b.username) }, b.username),
+    h("span", { class: "muted small" }, b.forever ? "forever" : "until " + new Date(b.until).toLocaleDateString(undefined, { month: "short", day: "numeric" })),
+    b.reason ? h("span", { class: "muted small", style: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px" }, "· " + b.reason) : null, h("span", { class: "spacer" }),
+    h("button", { class: "btn", onclick: async () => { const x = await api.owner_rpc("owner_unban", { p_username: b.username }); if (x.error) return toast(x.error, "err"); toast(`${b.username} is unbanned.`, "ok"); renderOwnerBans(); } }, "Unban"))));
+}
+async function renderOwnerFeedback() {
+  const box = $("#ownerFeedback"); if (!box) return;
+  box.innerHTML = "";
+  const status = renderOwnerFeedback._st || "new";
+  const seg = segmented([["new", "New"], ["seen", "Seen"], ["done", "Done"], ["all", "All"]], status, (v) => { renderOwnerFeedback._st = v; renderOwnerFeedback(); });
+  box.append(h("div", { class: "row", style: "align-items:flex-start" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Feedback"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Bug reports, ideas and ban appeals from players. Bug reports can include their launcher log.")), seg));
+  requestAnimationFrame(() => seg._remeasure());
+  const body = h("div", { style: "margin-top:10px" }); box.append(body);
+  const r = await api.owner_rpc("owner_feedback", { p_status: status });
+  if (r.error) return body.append(h("p", { class: "muted small" }, r.error));
+  const list = r.data || [];
+  if (!list.length) return body.append(h("p", { class: "muted small" }, status === "new" ? "No new feedback." : "Nothing here."));
+  const kinds = { bug: "🐞 Bug", idea: "💡 Idea", other: "💬 Other", appeal: "⚖️ Appeal" };
+  const set = (id, st) => async () => { const x = await api.owner_rpc("owner_feedback_set", { p_id: id, p_status: st }); if (x.error) return toast(x.error, "err"); renderOwnerFeedback(); };
+  body.append(...list.map((f) => h("div", { class: "rep" },
+    h("div", { class: "row", style: "gap:8px" }, h("span", { class: "fb-kind " + f.kind }, kinds[f.kind] || f.kind), h("b", { class: "rep-name", onclick: () => openProfile(f.username) }, f.username || "someone"),
+      h("span", { class: "muted small" }, "v" + (f.version || "?")), h("span", { class: "spacer" }), h("span", { class: "muted small" }, fmtAgo(Date.parse(f.at) / 1000))),
+    h("div", { class: "rep-note", style: "white-space:pre-wrap" }, f.message),
+    h("div", { class: "row", style: "gap:6px;margin-top:8px" },
+      f.has_log ? h("button", { class: "btn", onclick: async () => {
+        const x = await api.owner_rpc("owner_feedback_log", { p_id: f.id }); if (x.error) return toast(x.error, "err");
+        const pre = h("pre", { class: "log-view" }, x.data || "(empty)");
+        miniSheet(`${f.username}'s launcher log`, `Orbit v${f.version || "?"}`, [pre, h("button", { class: "btn", style: "margin-top:8px", onclick: async () => { await api.copy_text(x.data || ""); toast("Log copied.", "ok"); } }, "Copy log")], "Close", () => {});
+        requestAnimationFrame(() => { pre.scrollTop = pre.scrollHeight; });
+      } }, "View log") : null,
+      f.kind === "appeal" ? h("button", { class: "btn", onclick: async () => { const x = await api.owner_rpc("owner_unban", { p_username: f.username }); if (x.error) return toast(x.error, "err"); toast(`${f.username} is unbanned.`, "ok"); set(f.id, "done")(); renderOwnerBans(); } }, "Unban") : null,
+      h("span", { class: "spacer" }),
+      f.status !== "seen" ? h("button", { class: "btn ghost", onclick: set(f.id, "seen") }, "Mark seen") : null,
+      f.status !== "done" ? h("button", { class: "btn primary", onclick: set(f.id, "done") }, "Done") : null))));
 }
 
 // ===== v2.16: Roblox account switcher =====
@@ -4073,7 +4593,7 @@ async function renderOwner() {
   iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
-  renderOwnerLog(); renderOwnerNames(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
+  renderOwnerLog(); renderOwnerNames(); renderOwnerReports(); renderOwnerBans(); renderOwnerFeedback(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
   const safe = $("#ownerSafe"); safe.innerHTML = "";
   safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
@@ -4142,8 +4662,10 @@ async function checkAccount() {
   const a = S.account || {};
   if (!a.enabled) return;
   if (!a.logged_in) return showGate("login");
+  if (a.ban) showBanned(a.ban);
   const r = await api.account(true); S.account = r; renderAccountChip();
   if (!r.logged_in) showGate("login", r.expired ? "Your login expired. Log in again." : "");
+  if (r.ban) showBanned(r.ban); else $("#banGate")?.remove();
 }
 async function renderOwnerNames() {
   const box = $("#ownerNames"); if (!box) return;
@@ -4637,6 +5159,12 @@ function wireUpdates() {
   $("#checkUpd").onclick = () => checkUpdates(true);
   const row = $("#autoUpdRow"); row.innerHTML = "";
   row.append(toggleRow("Update automatically", "Download new versions in the background and install them when Orbit restarts.", cfg.updates.auto, (v) => { cfg.updates.auto = v; save(); }));
+  const u = (S.account && S.account.user) || {};
+  if (u.tester || u.owner) {
+    const beta = toggleRow("Get beta updates", "Try new versions before everyone else. Betas can have bugs, so send feedback from the Health page if something breaks. Only Beta Testers see this.",
+      !!cfg.beta_updates, async (v) => { cfg.beta_updates = v; await api.set_beta(v); toast(v ? "Beta updates on. Checking now..." : "Beta updates off. You'll move back to the normal version when the next one comes out.", "ok"); if (v) checkUpdates(true); });
+    beta.id = "betaCard"; row.append(beta);
+  }
 }
 
 

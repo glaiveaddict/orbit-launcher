@@ -312,5 +312,7 @@ jobs:
           print(body or f"Orbit Launcher v{v}")
           print("\n---\n**New here?** Download **OrbitSetup.exe** below and run it. Already installed? Orbit updates itself.")
           PY
+          pre=""; title="Orbit Launcher v$v"
+          case "$v" in *-*) pre="--prerelease"; title="Orbit Launcher v$v (beta)";; esac
           gh release create "v$v" dist/OrbitSetup.exe dist/OrbitLauncher.exe dist/OrbitLauncher.exe.sha256 \
-            --title "Orbit Launcher v$v" --notes-file notes.md
+            --title "$title" --notes-file notes.md $pre
