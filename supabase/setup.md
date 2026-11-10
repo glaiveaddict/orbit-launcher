@@ -10,3 +10,8 @@
 ```sql
 update public.profiles set is_owner = true where username = 'stabzane';
 ```
+
+## Updating to v2.16 (profiles, friends, leaderboard)
+Open SQL Editor > New query, paste everything in `setup.sql` again and press Run. It only adds what's missing, so running it again is safe.
+
+To give someone an extra badge (Beta Tester, OG, Staff, Creator, Bug Hunter, Verified or Supporter), open their profile in Orbit (Social > Look up a player) on the owner PC. Founder and Premium badges are automatic.

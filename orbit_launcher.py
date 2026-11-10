@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.15.0"
+APP_VERSION = "2.16.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -154,6 +154,7 @@ DEFAULT_SETTINGS = {
     "overlay": {"keystrokes": False, "keys_pos": "Bottom right", "keys_cps": True, "crosshair": "",
                 "crosshair_mode": "locked", "crosshair_size": 100, "stats_fps": False, "stats_ping": False, "stats_pos": "Top left", "stats_tilt": True, "timer": False, "timer_pos": "Top right"},
     "hotkeys": {"enabled": True},
+    "social": {"bio": "", "public_profile": True, "on_leaderboard": True, "share_activity": True},
     "mod_profile": "Default",
     "discord": {
         "enabled": False,
@@ -204,6 +205,7 @@ DEFAULT_SETTINGS = {
         "bg_file": "",
         "bg_dim": 0.55,
         "idle_hide": True,
+        "page_warp": True,
         "tray": True,
         "close_to_tray": False,
         "custom_colors": ["#9d6bff", "#d946ef"],
@@ -1674,6 +1676,16 @@ class SessionMonitor:
             save_json(LAST_SERVER_FILE, last)
         if self.game is game:
             self._discord(build_activity(self.discord, game["place_id"], game["job_id"], info, game["joined"]))
+            threading.Thread(target=self._social_beat, args=(game,), daemon=True).start()
+
+    def _social_beat(self, game):
+        """Keeps your Orbit profile's "Playing" status fresh for friends while you're in a game."""
+        while self.game is game:
+            social_sync(force=True)
+            for _ in range(120):
+                if self.game is not game:
+                    return
+                time.sleep(1)
 
     def _ping_loop(self, game):
         time.sleep(4)
@@ -1893,6 +1905,7 @@ class SessionMonitor:
         if record and self.session.get("sort_screenshots"):
             threading.Thread(target=sort_screenshots, daemon=True).start()
         self._discord(None)
+        social_sync_bg()
 
     def check_bedtime(self, now=None):
         bt = (self.session.get("bedtime") or "").strip()
@@ -3438,6 +3451,123 @@ def close_keys():
     KEYS_FILE.unlink(missing_ok=True)
 
 
+class RawInput:
+    """Counts every mouse click and key press, even ones shorter than a frame.
+
+    The old overlay checked the buttons about 30 times a second, so a quick click (pressed and released between
+    two checks) was never seen and the counter topped out around 10 CPS. Raw input gets one message per press
+    from Windows itself, on a hidden window in its own thread, so nothing is missed at any speed."""
+
+    WM_INPUT, RID_INPUT, RIDEV_INPUTSINK = 0x00FF, 0x10000003, 0x00000100
+    MOUSE_BITS = {0x0001: (0x01, True), 0x0002: (0x01, False), 0x0004: (0x02, True), 0x0008: (0x02, False),
+                  0x0010: (0x04, True), 0x0020: (0x04, False)}
+
+    def __init__(self, keys=()):
+        self.keys = set(keys)
+        self.down = {}
+        self.last_press = {}
+        self.presses = {0x01: [], 0x02: []}
+        self.lock = threading.Lock()
+        self.ok = False
+        self.error = None
+        self.swapped = False
+        if not IS_WINDOWS:
+            self.error = "not Windows"
+            return
+        ready = threading.Event()
+        threading.Thread(target=self._run, args=(ready,), daemon=True, name="orbit-rawinput").start()
+        ready.wait(3)
+
+    def _run(self, ready):
+        from ctypes import wintypes as wt
+        try:
+            u32 = ctypes.WinDLL("user32", use_last_error=True)
+            try:
+                self.swapped = bool(u32.GetSystemMetrics(23))
+            except Exception:
+                pass
+
+            class RID(ctypes.Structure):
+                _fields_ = [("usUsagePage", wt.USHORT), ("usUsage", wt.USHORT), ("dwFlags", wt.DWORD), ("hwndTarget", wt.HWND)]
+
+            class HEADER(ctypes.Structure):
+                _fields_ = [("dwType", wt.DWORD), ("dwSize", wt.DWORD), ("hDevice", wt.HANDLE), ("wParam", wt.WPARAM)]
+
+            u32.CreateWindowExW.restype = wt.HWND
+            u32.CreateWindowExW.argtypes = [wt.DWORD, wt.LPCWSTR, wt.LPCWSTR, wt.DWORD, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                            ctypes.c_int, wt.HWND, wt.HMENU, wt.HINSTANCE, wt.LPVOID]
+            u32.RegisterRawInputDevices.argtypes = [ctypes.POINTER(RID), wt.UINT, wt.UINT]
+            u32.GetRawInputData.argtypes = [wt.HANDLE, wt.UINT, wt.LPVOID, ctypes.POINTER(wt.UINT), wt.UINT]
+            u32.GetRawInputData.restype = wt.UINT
+            u32.GetMessageW.argtypes = [ctypes.POINTER(wt.MSG), wt.HWND, wt.UINT, wt.UINT]
+            u32.DispatchMessageW.argtypes = [ctypes.POINTER(wt.MSG)]
+            u32.TranslateMessage.argtypes = [ctypes.POINTER(wt.MSG)]
+            hwnd = u32.CreateWindowExW(0, "STATIC", "Orbit raw input", 0, 0, 0, 0, 0, None, None, None, None)
+            if not hwnd:
+                raise OSError(f"CreateWindowEx failed ({ctypes.get_last_error()})")
+            devs = (RID * 2)(RID(1, 2, self.RIDEV_INPUTSINK, hwnd), RID(1, 6, self.RIDEV_INPUTSINK, hwnd))
+            if not u32.RegisterRawInputDevices(devs, 2, ctypes.sizeof(RID)):
+                raise OSError(f"RegisterRawInputDevices failed ({ctypes.get_last_error()})")
+            self.ok = True
+        except Exception as e:
+            self.error = str(e)
+            ready.set()
+            return
+        ready.set()
+        hsize = ctypes.sizeof(HEADER)
+        buf = ctypes.create_string_buffer(256)
+        size = wt.UINT()
+        msg = wt.MSG()
+        while u32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+            if msg.message == self.WM_INPUT:
+                size.value = 256
+                n = u32.GetRawInputData(ctypes.c_void_p(msg.lParam), self.RID_INPUT, buf, ctypes.byref(size), hsize)
+                if 0 < n != 0xFFFFFFFF:
+                    try:
+                        self._handle(buf.raw[:n], hsize)
+                    except Exception:
+                        pass
+            u32.TranslateMessage(ctypes.byref(msg))
+            u32.DispatchMessageW(ctypes.byref(msg))
+
+    def _handle(self, data, hsize):
+        kind = struct.unpack_from("<I", data, 0)[0]
+        now = time.perf_counter()
+        if kind == 0:
+            flags = struct.unpack_from("<H", data, hsize + 4)[0]
+            for bit, (vk, pressed) in self.MOUSE_BITS.items():
+                if flags & bit:
+                    if self.swapped and vk in (0x01, 0x02):
+                        vk = 0x03 - vk
+                    self._set(vk, pressed, now)
+        elif kind == 1:
+            kflags, vk = struct.unpack_from("<H", data, hsize + 2)[0], struct.unpack_from("<H", data, hsize + 6)[0]
+            if vk in self.keys:
+                self._set(vk, not (kflags & 1), now)
+
+    def _set(self, vk, pressed, now):
+        with self.lock:
+            was = self.down.get(vk, False)
+            self.down[vk] = pressed
+            if pressed and not was:
+                self.last_press[vk] = now
+                if vk in self.presses:
+                    self.presses[vk].append(now)
+
+    def is_down(self, vk, hold=0.06):
+        """Down right now, or pressed in the last 60 ms so even the quickest tap lights up for a few frames."""
+        with self.lock:
+            return self.down.get(vk, False) or time.perf_counter() - self.last_press.get(vk, -9) < hold
+
+    def cps(self, vk, window=1.0):
+        now = time.perf_counter()
+        with self.lock:
+            lst = self.presses.get(vk, [])
+            while lst and now - lst[0] > window:
+                lst.pop(0)
+            return len(lst)
+
+
 def show_keys_window():
     import tkinter as tk
     import tkinter.font as tkfont
@@ -3487,9 +3617,11 @@ def show_keys_window():
     box(half + g, y, W, y + 24, "RMB", 0x02, f_small)
     y += 24 + g
     cps_text = cv.create_text(W / 2, y + 8, text="0 | 0 CPS", fill=c["fg"], font=f_small) if show_cps else None
-    state = {"alpha": 0.0, "hwnd": None, "xy": None, "down": {}, "clicks": {0x01: [], 0x02: []}}
+    state = {"alpha": 0.0, "hwnd": None, "xy": None, "down": {}, "clicks": {0x01: [], 0x02: []}, "tick": 0, "cps": None}
     peak = 0.88
     u32 = ctypes.windll.user32 if IS_WINDOWS else None
+    raw = RawInput(vk for _, _, vk in boxes)
+    log("Keystrokes input: " + ("raw input (every click counted)" if raw.ok else f"polling fallback ({raw.error})"))
 
     def target_xy():
         rect = roblox_rect() or (0, 0, root.winfo_screenwidth(), root.winfo_screenheight())
@@ -3522,6 +3654,7 @@ def show_keys_window():
     def poll():
         try:
             now = time.time()
+            state["tick"] += 1
             visible = roblox_in_front()
             if visible and not state["shown"]:
                 overlay_show(hwnd, True)
@@ -3531,35 +3664,46 @@ def show_keys_window():
                 overlay_show(hwnd, False)
                 state["shown"] = False
             target = peak if visible else 0.0
-            state["alpha"] += (target - state["alpha"]) * 0.35
-            if abs(state["alpha"] - target) < 0.02:
-                state["alpha"] = target
-            root.attributes("-alpha", state["alpha"])
+            if state["alpha"] != target:
+                state["alpha"] += (target - state["alpha"]) * 0.35
+                if abs(state["alpha"] - target) < 0.02:
+                    state["alpha"] = target
+                root.attributes("-alpha", state["alpha"])
             if state["alpha"] > 0:
                 for r, t, vk in boxes:
-                    down = bool(u32.GetAsyncKeyState(vk) & 0x8000) if u32 else False
+                    if raw.ok:
+                        down = raw.is_down(vk)
+                    else:
+                        down = bool(u32.GetAsyncKeyState(vk) & 0x8001) if u32 else False
                     if down != state["down"].get(vk):
                         state["down"][vk] = down
                         cv.itemconfigure(r, fill=accent if down else c["panel"], outline=accent2 if down else c["muted"])
                         cv.itemconfigure(t, fill="#ffffff" if down else c["fg"])
-                        if down and vk in state["clicks"]:
+                        if down and not raw.ok and vk in state["clicks"]:
                             state["clicks"][vk].append(now)
                 if cps_text:
-                    for vk in state["clicks"]:
-                        state["clicks"][vk] = [x for x in state["clicks"][vk] if now - x <= 1.0]
-                    cv.itemconfigure(cps_text, text=f"{len(state['clicks'][0x01])} | {len(state['clicks'][0x02])} CPS")
-                nxy = target_xy()
-                if nxy != state["xy"]:
-                    state["xy"] = nxy
-                    u32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), nxy[0], nxy[1], 0, 0, 0x0001 | 0x0010) \
-                        if u32 and hwnd else root.geometry(f"+{nxy[0]}+{nxy[1]}")
+                    if raw.ok:
+                        lc, rc = raw.cps(0x01), raw.cps(0x02)
+                    else:
+                        for vk in state["clicks"]:
+                            state["clicks"][vk] = [x for x in state["clicks"][vk] if now - x <= 1.0]
+                        lc, rc = len(state["clicks"][0x01]), len(state["clicks"][0x02])
+                    if (lc, rc) != state["cps"]:
+                        state["cps"] = (lc, rc)
+                        cv.itemconfigure(cps_text, text=f"{lc} | {rc} CPS", fill=accent2 if max(lc, rc) >= 10 else c["fg"])
+                if state["xy"] is None or state["tick"] % 15 == 0:
+                    nxy = target_xy()
+                    if nxy != state["xy"]:
+                        state["xy"] = nxy
+                        u32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1), nxy[0], nxy[1], 0, 0, 0x0001 | 0x0010) \
+                            if u32 and hwnd else root.geometry(f"+{nxy[0]}+{nxy[1]}")
         except tk.TclError:
             return
         except Exception:
             if not state.get("logged"):
                 state["logged"] = True
                 log("Keystrokes error:\n" + traceback.format_exc())
-        root.after(16 if state["alpha"] > 0 else 250, poll)
+        root.after(8 if state["alpha"] > 0 else 250, poll)
 
     poll()
     root.mainloop()
@@ -6706,6 +6850,366 @@ def account_key_check(key, refresh=False, fetch=True):
     return result
 
 
+SOCIAL_FILE = DATA_DIR / "social.json"
+SOCIAL_SYNC_EVERY = 90
+_SOCIAL_LOCK = threading.Lock()
+
+
+def _week_start_ts():
+    t = time.localtime()
+    midnight = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
+    return midnight - t.tm_wday * 86400
+
+
+def week_seconds():
+    start = _week_start_ts()
+    total = sum(int(x.get("seconds", 0)) for x in _sessions() if x.get("start", 0) >= start)
+    cur = load_json(CURRENT_FILE, None) or {}
+    if cur.get("joined") and roblox_running():
+        total += max(0, int(time.time() - max(cur["joined"], start)))
+    return total
+
+
+def roblox_name_for(uid):
+    if not uid:
+        return None
+    cache = load_json(SOCIAL_FILE, {}) or {}
+    names = cache.setdefault("names", {})
+    if str(uid) in names:
+        return names[str(uid)]
+    try:
+        name = fetch_json(f"https://users.roblox.com/v1/users/{int(uid)}", timeout=6).get("name")
+    except Exception:
+        return None
+    if name:
+        names[str(uid)] = name
+        save_json(SOCIAL_FILE, cache)
+    return name
+
+
+def social_payload(settings=None):
+    settings = settings or load_settings()
+    soc = settings.get("social") or {}
+    play = load_json(PLAYTIME_FILE, {}) or {}
+    total = sum(int(e.get("seconds", 0)) for e in play.values())
+    cur = load_json(CURRENT_FILE, None) or {}
+    playing = None
+    if cur.get("place_id") and roblox_running():
+        total += max(0, int(time.time() - cur.get("joined", time.time())))
+        if soc.get("share_activity", True) and not settings["session"].get("streamer_mode"):
+            playing = {"place_id": str(cur["place_id"]), "name": cur.get("name") or "a game"}
+    top = sorted(((pid, e) for pid, e in play.items() if str(pid).isdigit()), key=lambda kv: -int(kv[1].get("seconds", 0)))[:5]
+    try:
+        lvl = orbit_level()
+    except Exception as e:
+        log(f"Level for profile failed: {e}")
+        lvl = {"level": 1, "title": "Stargazer"}
+    uid = current_roblox_uid()
+    return {"roblox_id": uid, "roblox_name": roblox_name_for(uid), "bio": (soc.get("bio") or "")[:120],
+            "total_seconds": total, "week_seconds": week_seconds(),
+            "week_start": time.strftime("%Y-%m-%d", time.localtime(_week_start_ts())),
+            "level": lvl["level"], "level_title": lvl["title"],
+            "top_games": [{"pid": str(pid), "name": e.get("name") or "Game", "seconds": int(e.get("seconds", 0))} for pid, e in top],
+            "now_playing": playing, "public_profile": bool(soc.get("public_profile", True)),
+            "on_leaderboard": bool(soc.get("on_leaderboard", True)), "share_activity": bool(soc.get("share_activity", True))}
+
+
+def social_sync(settings=None, force=False):
+    """Sends your playtime, level and what you're playing to your Orbit profile. Quietly does nothing when logged out."""
+    if not accounts_on() or not (_load_account().get("user")):
+        return False
+    with _SOCIAL_LOCK:
+        state = load_json(SOCIAL_FILE, {}) or {}
+        if not force and time.time() - state.get("synced", 0) < SOCIAL_SYNC_EVERY:
+            return False
+        try:
+            account_rpc("sync_profile", {"p": social_payload(settings)})
+        except AccountError as e:
+            if not isinstance(e, AccountOffline):
+                log(f"Profile sync failed: {str(e)[:200]}")
+            return False
+        state = load_json(SOCIAL_FILE, {}) or {}
+        state["synced"] = int(time.time())
+        save_json(SOCIAL_FILE, state)
+        return True
+
+
+def social_sync_bg(force=True):
+    threading.Thread(target=lambda: social_sync(force=force), daemon=True).start()
+
+
+def roblox_friend_ids(uid):
+    ids, cursor = [], ""
+    for _ in range(4):
+        url = f"https://friends.roblox.com/v1/users/{int(uid)}/friends/find?limit=50" + (f"&cursor={urllib.parse.quote(cursor)}" if cursor else "")
+        try:
+            data = fetch_json(url, timeout=8)
+        except Exception:
+            if ids:
+                break
+            data = fetch_json(f"https://friends.roblox.com/v1/users/{int(uid)}/friends", timeout=8)
+            return [int(x["id"]) for x in data.get("data") or [] if x.get("id")]
+        ids += [int(x["id"]) for x in data.get("PageItems") or data.get("data") or [] if x.get("id")]
+        cursor = data.get("NextCursor") or data.get("nextPageCursor") or ""
+        if not cursor:
+            break
+    return ids
+
+
+def avatar_urls(user_ids, size="150x150"):
+    out, ids = {}, [int(i) for i in user_ids if str(i).isdigit()]
+    for i in range(0, len(ids), 100):
+        try:
+            data = fetch_json("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" + ",".join(map(str, ids[i:i + 100]))
+                              + f"&size={size}&format=Png&isCircular=false", timeout=8)
+            for d in data.get("data") or []:
+                if d.get("state") == "Completed":
+                    out[str(d["targetId"])] = d.get("imageUrl")
+        except Exception as e:
+            log(f"Avatar lookup failed: {e}")
+    return out
+
+
+def social_friends():
+    uid = current_roblox_uid()
+    if not uid:
+        return {"friends": [], "no_roblox": True}
+    ids = roblox_friend_ids(uid)
+    rows = account_rpc("friends_on_orbit", {"p_roblox_ids": ids[:300]}) if ids else []
+    pics = avatar_urls([r["roblox_id"] for r in rows if r.get("roblox_id")])
+    for r in rows:
+        r["avatar"] = pics.get(str(r.get("roblox_id")))
+    return {"friends": rows, "roblox_friends": len(ids), "roblox_id": uid}
+
+
+def social_leaderboard(period="all"):
+    data = account_rpc("leaderboard", {"p_period": "week" if period == "week" else "all", "p_limit": 50})
+    pics = avatar_urls([r["roblox_id"] for r in (data.get("rows") or []) if r.get("roblox_id")])
+    for r in data.get("rows") or []:
+        r["avatar"] = pics.get(str(r.get("roblox_id")))
+    if data.get("me"):
+        data["me"]["avatar"] = pics.get(str(data["me"].get("roblox_id"))) or None
+    return data
+
+
+def social_profile(username):
+    p = account_rpc("get_profile", {"p_username": username})
+    if p.get("found") and not p.get("private") and p.get("roblox_id"):
+        p["avatar"] = avatar_urls([p["roblox_id"]], "420x420").get(str(p["roblox_id"]))
+        icons = {}
+        try:
+            icons = {g["pid"]: game_info(g["pid"]).get("icon") for g in p.get("top_games") or []}
+        except Exception:
+            pass
+        for g in p.get("top_games") or []:
+            g["icon"] = icons.get(g["pid"])
+    return p
+
+
+RBX_ACCOUNTS_DIR = DATA_DIR / "roblox_accounts"
+RBX_ACCOUNTS_FILE = DATA_DIR / "roblox_accounts.json"
+_RBX_COOKIE_RE = re.compile(rb"_\|WARNING:-DO-NOT-SHARE-THIS\.[^\s;\"'\t\r\n]+")
+
+
+def rbx_cookie_file():
+    return LOCALAPPDATA / "Roblox" / "LocalStorage" / "RobloxCookies.dat"
+
+
+def _rbx_index():
+    data = load_json(RBX_ACCOUNTS_FILE, {}) or {}
+    data.setdefault("list", [])
+    data.setdefault("active", None)
+    return data
+
+
+def _rbx_snapshot_path(uid):
+    return RBX_ACCOUNTS_DIR / f"{int(uid)}.dat"
+
+
+def _rbx_session_cookie(raw):
+    """Finds the Roblox login inside a copy of RobloxCookies.dat. Only ever sent to roblox.com to check who it is."""
+    if not raw:
+        return None
+    blobs = [raw]
+    try:
+        data = json.loads(raw.decode("utf-8", "ignore"))
+        enc = base64.b64decode(data.get("CookiesData") or "")
+        if enc:
+            blobs.insert(0, _dpapi(enc, False))
+    except Exception:
+        pass
+    for b in blobs:
+        m = _RBX_COOKIE_RE.search(b or b"")
+        if m:
+            return m.group(0).decode("ascii", "ignore")
+    return None
+
+
+def _rbx_whoami(raw):
+    cookie = _rbx_session_cookie(raw)
+    if not cookie:
+        return None, "unknown"
+    req = urllib.request.Request("https://users.roblox.com/v1/users/authenticated",
+                                 headers={**ROBLOX_UA, "Cookie": ".ROBLOSECURITY=" + cookie})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode("utf-8"))
+            return {"id": int(d["id"]), "name": d.get("name"), "display": d.get("displayName")}, "ok"
+    except urllib.error.HTTPError as e:
+        return None, "expired" if e.code in (401, 403) else "unknown"
+    except Exception:
+        return None, "unknown"
+
+
+def _rbx_read_live():
+    f = rbx_cookie_file()
+    try:
+        return f.read_bytes() if f.is_file() else None
+    except OSError:
+        return None
+
+
+def _rbx_store(uid, raw):
+    RBX_ACCOUNTS_DIR.mkdir(parents=True, exist_ok=True)
+    _rbx_snapshot_path(uid).write_bytes(_dpapi(raw, True))
+
+
+def _rbx_load(uid):
+    try:
+        return _dpapi(_rbx_snapshot_path(uid).read_bytes(), False)
+    except Exception:
+        return None
+
+
+def rbx_accounts_state(check=False):
+    idx = _rbx_index()
+    live = _rbx_read_live()
+    out = {"accounts": [], "active": idx.get("active"), "logged_in": bool(live), "running": roblox_running(),
+           "supported": IS_WINDOWS}
+    pics = avatar_urls([a["id"] for a in idx["list"]]) if idx["list"] else {}
+    status = {}
+    if check and idx["list"]:
+        from concurrent.futures import ThreadPoolExecutor
+        def one(a):
+            raw = live if str(a["id"]) == str(idx.get("active")) and live else _rbx_load(a["id"])
+            who, st = _rbx_whoami(raw)
+            if st == "ok" and who and who["id"] != int(a["id"]):
+                st = "mismatch"
+            return a["id"], st
+        with ThreadPoolExecutor(4) as pool:
+            status = dict(pool.map(one, idx["list"]))
+    for a in idx["list"]:
+        out["accounts"].append({**a, "avatar": pics.get(str(a["id"])), "status": status.get(a["id"], "unchecked"),
+                                "active": str(a["id"]) == str(idx.get("active")) and bool(live)})
+    return out
+
+
+def rbx_save_current():
+    """Saves whoever is logged in to the Roblox app right now as a switchable account."""
+    raw = _rbx_read_live()
+    if not raw:
+        raise ValueError("Roblox isn't logged in yet. Log in on the Roblox app first, then press Save again.")
+    who, st = _rbx_whoami(raw)
+    if not who:
+        if st == "expired":
+            raise ValueError("That Roblox login has run out. Log in on the Roblox app again, then press Save.")
+        raise ValueError("Couldn't check which account is logged in. Check your internet and try again.")
+    idx = _rbx_index()
+    _rbx_store(who["id"], raw)
+    entry = next((a for a in idx["list"] if int(a["id"]) == who["id"]), None)
+    if entry is None:
+        entry = {"id": who["id"], "added": int(time.time())}
+        idx["list"].append(entry)
+    entry.update(name=who["name"], display=who.get("display"), last_used=int(time.time()))
+    idx["active"] = who["id"]
+    save_json(RBX_ACCOUNTS_FILE, idx)
+    save_json(ROBLOX_ACCOUNT_FILE, {"id": who["id"], "at": int(time.time())})
+    log(f"Saved Roblox account {who['name']} ({who['id']}) for switching")
+    return who
+
+
+def _rbx_refresh_active(idx):
+    """Roblox renews its login now and then, so the account being switched away from gets a fresh copy first."""
+    live = _rbx_read_live()
+    if not live:
+        return
+    saved = {int(a["id"]) for a in idx["list"]}
+    who, st = _rbx_whoami(live)
+    if who and who["id"] in saved:
+        _rbx_store(who["id"], live)
+    elif not who and st != "ok" and idx.get("active") and int(idx["active"]) in saved:
+        _rbx_store(idx["active"], live)
+
+
+def _rbx_require_closed(close):
+    if not roblox_running():
+        return
+    if not close:
+        raise RuntimeError("running")
+    close_roblox("switching Roblox accounts")
+    for _ in range(40):
+        if not roblox_running():
+            break
+        time.sleep(0.25)
+    if roblox_running():
+        raise ValueError("Roblox is still closing. Try again in a few seconds.")
+    time.sleep(0.6)
+
+
+def rbx_switch(uid, close=False):
+    idx = _rbx_index()
+    entry = next((a for a in idx["list"] if str(a["id"]) == str(uid)), None)
+    if not entry:
+        raise ValueError("That account isn't saved anymore.")
+    raw = _rbx_load(uid)
+    if not raw:
+        raise ValueError("The saved login for this account is missing. Remove it and add it again.")
+    _rbx_require_closed(close)
+    _rbx_refresh_active(idx)
+    f = rbx_cookie_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".orbit-tmp")
+    tmp.write_bytes(raw)
+    os.replace(tmp, f)
+    entry["last_used"] = int(time.time())
+    idx["active"] = entry["id"]
+    save_json(RBX_ACCOUNTS_FILE, idx)
+    save_json(ROBLOX_ACCOUNT_FILE, {"id": int(entry["id"]), "at": int(time.time())})
+    log(f"Switched Roblox to {entry.get('name')} ({entry['id']})")
+    return entry
+
+
+def rbx_add_new(close=False):
+    """Logs the Roblox app out locally (without ending the saved login) so another account can sign in."""
+    idx = _rbx_index()
+    _rbx_require_closed(close)
+    _rbx_refresh_active(idx)
+    live = _rbx_read_live()
+    if live:
+        who, _ = _rbx_whoami(live)
+        if who and not any(int(a["id"]) == who["id"] for a in idx["list"]):
+            _rbx_store(who["id"], live)
+            idx["list"].append({"id": who["id"], "name": who["name"], "display": who.get("display"),
+                                "added": int(time.time()), "last_used": int(time.time())})
+        RBX_ACCOUNTS_DIR.mkdir(parents=True, exist_ok=True)
+        (RBX_ACCOUNTS_DIR / "last-signed-in.bak").write_bytes(_dpapi(live, True))
+        rbx_cookie_file().unlink(missing_ok=True)
+    idx["active"] = None
+    save_json(RBX_ACCOUNTS_FILE, idx)
+    log("Cleared the Roblox app login so a new account can sign in")
+    return True
+
+
+def rbx_remove(uid):
+    idx = _rbx_index()
+    idx["list"] = [a for a in idx["list"] if str(a["id"]) != str(uid)]
+    if str(idx.get("active")) == str(uid):
+        idx["active"] = None if not _rbx_read_live() else idx.get("active")
+    save_json(RBX_ACCOUNTS_FILE, idx)
+    _rbx_snapshot_path(uid).unlink(missing_ok=True)
+    return True
+
+
 def premium_status(settings, refresh=False, fetch=True):
     code = settings.get("premium_key") or ""
     if not code:
@@ -7268,6 +7772,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.16.0": ["social", "accounts"],
     "2.15.0": ["owner:ownerLog", "premium"],
     "2.14.0": ["mods:storeCard"],
     "2.13.3": ["boost:statsOvCard"],
@@ -9907,6 +10412,104 @@ class Api:
     def account_logout(self):
         account_logout()
         return {"account": account_state()}
+
+    def _social(self, fn, *args):
+        try:
+            if not account_state()["logged_in"]:
+                return {"error": "Log in to your Orbit account first."}
+            return fn(*args)
+        except AccountOffline:
+            return {"error": "Couldn't reach Orbit's servers. Check your internet and try again.", "offline": True}
+        except AccountError as e:
+            low = str(e).lower()
+            if "could not find the function" in low or "pgrst202" in low or "does not exist" in low:
+                return {"error": "Profiles aren't switched on yet. The Orbit owner needs to run the new part of supabase/setup.sql.",
+                        "needs_setup": True}
+            return {"error": _friendly(e, "profile")}
+        except Exception as e:
+            return self._err(e)
+
+    def social_me(self):
+        def run():
+            social_sync(self._settings, force=True)
+            me = account_state()["user"]["username"]
+            return {"profile": social_profile(me), "settings": self._settings.get("social") or {},
+                    "local": {k: v for k, v in social_payload(self._settings).items() if k != "bio"}}
+        return self._social(run)
+
+    def social_profile(self, username):
+        if not USERNAME_RE.fullmatch(str(username or "")):
+            return {"error": "That's not an Orbit username."}
+        return self._social(social_profile, username)
+
+    def social_save(self, changes):
+        soc = self._settings.setdefault("social", {})
+        for k in ("public_profile", "on_leaderboard", "share_activity"):
+            if k in (changes or {}):
+                soc[k] = bool(changes[k])
+        if "bio" in (changes or {}):
+            soc["bio"] = re.sub(r"\s+", " ", str(changes["bio"] or "")).strip()[:120]
+        save_settings(self._settings)
+        return self._social(lambda: (social_sync(self._settings, force=True), {"ok": True})[1])
+
+    def social_friends(self):
+        return self._social(social_friends)
+
+    def social_leaderboard(self, period="all"):
+        return self._social(social_leaderboard, period)
+
+    def social_join(self, roblox_id):
+        if not str(roblox_id or "").isdigit():
+            return {"error": "Unknown player."}
+        return self.launch(follow_uri(int(roblox_id)))
+
+    def owner_set_badges(self, username, badges):
+        try:
+            self._owner_acct()
+            return account_rpc("owner_set_badges", {"p_username": username, "p_badges": list(badges or [])})
+        except Exception as e:
+            return {"error": _friendly(e, "owner") if isinstance(e, AccountError) else str(e)}
+
+    def rbx_accounts(self, check=False):
+        try:
+            return rbx_accounts_state(bool(check))
+        except Exception as e:
+            return self._err(e)
+
+    def _rbx(self, fn, *args):
+        try:
+            if not IS_WINDOWS:
+                return {"error": "Switching Roblox accounts only works on Windows."}
+            return fn(*args)
+        except RuntimeError as e:
+            if str(e) == "running":
+                return {"running": True}
+            return self._err(e)
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception as e:
+            return self._err(e)
+
+    def rbx_save_current(self):
+        return self._rbx(rbx_save_current)
+
+    def rbx_switch(self, uid, close=False, play=False):
+        def run():
+            entry = rbx_switch(uid, close)
+            if play:
+                self.launch("")
+            return {"ok": True, "account": entry}
+        return self._rbx(run)
+
+    def rbx_add_new(self, close=False):
+        def run():
+            rbx_add_new(close)
+            self.launch("")
+            return {"ok": True}
+        return self._rbx(run)
+
+    def rbx_remove(self, uid):
+        return self._rbx(rbx_remove, uid)
 
     def _owner_acct(self):
         if not is_owner():

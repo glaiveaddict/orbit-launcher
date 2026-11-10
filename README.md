@@ -1,4 +1,4 @@
-# Orbit Launcher v1.5
+# Orbit Launcher v2.16
 
 A custom Roblox launcher for Windows, in the style of Bloxstrap.
 
@@ -24,6 +24,8 @@ Accent colours (Appearance page): Void (default purple), Nebula, Pulsar, Quasar,
 - **Home**: launch Roblox, rejoin your last server, and make Roblox links from the website open through Orbit.
 - **FastFlags**: allowlisted presets plus a box for extra flags in JSON. Use **Add game...** to give a game its own flag profile, like low graphics just for one laggy game.
 - **Mods**: mod profiles. Each profile is its own folder of replacement files, and you switch between them from a dropdown. The originals are restored automatically.
+- **Accounts**: save your Roblox accounts and switch between them in one click. Logins stay on your PC, encrypted with Windows.
+- **Social**: your Orbit profile, Roblox friends who use Orbit (with one-click join), and a weekly and all-time playtime leaderboard.
 - **Discord**: Rich Presence with the game name, icon and play timer, plus an optional Join button.
 - **Session**: a server-location popup when you join, a play-time tracker with a stats table, and an offer to rejoin if Roblox closes mid-game.
 - **Appearance**: dark or light theme, six accent colours, a custom icon on the Roblox window, and "Roblox (Orbit)" desktop and Start menu shortcuts.

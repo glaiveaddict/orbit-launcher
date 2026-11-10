@@ -229,3 +229,195 @@ revoke execute on function public.is_owner(), public.me(), public.key_status(tex
 grant execute on function public.is_owner(), public.me(), public.key_status(text), public.redeem_key(text, text, timestamptz, boolean),
   public.owner_log(text, int), public.owner_users(text), public.owner_set_key(text, boolean), public.owner_clear_log(),
   public.owner_reset_password(text, text) to authenticated;
+
+-- ============================================================================
+-- v2.16: Orbit profiles, Friends on Orbit and the playtime leaderboard.
+-- Safe to run again: it only adds what's missing.
+-- ============================================================================
+alter table public.profiles add column if not exists roblox_id bigint;
+alter table public.profiles add column if not exists roblox_name text;
+alter table public.profiles add column if not exists bio text;
+alter table public.profiles add column if not exists badges text[] not null default '{}';
+alter table public.profiles add column if not exists total_seconds bigint not null default 0;
+alter table public.profiles add column if not exists week_seconds int not null default 0;
+alter table public.profiles add column if not exists week_start date;
+alter table public.profiles add column if not exists level int not null default 1;
+alter table public.profiles add column if not exists level_title text;
+alter table public.profiles add column if not exists top_games jsonb not null default '[]';
+alter table public.profiles add column if not exists now_playing jsonb;
+alter table public.profiles add column if not exists playing_at timestamptz;
+alter table public.profiles add column if not exists public_profile boolean not null default true;
+alter table public.profiles add column if not exists on_leaderboard boolean not null default true;
+alter table public.profiles add column if not exists share_activity boolean not null default true;
+create index if not exists profiles_roblox on public.profiles (roblox_id);
+create index if not exists profiles_total on public.profiles (total_seconds desc);
+
+create or replace function public._has_premium(p_uid uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.redemptions r where r.user_id = p_uid and not r.disabled
+                 and (r.expires_at is null or r.expires_at > now()))
+$$;
+
+create or replace function public._badges(p_uid uuid, p_owner boolean, p_extra text[]) returns text[]
+language sql stable security definer set search_path = public as $$
+  select array_remove(array[case when p_owner then 'founder' end,
+                            case when public._has_premium(p_uid) then 'premium' end], null) || coalesce(p_extra, '{}')
+$$;
+
+create or replace function public._this_week() returns date
+language sql stable as $$ select (date_trunc('week', now()))::date $$;
+
+create or replace function public.sync_profile(p jsonb) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  games jsonb := '[]'::jsonb;
+  g jsonb;
+  ws date;
+  playing jsonb;
+begin
+  if me is null then
+    raise exception 'log in first';
+  end if;
+  for g in select value from jsonb_array_elements(case when jsonb_typeof(p -> 'top_games') = 'array' then p -> 'top_games' else '[]'::jsonb end) limit 5 loop
+    if (g ->> 'pid') ~ '^[0-9]{1,15}$' then
+      games := games || jsonb_build_array(jsonb_build_object('pid', g ->> 'pid', 'name', left(coalesce(g ->> 'name', 'Game'), 60),
+                                                             'seconds', least(greatest(coalesce((g ->> 'seconds')::numeric, 0), 0), 315360000)::bigint));
+    end if;
+  end loop;
+  ws := case when (p ->> 'week_start') ~ '^\d{4}-\d{2}-\d{2}$' then (p ->> 'week_start')::date end;
+  if ws is not null and (ws > current_date + 1 or ws < current_date - 8) then
+    ws := null;
+  end if;
+  if jsonb_typeof(p -> 'now_playing') = 'object' and (p -> 'now_playing' ->> 'place_id') ~ '^[0-9]{1,15}$' then
+    playing := jsonb_build_object('place_id', p -> 'now_playing' ->> 'place_id', 'name', left(coalesce(p -> 'now_playing' ->> 'name', 'a game'), 60));
+  end if;
+  update public.profiles set
+    roblox_id = case when (p ->> 'roblox_id') ~ '^[0-9]{1,15}$' then (p ->> 'roblox_id')::bigint else roblox_id end,
+    roblox_name = case when (p ->> 'roblox_name') ~ '^[A-Za-z0-9_]{3,20}$' then p ->> 'roblox_name' else roblox_name end,
+    bio = case when p ? 'bio' then nullif(left(regexp_replace(coalesce(p ->> 'bio', ''), '[\r\n\t]+', ' ', 'g'), 120), '') else bio end,
+    total_seconds = least(greatest(coalesce((p ->> 'total_seconds')::numeric, total_seconds), 0), 315360000)::bigint,
+    week_seconds = case when ws is null then week_seconds else least(greatest(coalesce((p ->> 'week_seconds')::numeric, 0), 0), 604800)::int end,
+    week_start = coalesce(ws, week_start),
+    level = least(greatest(coalesce((p ->> 'level')::int, level), 1), 999),
+    level_title = coalesce(left(p ->> 'level_title', 24), level_title),
+    top_games = games,
+    now_playing = case when coalesce((p ->> 'share_activity')::boolean, share_activity) then playing end,
+    playing_at = case when playing is not null then now() else playing_at end,
+    public_profile = coalesce((p ->> 'public_profile')::boolean, public_profile),
+    on_leaderboard = coalesce((p ->> 'on_leaderboard')::boolean, on_leaderboard),
+    share_activity = coalesce((p ->> 'share_activity')::boolean, share_activity),
+    last_seen = now()
+  where id = me;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.get_profile(p_username text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  p public.profiles;
+  mine boolean;
+  rank_all int;
+begin
+  if auth.uid() is null then
+    raise exception 'log in first';
+  end if;
+  select * into p from public.profiles where lower(username) = lower(p_username);
+  if not found then
+    return json_build_object('found', false);
+  end if;
+  mine := p.id = auth.uid();
+  if not (p.public_profile or mine or public.is_owner()) then
+    return json_build_object('found', true, 'private', true, 'username', p.username);
+  end if;
+  select count(*) + 1 into rank_all from public.profiles q
+   where q.on_leaderboard and q.total_seconds > p.total_seconds;
+  return json_build_object(
+    'found', true, 'private', false, 'mine', mine, 'username', p.username, 'created_at', p.created_at,
+    'last_seen', p.last_seen, 'online', p.last_seen > now() - interval '5 minutes',
+    'roblox_id', p.roblox_id, 'roblox_name', p.roblox_name, 'bio', p.bio, 'badges', public._badges(p.id, p.is_owner, p.badges),
+    'total_seconds', p.total_seconds,
+    'week_seconds', case when p.week_start = public._this_week() then p.week_seconds else 0 end,
+    'level', p.level, 'level_title', p.level_title, 'top_games', p.top_games,
+    'rank', case when p.on_leaderboard and p.total_seconds > 0 then rank_all end,
+    'now_playing', case when p.share_activity and p.playing_at > now() - interval '5 minutes' then p.now_playing end,
+    'public_profile', p.public_profile, 'on_leaderboard', p.on_leaderboard, 'share_activity', p.share_activity);
+end
+$$;
+
+create or replace function public.leaderboard(p_period text default 'all', p_limit int default 50) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  wk date := public._this_week();
+  rows json;
+  mine json;
+begin
+  if auth.uid() is null then
+    raise exception 'log in first';
+  end if;
+  with board as (
+    select p.*, case when p_period = 'week' then (case when p.week_start = wk then p.week_seconds else 0 end)::bigint
+                     else p.total_seconds end as secs
+    from public.profiles p where p.on_leaderboard
+  ), ranked as (
+    select b.*, rank() over (order by b.secs desc) as pos from board b where b.secs > 0
+  )
+  select coalesce(json_agg(json_build_object('rank', r.pos, 'username', r.username, 'roblox_id', r.roblox_id, 'level', r.level,
+                                             'seconds', r.secs, 'badges', public._badges(r.id, r.is_owner, r.badges), 'me', r.id = auth.uid()) order by r.pos, r.username), '[]'::json)
+    into rows
+    from (select * from ranked order by pos, username limit least(greatest(coalesce(p_limit, 50), 1), 100)) r;
+  with board as (
+    select p.*, case when p_period = 'week' then (case when p.week_start = wk then p.week_seconds else 0 end)::bigint
+                     else p.total_seconds end as secs
+    from public.profiles p where p.on_leaderboard
+  )
+  select json_build_object('rank', (select count(*) + 1 from board b2 where b2.secs > b.secs), 'username', b.username,
+                           'roblox_id', b.roblox_id, 'level', b.level, 'seconds', b.secs, 'badges', public._badges(b.id, b.is_owner, b.badges), 'me', true)
+    into mine from board b where b.id = auth.uid() and b.secs > 0;
+  return json_build_object('period', p_period, 'rows', rows, 'me', mine,
+                           'players', (select count(*) from public.profiles where on_leaderboard and total_seconds > 0));
+end
+$$;
+
+create or replace function public.friends_on_orbit(p_roblox_ids bigint[]) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    raise exception 'log in first';
+  end if;
+  return coalesce((
+    select json_agg(json_build_object(
+      'username', p.username, 'roblox_id', p.roblox_id, 'level', p.level, 'badges', public._badges(p.id, p.is_owner, p.badges),
+      'last_seen', p.last_seen, 'online', p.last_seen > now() - interval '5 minutes',
+      'now_playing', case when p.share_activity and p.playing_at > now() - interval '5 minutes' then p.now_playing end)
+      order by p.playing_at desc nulls last, p.last_seen desc)
+    from public.profiles p
+    where p.roblox_id = any (p_roblox_ids[1:300]) and p.id <> auth.uid() and p.public_profile
+  ), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_set_badges(p_username text, p_badges text[]) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  clean text[];
+begin
+  if not public.is_owner() then
+    raise exception 'owner only';
+  end if;
+  select coalesce(array_agg(distinct b), '{}') into clean from unnest(p_badges) b
+   where b in ('beta', 'og', 'staff', 'creator', 'bug_hunter', 'verified', 'supporter');
+  update public.profiles set badges = clean where lower(username) = lower(p_username);
+  if not found then
+    raise exception 'no such user';
+  end if;
+  return json_build_object('username', p_username, 'badges', clean);
+end
+$$;
+
+revoke execute on function public._has_premium(uuid), public._badges(uuid, boolean, text[]), public.sync_profile(jsonb),
+  public.get_profile(text), public.leaderboard(text, int), public.friends_on_orbit(bigint[]),
+  public.owner_set_badges(text, text[]) from public, anon;
+grant execute on function public.sync_profile(jsonb), public.get_profile(text), public.leaderboard(text, int),
+  public.friends_on_orbit(bigint[]), public.owner_set_badges(text, text[]) to authenticated;

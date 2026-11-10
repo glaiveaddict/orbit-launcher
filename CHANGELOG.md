@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.16.0
+- **Orbit profiles:** every Orbit account now has a profile with your Roblox avatar, badges (Founder, Premium, Beta Tester and more), a bio, total and weekly play time, your level and your most played games. It updates by itself while you play (Social page).
+- **Friends on Orbit:** see which of your Roblox friends use Orbit, what they're playing right now, and join them in one click.
+- **Leaderboard:** who's played the most through Orbit this week and of all time, with a podium for the top 3.
+- **Roblox account switcher:** save all your Roblox accounts on the new Accounts page and switch between them in one click. Logins stay on your PC, locked with Windows encryption, and are never uploaded.
+- **Keystrokes overlay counts every click:** the CPS counter used to top out around 10 because quick clicks slipped between checks. It now gets every press straight from Windows, so 15, 20 or 30+ CPS shows correctly, and even the fastest taps light up the keys.
+- **Fresh look:** a light that circles cards when you hover them, shimmering page titles, a glowing title bar edge, a soft light that follows your cursor, and a hyperspace jump through the stars when you switch pages (you can turn it off in Appearance).
+- You can hide your profile, keep yourself off the leaderboard, or stop sharing what you're playing (Social > Profile). Streamer mode always hides your game.
+
 ## v2.15.0
 - **Orbit accounts:** Orbit now asks you to log in or make an account (just a username and password). Your name shows at the bottom of the menu, with a log out button next to it.
 - **Premium keys are now one key per account.** A key that's already been used can't be redeemed by anyone else. If you already had Premium, it moves to your account the first time you log in.

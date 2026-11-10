@@ -805,10 +805,150 @@ body.bg-fireflies #flies { opacity: 1; }
 .cov { display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: start; }
 .cov-pv { width: 96px; height: 96px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(180deg, #5aa7e6 0 50%, #3d8a3a 50%); }
 .cov-pv img { image-rendering: pixelated; }
+
+/* ===== v2.16 Social ===== */
+.oav { position: relative; flex: none; width: var(--sz, 44px); height: var(--sz, 44px); border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: var(--grad); color: #fff; font-weight: 800; font-size: calc(var(--sz, 44px) * .4); }
+.oav img { width: 100%; height: 100%; object-fit: cover; background: rgba(255,255,255,.06); }
+.oav-wrap { position: relative; flex: none; padding: 3px; border-radius: 50%; }
+.oav-wrap.ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; padding: 3px;
+  background: conic-gradient(from var(--spin, 0deg), var(--accent), var(--accent2), #22d3ee, var(--accent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ringSpin 6s linear infinite; }
+.oav-wrap .st { position: absolute; right: 2px; bottom: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--faint); border: 2.5px solid var(--panel-solid); z-index: 2; }
+.oav-wrap .st.on { background: var(--good); box-shadow: 0 0 10px var(--good); }
+.oav-wrap .st.play { background: #22d3ee; box-shadow: 0 0 10px #22d3ee; }
+@property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes ringSpin { to { --spin: 360deg; } }
+.obadge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px 0 7px; border-radius: 99px; font-size: 11px; font-weight: 700; letter-spacing: .02em;
+  color: var(--bc); background: color-mix(in srgb, var(--bc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--bc) 40%, transparent);
+  box-shadow: 0 0 14px -6px var(--bc); white-space: nowrap; }
+.obadge i { font-style: normal; font-size: 11px; }
+.obadge.sm { height: 18px; padding: 0 6px; font-size: 10px; } .obadge.sm b { display: none; }
+.prof-hero { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; padding: 24px 26px; overflow: hidden;
+  background: radial-gradient(70% 140% at 0% 0%, rgba(var(--accent-rgb),.22), transparent 60%), radial-gradient(60% 120% at 100% 100%, color-mix(in srgb, var(--accent2) 16%, transparent), transparent 60%), var(--panel); }
+.prof-hero .who h2 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.03em; background: var(--head-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.prof-hero .who .rb { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.prof-hero .who .rb a { color: inherit; text-decoration: none; } .prof-hero .who .rb a:hover { color: var(--text); }
+.prof-hero .bio { margin: 10px 0 0; color: var(--text); opacity: .9; line-height: 1.5; max-width: 560px; }
+.prof-hero .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.playing-pill { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 6px 12px 6px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 600;
+  background: rgba(34,211,238,.1); border: 1px solid rgba(34,211,238,.35); color: #a5f3fc; }
+.playing-pill i { width: 8px; height: 8px; border-radius: 50%; background: #22d3ee; box-shadow: 0 0 10px #22d3ee; animation: pulseC 1.6s infinite; }
+@keyframes pulseC { 50% { opacity: .35; } }
+.stat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+.stat-tile { position: relative; overflow: hidden; padding: 16px 18px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(18px); }
+.stat-tile::after { content: ""; position: absolute; right: -30px; top: -30px; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(var(--accent-rgb),.28), transparent 70%); }
+.stat-tile small { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.stat-tile b { display: block; margin-top: 6px; font-size: 24px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.stat-tile span { font-size: 12px; color: var(--muted); }
+.topg { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; }
+.topg + .topg { border-top: 1px solid var(--line); }
+.topg .ic { width: 40px; height: 40px; border-radius: 10px; background: var(--panel3) center/cover; }
+.topg .bar { height: 6px; margin-top: 6px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.topg .bar i { display: block; height: 100%; border-radius: inherit; background: var(--grad); box-shadow: 0 0 12px rgba(var(--accent-rgb),.8); transform-origin: left; animation: grow .9s var(--ease) backwards; }
+@keyframes grow { from { transform: scaleX(0); } }
+.friend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.friend { display: flex; gap: 12px; align-items: center; margin: 0; padding: 14px; cursor: pointer; }
+.friend .nm { font-weight: 700; display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
+.friend .ln { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.friend .ln.play { color: #67e8f9; }
+.friend .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.lvl { display: inline-grid; place-items: center; min-width: 26px; height: 18px; padding: 0 5px; border-radius: 6px; font-size: 10.5px; font-weight: 800; color: var(--on-accent); background: var(--grad); }
+.podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 14px; align-items: end; margin-bottom: 14px; }
+.pod { position: relative; margin: 0; padding: 22px 14px 16px; text-align: center; cursor: pointer; --pc: #cbd5e1; }
+.pod.p1 { --pc: #fbbf24; padding-top: 30px; } .pod.p3 { --pc: #f59e0b; --pc: #d97706; }
+.pod::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--pc) 22%, transparent), transparent 70%); }
+.pod .medal { position: absolute; top: 10px; left: 12px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 12px; color: #1a1205;
+  background: linear-gradient(135deg, #fff, var(--pc)); box-shadow: 0 0 16px -2px var(--pc); }
+.pod .oav-wrap { margin: 0 auto 10px; width: fit-content; }
+.pod .oav-wrap::before { content: ""; position: absolute; inset: 0; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, #fff, var(--pc));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.pod .nm { font-weight: 800; font-size: 15px; } .pod .tm { margin-top: 4px; font-size: 20px; font-weight: 800; color: var(--pc); letter-spacing: -.02em; text-shadow: 0 0 18px color-mix(in srgb, var(--pc) 60%, transparent); }
+.lb-row { display: grid; grid-template-columns: 44px 36px 1fr auto auto; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 12px; cursor: pointer; transition: background .2s; }
+.lb-row:hover { background: var(--panel2); }
+.lb-row .rk { font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
+.lb-row .tm { font-weight: 750; font-variant-numeric: tabular-nums; }
+.lb-row.me { background: linear-gradient(90deg, rgba(var(--accent-rgb),.2), rgba(var(--accent-rgb),.04)); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.35); }
+.lb-pin { position: sticky; bottom: -40px; margin-top: 8px; backdrop-filter: blur(14px); }
+.sheet-wrap { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; background: rgba(4,2,10,.55); backdrop-filter: blur(10px); animation: fadeIn .25s; }
+.sheet { width: min(760px, calc(100vw - 80px)); max-height: calc(100vh - 90px); overflow-y: auto; padding: 18px; border-radius: 22px; background: var(--panel-solid); border: 1px solid var(--line2);
+  box-shadow: 0 40px 100px -30px rgba(0,0,0,.9), 0 0 80px -40px rgba(var(--accent-rgb),1); animation: sheetIn .5s var(--spring); }
+.sheet { position: relative; } .sheet .card { margin-bottom: 12px; }
+.sheet .x { position: absolute; top: 28px; right: 28px; z-index: 5; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: var(--muted); background: rgba(0,0,0,.35); border: 1px solid var(--line2); backdrop-filter: blur(8px); transition: all .25s var(--ease); }
+.sheet .x:hover { color: #fff; background: #e11d48; border-color: transparent; transform: rotate(90deg); }
+@keyframes fadeIn { from { opacity: 0; } } @keyframes sheetIn { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+.skel { height: 120px; border-radius: var(--radius); margin-bottom: 14px; background: linear-gradient(100deg, var(--panel2) 30%, var(--panel3) 50%, var(--panel2) 70%); background-size: 300% 100%; animation: skel 1.3s linear infinite; }
+@keyframes skel { to { background-position: -150% 0; } }
+/* ===== v2.16 Accounts ===== */
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.acc { margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+.acc .nm { margin-top: 8px; font-weight: 800; font-size: 16px; } .acc .un { color: var(--muted); font-size: 12.5px; }
+.acc .state { margin-top: 8px; font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.acc .state.on { color: var(--good); text-shadow: 0 0 12px rgba(74,222,128,.6); } .acc .state.bad { color: var(--bad); }
+.acc .row { margin-top: 12px; justify-content: center; }
+.acc.active { border-color: rgba(var(--accent-rgb),.55); box-shadow: 0 0 0 1px rgba(var(--accent-rgb),.35), 0 24px 60px -30px rgba(var(--accent-rgb),1); }
+.acc .kebab { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 9px; color: var(--muted); display: grid; place-items: center; }
+.acc .kebab:hover { background: rgba(251,113,133,.12); color: var(--bad); }
+.acc.add-tile { justify-content: center; min-height: 230px; border-style: dashed; cursor: pointer; color: var(--muted); }
+.acc.add-tile:hover { color: var(--text); }
+.acc.add-tile .plus { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; font-weight: 300; background: var(--panel2); border: 1px solid var(--line2); }
+.info-strip { display: flex; gap: 14px; align-items: flex-start; }
+.info-strip svg { width: 22px; height: 22px; flex: none; color: var(--accent); margin-top: 2px; filter: drop-shadow(0 0 8px rgba(var(--accent-rgb),.7)); }
+.banner-wait { border-color: rgba(34,211,238,.45); background: linear-gradient(90deg, rgba(34,211,238,.12), transparent 70%), var(--panel); }
+
+/* ===== v2.16: cooler UI ===== */
+/* Orbit border: a comet of light circles a card's edge while you hover it */
+.card:not(.hero):not(.pod)::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1.2px; pointer-events: none; opacity: 0; z-index: 1;
+  background: conic-gradient(from var(--spin), transparent 0deg 200deg, rgba(var(--accent-rgb),.15) 240deg, var(--accent) 300deg, var(--accent2) 340deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  transition: opacity .45s var(--ease); animation: ringSpin 3.2s linear infinite paused; }
+.card:not(.hero):not(.pod):hover::after { opacity: 1; animation-play-state: running; }
+.card.acc.active::after, .card.prof-hero::after { opacity: .85; animation-play-state: running; animation-duration: 6s; }
+/* Page titles: shimmering gradient and a glowing underline that draws in */
+.page-head h1 { background: linear-gradient(100deg, var(--text) 0%, var(--text) 35%, color-mix(in srgb, var(--accent) 55%, #fff) 48%, var(--text) 62%, var(--text) 100%);
+  background-size: 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.page.active .page-head h1 { animation: titleSheen 2.4s var(--ease) .15s both; }
+@keyframes titleSheen { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+[data-mode="light"] .page-head h1 { background-image: linear-gradient(100deg, var(--text) 0%, var(--text) 35%, var(--accent) 48%, var(--text) 62%, var(--text) 100%); }
+.page-head > div:first-child, .page-head:not(.row) { position: relative; }
+.page-head h1::after { content: none; }
+.page-head > div:first-child::before, .page-head:not(.row)::before { content: ""; position: absolute; left: 0; bottom: -10px; height: 2px; width: 46px; border-radius: 2px;
+  background: var(--grad); box-shadow: 0 0 12px rgba(var(--accent-rgb),.9); transform-origin: left; transform: scaleX(0); }
+.page.active .page-head > div:first-child::before, .page.active .page-head:not(.row)::before { animation: lineIn .9s var(--spring) .25s forwards; }
+@keyframes lineIn { to { transform: scaleX(1); } }
+.page-head { margin-bottom: 26px; }
+/* Title bar: a slow aurora line along the bottom edge */
+.titlebar { position: relative; }
+.titlebar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none; opacity: .9;
+  background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent2) 45%, transparent 60%, transparent); background-size: 220% 100%; animation: edgeFlow 9s linear infinite; }
+@keyframes edgeFlow { from { background-position: 120% 0; } to { background-position: -100% 0; } }
+/* Sidebar: soft light that follows your cursor, glowing group labels */
+.sidebar { position: relative; }
+.sidebar::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s;
+  background: radial-gradient(180px circle at var(--sx, 50%) var(--sy, 50%), rgba(var(--accent-rgb),.13), transparent 70%); }
+.sidebar:hover::before { opacity: 1; }
+.nav-group { display: flex; align-items: center; gap: 8px; }
+.nav-group::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line2), transparent); }
+.nav-item.active span { text-shadow: 0 0 18px rgba(var(--accent-rgb),.7); }
+.nav-indicator::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.14) 50%, transparent 70%); background-size: 250% 100%; animation: sheen 5s ease-in-out infinite; }
+/* Buttons: a light sweep across primary buttons on hover */
+.btn.primary::before { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.35) 50%, transparent 80%); }
+.btn.primary:hover::before { transform: translateX(120%); transition: transform .75s var(--ease); }
+.switch input:checked ~ .knob { box-shadow: 0 0 12px rgba(255,255,255,.9), 0 2px 6px rgba(0,0,0,.4); }
+::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(var(--accent-rgb),.45), color-mix(in srgb, var(--accent2) 35%, transparent)); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--grad); background-clip: padding-box; }
+/* Cursor light across the whole window */
+#glow { position: fixed; z-index: 0; left: 0; top: 0; width: 560px; height: 560px; margin: -280px 0 0 -280px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(var(--accent-rgb),.10), transparent 62%); transform: translate3d(var(--gx, -999px), var(--gy, -999px), 0); transition: opacity .6s; }
+body.idle #glow { opacity: 0; }
+[data-mode="light"] #glow { background: radial-gradient(circle, rgba(var(--accent-rgb),.12), transparent 62%); }
+@media (prefers-reduced-motion: reduce) { .card::after, .titlebar::after, .nav-indicator::after, .page.active .page-head h1 { animation: none !important; } }
 </style>
 </head>
 <body>
-<div id="bgImage"></div><div id="aurora"></div><div id="holo"></div><canvas id="flies"></canvas><canvas id="stars"></canvas><div class="nebula"></div><canvas id="fx"></canvas>
+<div id="bgImage"></div><div id="aurora"></div><div id="holo"></div><canvas id="flies"></canvas><canvas id="stars"></canvas><div class="nebula"></div><div id="glow"></div><canvas id="fx"></canvas>
 <div id="app">
   <header class="titlebar">
     <div class="drag pywebview-drag-region">
@@ -1098,6 +1238,15 @@ body.bg-fireflies #flies { opacity: 1; }
       </div>
     </section>
 
+    <section class="page" id="page-social">
+      <div class="page-head rise row" style="--i:0"><div><h1>Social</h1><p>Your Orbit profile, Roblox friends who use Orbit, and who's played the most.</p></div><span class="spacer"></span><div id="socTabs"></div></div>
+      <div id="socBody"></div>
+    </section>
+    <section class="page" id="page-accounts">
+      <div class="page-head rise row" style="--i:0"><div><h1>Accounts</h1><p>Keep all your Roblox accounts here and switch between them in one click.</p></div><span class="spacer"></span>
+        <button class="btn primary" id="rbxAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add account</button></div>
+      <div id="rbxBody"></div>
+    </section>
     <section class="page" id="page-game">
       <div class="rise" style="--i:0;margin-bottom:12px"><button class="btn ghost" id="gameBack">← Back</button></div>
       <div id="gameBody"></div>
@@ -1205,11 +1354,14 @@ const ICONS = {
   discover: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
   premium: '<path d="M6 3h12l3 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M12 21 9 9M12 21l3-12"/>',
   owner: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 21h14"/>',
+  social: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M16 14.6a5 5 0 0 1 6 4.9"/>',
+  accounts: '<circle cx="8" cy="8" r="3.2"/><path d="M2.8 19a5.2 5.2 0 0 1 10.4 0"/><path d="M15 7h6m0 0-2.2-2.2M21 7l-2.2 2.2M21 15h-6m0 0 2.2-2.2M15 15l2.2 2.2"/>',
+  shield: '<path d="M12 3 4 6v6c0 4.6 3.4 8.3 8 9 4.6-.7 8-4.4 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
-const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["discover", "Discover"], ["servers", "Servers"],
-               ["#You"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
+const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["discover", "Discover"], ["servers", "Servers"], ["accounts", "Accounts"],
+               ["#You"], ["social", "Social"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
                ["#Orbit"], ["premium", "Premium"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
 
@@ -1295,6 +1447,7 @@ function modal({ title, text = "", input = false, placeholder = "", ok = "OK", d
 
 
 let starRGB = "220,210,255";
+let starBoost = 0;
 function applyTheme() {
   const a = cfg.appearance, names = Object.keys(S.accents);
   if (a.accent !== "Custom" && !S.accents[a.accent]) a.accent = names[0];
@@ -1314,6 +1467,16 @@ function applyTheme() {
 }
 
 
+function cursorLight() {
+  const glow = $("#glow"), side = $(".sidebar"); let raf = 0, ex = 0, ey = 0;
+  addEventListener("pointermove", (e) => {
+    ex = e.clientX; ey = e.clientY; if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0; glow.style.setProperty("--gx", ex + "px"); glow.style.setProperty("--gy", ey + "px");
+      const r = side.getBoundingClientRect(); side.style.setProperty("--sx", ex - r.left + "px"); side.style.setProperty("--sy", ey - r.top + "px");
+    });
+  }, { passive: true });
+}
 function starfield() {
   const c = $("#stars"), x = c.getContext("2d");
   let W, H, dpr, stars = [], shooting = null, last = 0, px = 0, py = 0, tx = 0, ty = 0;
@@ -1343,10 +1506,15 @@ function starfield() {
       }
       return;
     }
+    const boost = starBoost; starBoost *= .86; if (starBoost < .01) starBoost = 0;
     for (const st of stars) {
-      st.t += st.s * 3; st.x -= st.z * .12 * dpr; if (st.x < -2) { st.x = W + 2; st.y = Math.random() * H; }
-      const al = (.2 + .8 * Math.abs(Math.sin(st.t))) * st.z, r = (st.z * 1.1 + .25) * dpr;
-      x.fillStyle = `rgba(${starRGB},${al})`; x.beginPath(); x.arc(st.x - px * st.z * 34 * dpr, st.y - py * st.z * 24 * dpr, r, 0, 6.283); x.fill();
+      const v = st.z * .12 * dpr * (1 + boost * 90);
+      st.t += st.s * 3; st.x -= v; if (st.x < -2) { st.x = W + 2 + Math.random() * W * boost; st.y = Math.random() * H; }
+      const al = (.2 + .8 * Math.abs(Math.sin(st.t))) * st.z, r = (st.z * 1.1 + .25) * dpr, sx = st.x - px * st.z * 34 * dpr, sy = st.y - py * st.z * 24 * dpr;
+      if (boost > .04) {
+        x.strokeStyle = `rgba(${starRGB},${Math.min(1, al + boost * .4)})`; x.lineWidth = r * 1.6; x.lineCap = "round";
+        x.beginPath(); x.moveTo(sx, sy); x.lineTo(sx + v * 2.2, sy); x.stroke();
+      } else { x.fillStyle = `rgba(${starRGB},${al})`; x.beginPath(); x.arc(sx, sy, r, 0, 6.283); x.fill(); }
     }
     if (!shooting && Math.random() < .004) shooting = { x: Math.random() * W * .7 + W * .3, y: Math.random() * H * .4, l: 0 };
     if (shooting) {
@@ -1527,6 +1695,7 @@ async function refreshLive() {
 }
 function go(id) {
   if (id === "owner" && !S.owner) id = "home";
+  if (id !== page && cfg?.appearance?.page_warp !== false) starBoost = Math.max(starBoost, .55);
   page = id;
   if (["home", "session", "achievements", "library"].includes(id) && api && api.live_state && !go._busy) {
     go._busy = true; refreshLive().then(() => { go._busy = false; if (page === id) ({ home: renderHome, session: renderSession, library: renderLibrary })[id]?.(); });
@@ -1538,7 +1707,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: applyLocks, discover: () => renderDiscover(), credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
+     social: renderSocial, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: renderHealth, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -2105,7 +2274,7 @@ function renderSession() {
     toggleRow("Check my connection when a game starts", "Runs a quick test for lost packets and lag spikes and warns you if your Wi-Fi is struggling.", !!s.net_check, (v) => { s.net_check = v; save(); }),
     toggleRow("Streamer mode", "Hides your server location and join buttons from the badge, popups, Home and Discord, so you can stream safely.", !!s.streamer_mode, (v) => { s.streamer_mode = v; save(); }),
     bedtimeRow(s),
-    toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
+    toggleRow("Keystrokes & clicks overlay", "Shows W A S D, Space and your mouse buttons light up on the Roblox screen, with clicks per second. Counts every click, even 20+ CPS. Great for PvP clips. Starts with your next Roblox session.", !!(cfg.overlay && cfg.overlay.keystrokes), (v) => { cfg.overlay.keystrokes = v; save(); }),
     h("div", { class: "toggle-row" }, h("div", { class: "t" }, h("b", {}, "Overlay position"), h("span", {}, "Where the keystrokes sit on the Roblox window.")),
       segmented([["Top left", "Top left"], ["Top right", "Top right"], ["Bottom left", "Bottom left"], ["Bottom right", "Bottom right"]], (cfg.overlay && cfg.overlay.keys_pos) || "Bottom right", (v) => { cfg.overlay.keys_pos = v; save(); })),
     toggleRow("Show clicks per second", "Left | right clicks in the last second, under the mouse buttons.", !(cfg.overlay && cfg.overlay.keys_cps === false), (v) => { cfg.overlay.keys_cps = v; save(); }),
@@ -2192,6 +2361,7 @@ function renderAppearance() {
   const spc = $("#splashCard"); spc.innerHTML = "";
   renderShare(); renderGallery(); renderThemeMaker(); renderLang();
   spc.append(toggleRow("Startup animation", "Plays a short black hole intro when Orbit opens.", a.splash !== false, (v) => { a.splash = v; save(); if (v) playSplash(); }));
+  spc.append(toggleRow("Hyperspace between pages", "The stars streak past for a moment when you switch pages (Starfield background).", a.page_warp !== false, (v) => { a.page_warp = v; save(); if (v) starBoost = .8; }));
   spc.append(toggleRow("Hide the menu when idle", "If you don't touch the mouse or keyboard for 30 seconds, the menu fades away and only the background shows. Move the mouse to bring it back.", a.idle_hide !== false, (v) => { a.idle_hide = v; save(); idleWake(); }));
   $("#iconStatus").textContent = S.icon_set ? "Custom icon set ✓" : "No custom icon chosen. Roblox keeps its normal icon.";
   $("#removeIcon").disabled = !S.icon_set;
@@ -2334,6 +2504,239 @@ async function loadGames(pids) {
   pids.forEach((p) => { const g = gameCache[p]; if (g && g.icon) iconCache[p] = g.icon; });
 }
 const pt = (pid) => (S.playtime && S.playtime[pid] ? S.playtime[pid].seconds : 0);
+
+// ===== v2.16: Social (profiles, friends on Orbit, leaderboard) =====
+const BADGES = {
+  founder: ["Founder", "#fbbf24", "👑"], premium: ["Premium", "#f5c451", "💎"], beta: ["Beta Tester", "#22d3ee", "🧪"], og: ["OG", "#a78bfa", "⭐"],
+  staff: ["Staff", "#f472b6", "🛡️"], creator: ["Creator", "#fb7185", "🎬"], bug_hunter: ["Bug Hunter", "#4ade80", "🐞"], verified: ["Verified", "#60a5fa", "✔️"],
+  supporter: ["Supporter", "#fb923c", "❤️"],
+};
+const GIVABLE = ["beta", "og", "staff", "creator", "bug_hunter", "verified", "supporter"];
+function badgeEl(id, small = false) {
+  const [label, color, ico] = BADGES[id] || [id, "#a1a1aa", "•"];
+  return h("span", { class: "obadge" + (small ? " sm" : ""), style: `--bc:${color}`, title: label }, h("i", {}, ico), h("b", {}, label));
+}
+function avatarEl(url, name, size = 44, opts = {}) {
+  const av = h("div", { class: "oav", style: `--sz:${size}px` });
+  if (url) av.append(h("img", { src: url, alt: "", loading: "lazy", onerror: (e) => { e.target.remove(); av.textContent = (name || "?")[0].toUpperCase(); } }));
+  else av.textContent = (name || "?")[0].toUpperCase();
+  const wrap = h("div", { class: "oav-wrap" + (opts.ring ? " ring" : "") }, av);
+  if (opts.status) wrap.append(h("span", { class: "st " + opts.status }));
+  return wrap;
+}
+function fmtHrs(sec) {
+  sec = Math.max(0, sec || 0); const hrs = sec / 3600;
+  if (hrs >= 100) return Math.round(hrs).toLocaleString() + "h";
+  if (hrs >= 1) return (Math.round(hrs * 10) / 10) + "h";
+  return Math.round(sec / 60) + "m";
+}
+function socError(r, retry) {
+  const box = h("div", { class: "card" });
+  box.append(emptyState(r.needs_setup ? "owner" : "social", r.needs_setup ? "Profiles aren't switched on yet" : "Couldn't load this", r.error || "Try again in a minute."));
+  if (retry) box.append(h("div", { class: "row", style: "justify-content:center" }, h("button", { class: "btn", onclick: retry }, "Try again")));
+  return box;
+}
+let socTab = "profile";
+function renderSocial() {
+  const tabs = $("#socTabs"), body = $("#socBody");
+  tabs.innerHTML = "";
+  tabs.append(segmented([["profile", "Profile"], ["friends", "Friends"], ["leaderboard", "Leaderboard"]], socTab, (v) => { socTab = v; renderSocialTab(); }));
+  if (!(S.account || {}).enabled) { body.replaceChildren(h("div", { class: "card" }, emptyState("social", "Orbit accounts aren't set up", "Profiles, friends and the leaderboard need Orbit accounts."))); return; }
+  renderSocialTab();
+}
+function socLoading(body, n = 2) { body.replaceChildren(...Array.from({ length: n }, (_, i) => h("div", { class: "skel", style: `height:${i ? 90 : 150}px` }))); }
+async function renderSocialTab() {
+  const body = $("#socBody"), tab = socTab;
+  socLoading(body);
+  const fn = { profile: socProfile, friends: socFriends, leaderboard: socBoard }[tab];
+  const out = await fn();
+  if (page !== "social" || socTab !== tab) return;
+  body.replaceChildren(...out);
+  body.querySelectorAll(".card, .stat-tile").forEach((el, i) => { el.classList.add("rise"); el.style.setProperty("--i", Math.min(i, 6)); });
+}
+function profileView(p, { mine = false, local = null } = {}) {
+  if (!p || !p.found) return [h("div", { class: "card" }, emptyState("social", "No Orbit player with that name", "Check the spelling and try again."))];
+  if (p.private) return [h("div", { class: "card" }, emptyState("social", `${p.username}'s profile is private`, "They chose to keep their profile to themselves."))];
+  const status = p.now_playing ? "play" : p.online ? "on" : "";
+  const rb = p.roblox_name ? h("a", { href: "#", onclick: (e) => { e.preventDefault(); api.open_url(`https://www.roblox.com/users/${p.roblox_id}/profile`); } }, "@" + p.roblox_name + " on Roblox") : (mine ? "Play a game through Orbit to link your Roblox account" : "");
+  const since = p.created_at ? "Joined " + new Date(p.created_at).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
+  const seen = p.now_playing ? "" : p.online ? " · Online now" : p.last_seen ? " · Seen " + fmtAgo(Date.parse(p.last_seen) / 1000) : "";
+  const hero = h("div", { class: "card prof-hero tilt" },
+    avatarEl(p.avatar, p.username, 104, { ring: true, status }),
+    h("div", { class: "who", style: "min-width:0" },
+      h("div", { class: "row", style: "gap:10px" }, h("h2", {}, p.username), h("span", { class: "lvl", style: "height:22px;font-size:12px" }, "LV " + (p.level || 1)), p.level_title ? h("span", { class: "muted small" }, p.level_title) : null),
+      h("div", { class: "rb" }, rb, h("span", {}, (rb && since ? " · " : "") + since + seen)),
+      (p.badges || []).length ? h("div", { class: "badges" }, (p.badges || []).map((b) => badgeEl(b))) : null,
+      p.bio ? h("p", { class: "bio" }, p.bio) : mine ? h("p", { class: "bio muted" }, "Add a bio below so people know what you're about.") : null,
+      p.now_playing ? h("div", { class: "playing-pill" }, h("i"), "Playing " + p.now_playing.name) : null));
+  const week = mine && local ? local.week_seconds : p.week_seconds, total = mine && local ? Math.max(local.total_seconds, p.total_seconds || 0) : p.total_seconds;
+  const tiles = h("div", { class: "stat-tiles" },
+    h("div", { class: "stat-tile" }, h("small", {}, "Total time"), h("b", {}, fmtHrs(total)), h("span", {}, "on Orbit")),
+    h("div", { class: "stat-tile" }, h("small", {}, "This week"), h("b", {}, fmtHrs(week)), h("span", {}, "since Monday")),
+    h("div", { class: "stat-tile" }, h("small", {}, "Level"), h("b", {}, String(p.level || 1)), h("span", {}, p.level_title || "Stargazer")),
+    h("div", { class: "stat-tile" }, h("small", {}, "Rank"), h("b", {}, p.rank ? "#" + p.rank : "—"), h("span", {}, p.rank ? "all-time leaderboard" : p.on_leaderboard === false ? "hidden from leaderboard" : "play to get ranked")));
+  const games = p.top_games || [], max = Math.max(1, ...games.map((g) => g.seconds || 0));
+  const top = h("div", { class: "card" }, h("h3", {}, "Most played"),
+    games.length ? h("div", { style: "margin-top:8px" }, games.map((g) => h("div", { class: "topg" },
+      h("div", { class: "ic", style: g.icon ? `background-image:url("${g.icon}")` : "" }),
+      h("div", { style: "min-width:0" }, h("div", { style: "font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, g.name), h("div", { class: "bar" }, h("i", { style: `width:${Math.max(4, 100 * (g.seconds || 0) / max)}%` }))),
+      h("div", { class: "muted", style: "font-weight:700;font-variant-numeric:tabular-nums" }, fmtHrs(g.seconds)))))
+      : h("p", { class: "sub", style: "margin:6px 0 0" }, mine ? "Play some games through Orbit and your favorites show up here." : "Nothing played yet."));
+  return [hero, tiles, top];
+}
+async function socProfile() {
+  const r = await api.social_me();
+  if (r.error) return [socError(r, renderSocialTab)];
+  const set = r.settings || {};
+  const bio = h("input", { class: "input", maxlength: 120, placeholder: "Say something about yourself (120 characters)", style: "flex:1", value: set.bio || "" });
+  const saveSoc = async (changes, msg) => { cfg.social = Object.assign(cfg.social || {}, changes); const res = await api.social_save(changes); if (res && res.error) toast(res.error, "err"); else if (msg) toast(msg, "ok"); };
+  const saveBio = h("button", { class: "btn", onclick: async () => { await saveSoc({ bio: bio.value }, "Bio saved."); renderSocialTab(); } }, "Save bio");
+  bio.onkeydown = (e) => { if (e.key === "Enter") saveBio.click(); };
+  const edit = h("div", { class: "card" }, h("h3", {}, "Edit profile"), h("p", { class: "sub" }, "Your playtime, level and favorite games update by themselves while you play."),
+    h("div", { class: "row", style: "margin-bottom:6px" }, bio, saveBio),
+    toggleRow("Public profile", "Other Orbit players can open your profile and see you in their Friends tab.", set.public_profile !== false, (v) => saveSoc({ public_profile: v })),
+    toggleRow("Show me on the leaderboard", "Turn this off to keep your playtime off the rankings.", set.on_leaderboard !== false, (v) => saveSoc({ on_leaderboard: v })),
+    toggleRow("Show friends what I'm playing", "Friends on Orbit see which game you're in. Streamer mode always hides it.", set.share_activity !== false, (v) => saveSoc({ share_activity: v })));
+  const q = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, spellcheck: "false", style: "flex:1" });
+  const look = h("button", { class: "btn primary", onclick: () => q.value.trim() && openProfile(q.value.trim()) }, "View profile");
+  q.onkeydown = (e) => { if (e.key === "Enter") look.click(); };
+  const lookup = h("div", { class: "card" }, h("h3", {}, "Look up a player"), h("p", { class: "sub" }, "See anyone's Orbit profile by their Orbit username."), h("div", { class: "row" }, q, look));
+  return [...profileView(r.profile, { mine: true, local: r.local }), edit, lookup];
+}
+async function openProfile(username) {
+  const wrap = h("div", { class: "sheet-wrap" }), sheet = h("div", { class: "sheet" });
+  const close = () => { wrap.remove(); document.removeEventListener("keydown", esc); };
+  const esc = (e) => { if (e.key === "Escape") close(); };
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  document.addEventListener("keydown", esc);
+  sheet.append(h("button", { class: "x", title: "Close (Esc)", onclick: close }, "✕"), h("div", { class: "skel", style: "height:160px" }));
+  wrap.append(sheet); document.body.append(wrap);
+  const p = await api.social_profile(username);
+  if (!wrap.isConnected) return;
+  sheet.replaceChildren(h("button", { class: "x", title: "Close (Esc)", onclick: close }, "✕"));
+  if (p.error) { sheet.append(socError(p)); return; }
+  sheet.append(...profileView(p, { mine: p.mine }));
+  if (S.owner && p.found && !p.private) {
+    const have = new Set((p.badges || []).filter((b) => GIVABLE.includes(b)));
+    const chips = h("div", { class: "row", style: "gap:8px" }, GIVABLE.map((b) => {
+      const c = h("button", { class: "chip" + (have.has(b) ? " on" : "") }, (BADGES[b][2]) + " " + BADGES[b][0]);
+      c.onclick = () => { have.has(b) ? have.delete(b) : have.add(b); c.classList.toggle("on"); };
+      return c;
+    }));
+    const saveB = h("button", { class: "btn primary", onclick: async () => {
+      const r = await api.owner_set_badges(p.username, [...have]);
+      if (r.error) return toast(r.error, "err");
+      toast(`Badges saved for ${p.username}.`, "ok"); close(); openProfile(p.username);
+    } }, "Save badges");
+    sheet.append(h("div", { class: "card" }, h("h3", {}, "Owner: badges"), h("p", { class: "sub" }, "Founder and Premium are automatic. Pick any extra badges for this player."), chips, h("div", { class: "row", style: "margin-top:12px;justify-content:flex-end" }, saveB)));
+  }
+}
+async function socFriends() {
+  const r = await api.social_friends();
+  if (r.error) return [socError(r, renderSocialTab)];
+  const refresh = h("button", { class: "btn", onclick: renderSocialTab }, "Refresh");
+  if (r.no_roblox) return [h("div", { class: "card" }, emptyState("social", "Orbit doesn't know your Roblox account yet", "Play any game through Orbit once, then come back here."))];
+  const list = r.friends || [];
+  const head = h("div", { class: "card" }, h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Friends on Orbit"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, list.length ? `${list.length} of your ${r.roblox_friends} Roblox friends use Orbit.` : `None of your ${r.roblox_friends || 0} Roblox friends use Orbit yet. Send them the download link!`)), refresh));
+  if (!list.length) return [head];
+  const grid = h("div", { class: "friend-grid" }, list.map((f) => {
+    const status = f.now_playing ? "play" : f.online ? "on" : "";
+    const line = f.now_playing ? "Playing " + f.now_playing.name : f.online ? "Online on Orbit" : "Seen " + fmtAgo(Date.parse(f.last_seen) / 1000);
+    const join = f.now_playing && f.roblox_id ? h("button", { class: "btn primary", onclick: async (e) => { e.stopPropagation(); const res = await api.social_join(f.roblox_id); if (res && res.error) toast(res.error, "err"); else toast(`Joining ${f.username}...`, "ok"); } }, "Join") : null;
+    return h("div", { class: "card friend tilt", onclick: () => openProfile(f.username) }, avatarEl(f.avatar, f.username, 46, { status }),
+      h("div", { style: "flex:1;min-width:0" }, h("div", { class: "nm" }, f.username, h("span", { class: "lvl" }, f.level || 1), (f.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
+        h("div", { class: "ln" + (f.now_playing ? " play" : "") }, line)), join);
+  }));
+  return [head, grid];
+}
+let lbPeriod = "week";
+async function socBoard() {
+  const r = await api.social_leaderboard(lbPeriod);
+  if (r.error) return [socError(r, renderSocialTab)];
+  const seg = segmented([["week", "This week"], ["all", "All time"]], lbPeriod, (v) => { lbPeriod = v; renderSocialTab(); });
+  const head = h("div", { class: "card" }, h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Leaderboard"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, `Most time played through Orbit${lbPeriod === "week" ? " since Monday" : ""}. ${r.players || 0} players ranked.`)), seg));
+  requestAnimationFrame(() => seg._remeasure && seg._remeasure());
+  const rows = r.rows || [];
+  if (!rows.length) return [head, h("div", { class: "card" }, emptyState("achievements", "Nobody's on the board yet", "Play a game through Orbit and claim first place."))];
+  const pod = (x, n) => x ? h("div", { class: `card pod p${n} tilt`, onclick: () => openProfile(x.username) }, h("span", { class: "medal" }, n), avatarEl(x.avatar, x.username, n === 1 ? 84 : 68),
+    h("div", { class: "nm" }, x.username), h("div", { class: "row", style: "justify-content:center;gap:4px;margin-top:4px" }, h("span", { class: "lvl" }, "LV " + (x.level || 1)), (x.badges || []).slice(0, 2).map((b) => badgeEl(b, true))),
+    h("div", { class: "tm" }, fmtHrs(x.seconds))) : h("div");
+  const podium = h("div", { class: "podium" }, pod(rows[1], 2), pod(rows[0], 1), pod(rows[2], 3));
+  const row = (x) => h("div", { class: "lb-row" + (x.me ? " me" : ""), onclick: () => openProfile(x.username) }, h("div", { class: "rk" }, "#" + x.rank), avatarEl(x.avatar, x.username, 32),
+    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, x.username, (x.badges || []).slice(0, 3).map((b) => badgeEl(b, true))), h("span", { class: "lvl" }, x.level || 1), h("div", { class: "tm" }, fmtHrs(x.seconds)));
+  const rest = rows.slice(3);
+  const listCard = h("div", { class: "card", style: "padding:10px" }, rest.length ? rest.map(row) : h("p", { class: "sub", style: "margin:8px" }, "Only the top 3 so far."));
+  const out = [head, podium, listCard];
+  if (r.me && !rows.some((x) => x.me)) out.push(h("div", { class: "card lb-pin", style: "padding:8px" }, row(r.me)));
+  return out;
+}
+
+// ===== v2.16: Roblox account switcher =====
+let rbxWaiting = false;
+async function rbxCall(fn, args, closeAt) {
+  let r = await api[fn](...args);
+  if (r && r.running) {
+    const ok = await modal({ title: "Close Roblox?", text: "Roblox has to be closed to switch accounts. Close it now?", ok: "Close Roblox" });
+    if (!ok) return null;
+    toast("Closing Roblox...", "");
+    r = await api[fn](...args.map((a, i) => (i === closeAt ? true : a)));
+  }
+  if (r && r.error) { toast(r.error, "err"); return null; }
+  return r;
+}
+async function renderAccounts(check = true) {
+  const body = $("#rbxBody");
+  if (!body.children.length) socLoading(body, 1);
+  let st = await api.rbx_accounts(false);
+  paintAccounts(st);
+  if (check && st.accounts && st.accounts.length) { st = await api.rbx_accounts(true); if (page === "accounts") paintAccounts(st); }
+}
+function paintAccounts(st) {
+  const body = $("#rbxBody"); if (!st || st.error) { body.replaceChildren(socError(st || {}, () => renderAccounts())); return; }
+  const out = [];
+  if (!st.supported) out.push(h("div", { class: "card warn-card" }, h("b", {}, "Account switching works on Windows only.")));
+  const unsaved = st.logged_in && !st.accounts.some((a) => a.active);
+  if (rbxWaiting || unsaved) {
+    const saveBtn = h("button", { class: "btn primary", onclick: async () => {
+      const r = await api.rbx_save_current(); if (r.error) return toast(r.error, "err");
+      rbxWaiting = false; toast(`Saved ${r.name}. You can switch to it any time.`, "ok"); sfx?.("ready"); renderAccounts(false);
+    } }, "Save this account");
+    out.push(h("div", { class: "card banner-wait" }, h("div", { class: "row" }, h("div", { style: "flex:1" },
+      h("h3", { style: "margin:0" }, rbxWaiting ? "Log in on Roblox, then save" : "Save the account Roblox is using"),
+      h("p", { class: "sub", style: "margin:4px 0 0" }, rbxWaiting ? "Roblox opened on its login screen. Log in to the other account there, then press Save this account." : "Roblox is logged in to an account Orbit hasn't saved yet. Save it so you can switch back to it later.")), saveBtn)));
+  }
+  const grid = h("div", { class: "acc-grid" });
+  st.accounts.forEach((a) => {
+    const bad = a.status === "expired" || a.status === "mismatch";
+    const state = a.active ? h("div", { class: "state on" }, "● In use") : bad ? h("div", { class: "state bad" }, "Login expired") : h("div", { class: "state" }, a.last_used ? "Used " + fmtAgo(a.last_used) : "Saved");
+    const sw = (play) => h("button", { class: "btn" + (play ? " primary" : ""), onclick: async () => {
+      const r = await rbxCall("rbx_switch", [a.id, false, play], 1); if (!r) return;
+      toast(`Switched to ${a.display || a.name}.` + (play ? " Opening Roblox..." : ""), "ok"); renderAccounts(false);
+    } }, play ? "Switch & play" : "Switch");
+    const actions = a.active ? [h("button", { class: "btn primary", onclick: () => api.launch("") }, "Play")] : bad ? [h("button", { class: "btn", onclick: () => addAccount() }, "Log in again")] : [sw(false), sw(true)];
+    const kebab = h("button", { class: "kebab", title: "Remove from Orbit", onclick: async () => {
+      if (!await modal({ title: `Remove ${a.name}?`, text: "Orbit forgets this saved login. Your Roblox account itself isn't touched.", ok: "Remove", danger: true })) return;
+      await api.rbx_remove(a.id); renderAccounts(false);
+    } }); kebab.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    grid.append(h("div", { class: "card acc tilt" + (a.active ? " active" : "") }, kebab, avatarEl(a.avatar, a.name, 78, { ring: a.active }),
+      h("div", { class: "nm" }, a.display || a.name), h("div", { class: "un" }, "@" + a.name), state, h("div", { class: "row" }, actions)));
+  });
+  grid.append(h("div", { class: "card acc add-tile", onclick: () => addAccount() }, h("div", { class: "plus" }, "+"), h("div", { class: "nm" }, "Add account"), h("div", { class: "un" }, "Log in to another Roblox account")));
+  out.push(grid);
+  const shield = h("div"); shield.innerHTML = svg("shield");
+  out.push(h("div", { class: "card", style: "margin-top:14px" }, h("div", { class: "info-strip" }, shield.firstChild, h("div", {},
+    h("b", {}, "Your logins stay on this PC"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Saved logins are locked with Windows encryption and never leave your computer. To add an account, use Add account here. Don't press Log out inside Roblox on a saved account, because that ends the saved login too. Premium keys only work on the Roblox account they were made for.")))));
+  body.replaceChildren(...out);
+}
+async function addAccount() {
+  if (!await modal({ title: "Add a Roblox account", text: "Orbit keeps your current login saved, then opens Roblox on its login screen so you can sign in to another account.", ok: "Continue" })) return;
+  const r = await rbxCall("rbx_add_new", [false], 0);
+  if (!r) return;
+  rbxWaiting = true; go("accounts");
+}
 
 function emptyState(icon, title, sub) {
   const d = h("div"); d.innerHTML = svg(icon);
@@ -4190,13 +4593,14 @@ async function init() {
   if (S.mode !== "setup" && cfg.appearance.splash !== false && !location.search.includes("nosplash")) playSplash();
   $("#ver").textContent = "v" + S.version;
   if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
-  spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
+  spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground(); cursorLight();
   buildNav(); watchNav(); renderNewTags(); checkAccount(); wire(); wireUpdates(); wireExtras(); wireClips(); wireWrapped(); renderCredits(); startI18n();
   $("#spotCancel").onclick = async () => { await api.cancel_spot(); toast("Stopped waiting.", "ok"); pollSpot(); };
   pollSpot();
   idleWatch();
   $("#discGo").onclick = () => renderDiscover($("#discQ").value.trim()); $("#discQ").onkeydown = (e) => { if (e.key === "Enter") $("#discGo").click(); };
   $("#discReset").onclick = () => { $("#discQ").value = ""; discData = null; renderDiscover(""); };
+  $("#rbxAdd").onclick = () => addAccount();
   setPremPill(S.premium);
   if (cfg.premium_key) api.premium(true).then(premChanged);
   go("home");
