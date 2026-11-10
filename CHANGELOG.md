@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.15.0
+- **Orbit accounts:** Orbit now asks you to log in or make an account (just a username and password). Your name shows at the bottom of the menu, with a log out button next to it.
+- **Premium keys are now one key per account.** A key that's already been used can't be redeemed by anyone else. If you already had Premium, it moves to your account the first time you log in.
+- Forgot your password? Ask the Orbit owner to reset it.
+
 ## v2.14.1
 - **NEW! tags:** after an update, the sections with new stuff get a NEW! tag in the menu. Open the section and the tag goes away, and the new part is highlighted so you can spot it.
 - **Menu highlight fixed:** the highlight on the selected menu item no longer spills onto the item below it.

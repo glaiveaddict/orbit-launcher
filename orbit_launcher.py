@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.14.1"
+APP_VERSION = "2.15.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -6463,8 +6463,8 @@ def revoked_premium_ids(refresh=False, fetch=True):
     return ids
 
 
-ACCOUNT_URL = os.environ.get("ORBIT_ACCOUNT_URL") or ""
-ACCOUNT_KEY = os.environ.get("ORBIT_ACCOUNT_KEY") or ""
+ACCOUNT_URL = os.environ.get("ORBIT_ACCOUNT_URL") or "https://jyoriqaedpeusebziqzc.supabase.co"
+ACCOUNT_KEY = os.environ.get("ORBIT_ACCOUNT_KEY") or "sb_publishable_4fSD4wknEdve5Twlb2N-Bg_fuMOJ-3a"
 ACCOUNT_DOMAIN = "players.orbit.invalid"
 ACCOUNT_FILE = DATA_DIR / "account.json"
 KEYCHECK_FILE = DATA_DIR / "keycheck.json"
@@ -6486,9 +6486,8 @@ def accounts_on():
 def _sb(method, path, body=None, token=None, timeout=12):
     req = urllib.request.Request(ACCOUNT_URL.rstrip("/") + path, method=method,
                                  data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"apikey": ACCOUNT_KEY, "Authorization": "Bearer " + (token or ACCOUNT_KEY),
-                                          "Content-Type": "application/json", "Accept": "application/json",
-                                          "User-Agent": APP_ID + "/" + APP_VERSION})
+                                 headers={"apikey": ACCOUNT_KEY, "Content-Type": "application/json", "Accept": "application/json",
+                                          "User-Agent": APP_ID + "/" + APP_VERSION, **({"Authorization": "Bearer " + token} if token else {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read().decode("utf-8")
@@ -7269,6 +7268,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.15.0": ["owner:ownerLog", "premium"],
     "2.14.0": ["mods:storeCard"],
     "2.13.3": ["boost:statsOvCard"],
     "2.13.0": ["appearance:splashCard"],
