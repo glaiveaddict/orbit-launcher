@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.16.1
+- **Change your username:** Social > Profile now has a Username box. Type a new name and Orbit tells you right away if it's free. Names someone else already has can't be used. You log in with the new name from then on, with the same password.
+- The owner key log shows when a player changes their username.
+- **Fix: Roblox staying muted after you tab back in.** Orbit now unmutes Roblox on every sound device (not just your default one), double-checks for a few seconds after you click back in and fixes it if the sound didn't come back, and unmutes Roblox if it was left muted after closing while tabbed out.
+
 ## v2.16.0
 - **Orbit profiles:** every Orbit account now has a profile with your Roblox avatar, badges (Founder, Premium, Beta Tester and more), a bio, total and weekly play time, your level and your most played games. It updates by itself while you play (Social page).
 - **Friends on Orbit:** see which of your Roblox friends use Orbit, what they're playing right now, and join them in one click.

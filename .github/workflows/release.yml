@@ -246,7 +246,7 @@ jobs:
               ci = ol.clip_info(ol.Path(out)); print("CHECK clip info:", ci["duration"], bool(ci["thumb"])); ok &= bool(ci["thumb"])
           from PIL import Image as _Im
           sky = _Im.open("store/skies/sunset/sky512_up.tex"); print("CHECK sky dds:", sky.size, sky.mode)
-          print("CHECK mute sessions:", ol.set_process_mute([os.getpid()], True))
+          print("CHECK mute sessions:", ol.set_process_mute([os.getpid()], True), ol.set_process_mute([os.getpid()], False), "muted now:", ol.muted_sessions([os.getpid()]))
           print("CHECK do not disturb:", ol.set_dnd(True), ol.set_dnd(False))
           print("CHECK media pause:", ol.pause_media(), ol.resume_media())
           print("CHECK battery:", ol.on_battery())

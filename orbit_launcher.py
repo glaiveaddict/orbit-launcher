@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.16.0"
+APP_VERSION = "2.16.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -1156,6 +1156,8 @@ def set_power_throttle(pid, on):
 
 
 class BackgroundGuard:
+    HEAL_SECONDS = 12
+
     def __init__(self, perf, mute=False):
         self.perf = perf or {}
         self.prio = self.perf.get("bg_guard", True)
@@ -1164,29 +1166,59 @@ class BackgroundGuard:
         self.stop_event = threading.Event()
         self.pids = []
         self.pids_at = 0
+        self.heal_until = 0
+        self.heal_at = 0
+        if TABMUTE_FILE.exists():
+            # Last time Roblox was left muted (it closed or crashed while tabbed out), and Windows remembers that.
+            self.heal_until = time.time() + 40
 
-    def _pids(self):
-        if time.time() - self.pids_at > 5:
+    def _pids(self, fresh=False):
+        if fresh or time.time() - self.pids_at > 5:
             self.pids, self.pids_at = pids_named("RobloxPlayerBeta.exe"), time.time()
         return self.pids
 
     def apply(self, dim):
         normal = 0x00008000 if self.perf.get("high_priority") else 0x00000020
+        pids = self._pids(fresh=not dim)
         if self.prio:
-            for pid in self._pids():
+            for pid in pids:
                 set_priority(pid=pid, cls=0x00004000 if dim else normal)
                 set_power_throttle(pid, dim)
-        if self.mute:
+        if self.mute or (not dim and self.heal_until):
             try:
-                n = set_process_mute(self._pids(), dim)
+                n = set_process_mute(pids, dim)
+                if dim:
+                    save_json(TABMUTE_FILE, {"at": int(time.time())})
                 if n:
                     log(f"Roblox {'muted' if dim else 'unmuted'} ({n} audio session{'s' if n != 1 else ''})")
             except Exception as e:
                 log(f"Mute failed: {e}")
+            if not dim:
+                self.heal_until = time.time() + self.HEAL_SECONDS
         self.dimmed = dim
 
+    def _heal(self):
+        """For a few seconds after you tab back in, keep checking Roblox really is unmuted and fix it if not.
+        Covers an unmute that didn't stick, a new audio session, or a sound device that changed."""
+        now = time.time()
+        if now - self.heal_at < 1:
+            return
+        self.heal_at = now
+        try:
+            pids = self._pids(fresh=True)
+            stuck = muted_sessions(pids)
+            if stuck:
+                n = set_process_mute(pids, False)
+                log(f"Roblox was still muted after tabbing in, unmuted {n} audio session{'s' if n != 1 else ''}")
+            elif now >= self.heal_until - 1 and pids:
+                TABMUTE_FILE.unlink(missing_ok=True)
+        except Exception as e:
+            log(f"Unmute check failed: {e}")
+        if now >= self.heal_until:
+            self.heal_until = 0
+
     def run(self):
-        while not self.stop_event.wait(0.35):
+        while not self.stop_event.wait(0.25):
             try:
                 if not self._pids():
                     continue
@@ -1195,6 +1227,8 @@ class BackgroundGuard:
                     self.apply(True)
                 elif front and self.dimmed:
                     self.apply(False)
+                elif front and self.heal_until:
+                    self._heal()
             except Exception:
                 pass
         if self.dimmed:
@@ -2066,7 +2100,7 @@ class SessionMonitor:
             start_crosshair_overlay()
         perf = self.settings.get("performance") or {}
         mute = bool(self.session.get("mute_tabbed"))
-        self.guard = BackgroundGuard(perf, mute).start() if IS_WINDOWS and (perf.get("bg_guard", True) or mute) else None
+        self.guard = BackgroundGuard(perf, mute).start() if IS_WINDOWS and (perf.get("bg_guard", True) or mute or TABMUTE_FILE.exists()) else None
         ov = self.settings.get("overlay") or {}
         if ov.get("stats_fps") or ov.get("stats_ping"):
             start_stats_overlay()
@@ -5190,50 +5224,79 @@ def _release(ptr):
         _vcall(ptr, 2, ctypes.c_ulong)(ptr)
 
 
-def set_process_mute(pids, mute):
+def _roblox_audio(pids, action):
+    """Mutes, unmutes or counts muted audio sessions for these processes on every active output device.
+
+    Looking at every device (not just the default one) matters: if Roblox plays through a headset while the
+    default device is something else, or you switch outputs mid-game, the session lives on another device."""
     if not IS_WINDOWS or not pids:
         return 0
     pids = {int(x) for x in pids}
     ole = ctypes.windll.ole32
     ole.CoInitialize(None)
     HR, VP = ctypes.c_long, ctypes.c_void_p
-    enum, dev, mgr, sessions = VP(), VP(), VP(), VP()
+    enum, devs = VP(), VP()
     ole.CoCreateInstance.argtypes = [VP, VP, ctypes.c_ulong, VP, ctypes.POINTER(VP)]
     if ole.CoCreateInstance(ctypes.byref(_guid("BCDE0395-E52F-467C-8E3D-C4579291692E")), None, 23,
                             ctypes.byref(_guid("A95664D2-9614-4F35-A746-DE8DB63617E6")), ctypes.byref(enum)) != 0:
         return 0
     done = 0
     try:
-        if _vcall(enum, 4, HR, ctypes.c_int, ctypes.c_int, ctypes.POINTER(VP))(enum, 0, 1, ctypes.byref(dev)) != 0:
+        if _vcall(enum, 3, HR, ctypes.c_int, ctypes.c_ulong, ctypes.POINTER(VP))(enum, 0, 1, ctypes.byref(devs)) != 0:
             return 0
-        if _vcall(dev, 3, HR, VP, ctypes.c_ulong, VP, ctypes.POINTER(VP))(dev, ctypes.byref(_guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F")), 23, None, ctypes.byref(mgr)) != 0:
-            return 0
-        if _vcall(mgr, 5, HR, ctypes.POINTER(VP))(mgr, ctypes.byref(sessions)) != 0:
-            return 0
-        count = ctypes.c_int(0)
-        _vcall(sessions, 3, HR, ctypes.POINTER(ctypes.c_int))(sessions, ctypes.byref(count))
-        for i in range(count.value):
-            ctl, ctl2, vol = VP(), VP(), VP()
+        ndev = ctypes.c_uint(0)
+        _vcall(devs, 3, HR, ctypes.POINTER(ctypes.c_uint))(devs, ctypes.byref(ndev))
+        for d in range(ndev.value):
+            dev, mgr, sessions = VP(), VP(), VP()
             try:
-                if _vcall(sessions, 4, HR, ctypes.c_int, ctypes.POINTER(VP))(sessions, i, ctypes.byref(ctl)) != 0:
+                if _vcall(devs, 4, HR, ctypes.c_uint, ctypes.POINTER(VP))(devs, d, ctypes.byref(dev)) != 0:
                     continue
-                if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d")), ctypes.byref(ctl2)) != 0:
+                if _vcall(dev, 3, HR, VP, ctypes.c_ulong, VP, ctypes.POINTER(VP))(dev, ctypes.byref(_guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F")), 23, None, ctypes.byref(mgr)) != 0:
                     continue
-                pid = ctypes.c_ulong(0)
-                _vcall(ctl2, 14, HR, ctypes.POINTER(ctypes.c_ulong))(ctl2, ctypes.byref(pid))
-                if pid.value not in pids:
+                if _vcall(mgr, 5, HR, ctypes.POINTER(VP))(mgr, ctypes.byref(sessions)) != 0:
                     continue
-                if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("87CE5498-68D6-44E5-9215-6DA47EF883D8")), ctypes.byref(vol)) != 0:
-                    continue
-                if _vcall(vol, 5, HR, ctypes.c_int, VP)(vol, 1 if mute else 0, None) == 0:
-                    done += 1
+                count = ctypes.c_int(0)
+                _vcall(sessions, 3, HR, ctypes.POINTER(ctypes.c_int))(sessions, ctypes.byref(count))
+                for i in range(count.value):
+                    ctl, ctl2, vol = VP(), VP(), VP()
+                    try:
+                        if _vcall(sessions, 4, HR, ctypes.c_int, ctypes.POINTER(VP))(sessions, i, ctypes.byref(ctl)) != 0:
+                            continue
+                        if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d")), ctypes.byref(ctl2)) != 0:
+                            continue
+                        pid = ctypes.c_ulong(0)
+                        _vcall(ctl2, 14, HR, ctypes.POINTER(ctypes.c_ulong))(ctl2, ctypes.byref(pid))
+                        if pid.value not in pids:
+                            continue
+                        if _vcall(ctl, 0, HR, VP, ctypes.POINTER(VP))(ctl, ctypes.byref(_guid("87CE5498-68D6-44E5-9215-6DA47EF883D8")), ctypes.byref(vol)) != 0:
+                            continue
+                        if action == "count_muted":
+                            m = ctypes.c_int(0)
+                            if _vcall(vol, 6, HR, ctypes.POINTER(ctypes.c_int))(vol, ctypes.byref(m)) == 0 and m.value:
+                                done += 1
+                        elif _vcall(vol, 5, HR, ctypes.c_int, VP)(vol, 1 if action == "mute" else 0, None) == 0:
+                            done += 1
+                    finally:
+                        for x in (vol, ctl2, ctl):
+                            _release(x)
             finally:
-                for x in (vol, ctl2, ctl):
+                for x in (sessions, mgr, dev):
                     _release(x)
     finally:
-        for x in (sessions, mgr, dev, enum):
+        for x in (devs, enum):
             _release(x)
     return done
+
+
+def set_process_mute(pids, mute):
+    return _roblox_audio(pids, "mute" if mute else "unmute")
+
+
+def muted_sessions(pids):
+    return _roblox_audio(pids, "count_muted")
+
+
+TABMUTE_FILE = DATA_DIR / "tabmute.json"
 
 
 DND_FILE = DATA_DIR / "dnd.json"
@@ -6817,6 +6880,35 @@ def account_state(check=False):
     return st
 
 
+USERNAME_REASONS = {"invalid": "Usernames are 3 to 20 letters, numbers or underscores.", "taken": "Someone already has that username.",
+                    "yours": "That's already your username."}
+
+
+def account_username_check(name):
+    name = (name or "").strip().lstrip("@")
+    if not USERNAME_RE.fullmatch(name):
+        return {"ok": False, "reason": "invalid", "text": USERNAME_REASONS["invalid"]}
+    r = account_rpc("username_available", {"p_username": name})
+    if not r.get("ok"):
+        r["text"] = USERNAME_REASONS.get(r.get("reason"), "You can't use that username.")
+    return r
+
+
+def account_change_username(name):
+    name = (name or "").strip().lstrip("@")
+    if not USERNAME_RE.fullmatch(name):
+        raise ValueError(USERNAME_REASONS["invalid"])
+    r = account_rpc("change_username", {"p_username": name})
+    if not r.get("ok"):
+        raise ValueError(USERNAME_REASONS.get(r.get("reason"), "You can't use that username."))
+    data = _load_account()
+    if data.get("user"):
+        data["user"]["username"] = r["username"]
+        save_json(ACCOUNT_FILE, data)
+    log(f"Orbit username changed from {r.get('old')} to {r['username']}")
+    return account_state()
+
+
 def account_key_check(key, refresh=False, fetch=True):
     acct = _load_account()
     user = acct.get("user")
@@ -7772,6 +7864,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.16.1": ["social:unameCard"],
     "2.16.0": ["social", "accounts"],
     "2.15.0": ["owner:ownerLog", "premium"],
     "2.14.0": ["mods:storeCard"],
@@ -10428,6 +10521,17 @@ class Api:
             return {"error": _friendly(e, "profile")}
         except Exception as e:
             return self._err(e)
+
+    def username_check(self, name):
+        return self._social(account_username_check, name)
+
+    def change_username(self, name):
+        def run():
+            try:
+                return {"account": account_change_username(name)}
+            except ValueError as e:
+                return {"error": str(e)}
+        return self._social(run)
 
     def social_me(self):
         def run():

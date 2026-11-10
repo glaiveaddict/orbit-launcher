@@ -421,3 +421,73 @@ revoke execute on function public._has_premium(uuid), public._badges(uuid, boole
   public.owner_set_badges(text, text[]) from public, anon;
 grant execute on function public.sync_profile(jsonb), public.get_profile(text), public.leaderboard(text, int),
   public.friends_on_orbit(bigint[]), public.owner_set_badges(text, text[]) to authenticated;
+
+-- ============================================================================
+-- v2.16.1: change your Orbit username. Your login follows the new name.
+-- Safe to run again.
+-- ============================================================================
+alter table public.profiles add column if not exists username_changed_at timestamptz;
+
+create or replace function public.username_available(p_username text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+begin
+  if me is null then
+    raise exception 'log in first';
+  end if;
+  if p_username is null or p_username !~ '^[A-Za-z0-9_]{3,20}$' then
+    return json_build_object('ok', false, 'reason', 'invalid');
+  end if;
+  select id into owner_id from public.profiles where lower(username) = lower(p_username);
+  if owner_id is null then
+    return json_build_object('ok', true);
+  end if;
+  if owner_id = me then
+    if exists (select 1 from public.profiles where id = me and username = p_username) then
+      return json_build_object('ok', false, 'reason', 'yours');
+    end if;
+    return json_build_object('ok', true, 'case_only', true);
+  end if;
+  return json_build_object('ok', false, 'reason', 'taken');
+end
+$$;
+
+create or replace function public.change_username(p_username text) returns json
+language plpgsql security definer set search_path = public, auth as $$
+declare
+  me uuid := auth.uid();
+  avail json;
+  old_name text;
+  domain text;
+  new_email text;
+begin
+  if me is null then
+    raise exception 'log in first';
+  end if;
+  avail := public.username_available(p_username);
+  if not (avail ->> 'ok')::boolean then
+    return avail;
+  end if;
+  select username into old_name from public.profiles where id = me for update;
+  select coalesce(nullif(split_part(email, '@', 2), ''), 'players.orbit.invalid') into domain from auth.users where id = me;
+  new_email := lower(p_username) || '@' || domain;
+  begin
+    update public.profiles set username = p_username, username_changed_at = now() where id = me;
+    update auth.users set email = new_email, updated_at = now(),
+           raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('username', p_username)
+     where id = me;
+    update auth.identities set identity_data = coalesce(identity_data, '{}'::jsonb) || jsonb_build_object('email', new_email), updated_at = now()
+     where user_id = me and provider = 'email';
+  exception when unique_violation then
+    return json_build_object('ok', false, 'reason', 'taken');
+  end;
+  update public.redemptions set username = p_username where user_id = me;
+  insert into public.key_log (event, username, detail) values ('renamed', p_username, 'was ' || old_name);
+  return json_build_object('ok', true, 'username', p_username, 'old', old_name);
+end
+$$;
+
+revoke execute on function public.username_available(text), public.change_username(text) from public, anon;
+grant execute on function public.username_available(text), public.change_username(text) to authenticated;

@@ -945,6 +945,10 @@ body.bg-fireflies #flies { opacity: 1; }
 body.idle #glow { opacity: 0; }
 [data-mode="light"] #glow { background: radial-gradient(circle, rgba(var(--accent-rgb),.12), transparent 62%); }
 @media (prefers-reduced-motion: reduce) { .card::after, .titlebar::after, .nav-indicator::after, .page.active .page-head h1 { animation: none !important; } }
+.uname-at { font-weight: 800; color: var(--accent); font-size: 18px; margin-right: -4px; text-shadow: 0 0 12px rgba(var(--accent-rgb),.7); }
+.uname-note { margin-top: 8px; font-size: 12.5px; color: var(--muted); min-height: 17px; transition: color .25s; }
+.uname-note.good { color: var(--good); } .uname-note.good::before { content: "✓ "; font-weight: 800; }
+.uname-note.bad { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -2597,11 +2601,49 @@ async function socProfile() {
     toggleRow("Public profile", "Other Orbit players can open your profile and see you in their Friends tab.", set.public_profile !== false, (v) => saveSoc({ public_profile: v })),
     toggleRow("Show me on the leaderboard", "Turn this off to keep your playtime off the rankings.", set.on_leaderboard !== false, (v) => saveSoc({ on_leaderboard: v })),
     toggleRow("Show friends what I'm playing", "Friends on Orbit see which game you're in. Streamer mode always hides it.", set.share_activity !== false, (v) => saveSoc({ share_activity: v })));
+  const uname = usernameCard();
   const q = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, spellcheck: "false", style: "flex:1" });
   const look = h("button", { class: "btn primary", onclick: () => q.value.trim() && openProfile(q.value.trim()) }, "View profile");
   q.onkeydown = (e) => { if (e.key === "Enter") look.click(); };
   const lookup = h("div", { class: "card" }, h("h3", {}, "Look up a player"), h("p", { class: "sub" }, "See anyone's Orbit profile by their Orbit username."), h("div", { class: "row" }, q, look));
-  return [...profileView(r.profile, { mine: true, local: r.local }), edit, lookup];
+  return [...profileView(r.profile, { mine: true, local: r.local }), uname, edit, lookup];
+}
+function usernameCard() {
+  const current = (S.account && S.account.user && S.account.user.username) || "";
+  const inp = h("input", { class: "input", maxlength: 20, spellcheck: "false", value: current, placeholder: "New username", style: "flex:1" });
+  const note = h("div", { class: "uname-note" }, "3 to 20 letters, numbers or underscores.");
+  const btn = h("button", { class: "btn primary", disabled: true }, "Change username");
+  let timer = null, seq = 0, okName = null;
+  const setNote = (text, kind = "") => { note.textContent = text; note.className = "uname-note " + kind; };
+  const check = () => {
+    clearTimeout(timer); okName = null; btn.disabled = true;
+    const v = inp.value.trim().replace(/^@/, "");
+    if (!v || v === current) return setNote(v === current ? "This is your username right now." : "3 to 20 letters, numbers or underscores.");
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(v)) return setNote("Usernames are 3 to 20 letters, numbers or underscores.", "bad");
+    setNote("Checking...", "");
+    const mine = ++seq;
+    timer = setTimeout(async () => {
+      const r = await api.username_check(v);
+      if (mine !== seq) return;
+      if (r.error) return setNote(r.error, "bad");
+      if (r.ok) { okName = v; btn.disabled = false; setNote(r.case_only ? `Just changes the capital letters: ${v}` : `${v} is available!`, "good"); }
+      else setNote(r.text || "You can't use that username.", "bad");
+    }, 350);
+  };
+  inp.addEventListener("input", check);
+  inp.onkeydown = (e) => { if (e.key === "Enter" && !btn.disabled) btn.click(); };
+  btn.onclick = async () => {
+    const v = okName; if (!v) return;
+    if (!await modal({ title: `Change your username to ${v}?`, text: `From now on you log in to Orbit as ${v} (same password). Your old name, ${current}, becomes free for anyone else to take.`, ok: "Change it" })) return;
+    btn.disabled = true; setNote("Changing...", "");
+    const r = await api.change_username(v);
+    if (r.error) { setNote(r.error, "bad"); btn.disabled = false; return; }
+    S.account = r.account; renderAccountChip(); sfx?.("ready");
+    toast(`You're ${v} now. Log in with ${v} next time.`, "ok"); renderSocialTab();
+  };
+  return h("div", { class: "card", id: "unameCard" }, h("h3", {}, "Username"),
+    h("p", { class: "sub" }, "Change the name people see on your profile, the leaderboard and Friends. It's also the name you log in with."),
+    h("div", { class: "row" }, h("span", { class: "uname-at" }, "@"), inp, btn), note);
 }
 async function openProfile(username) {
   const wrap = h("div", { class: "sheet-wrap" }), sheet = h("div", { class: "sheet" });
@@ -4106,7 +4148,7 @@ async function renderOwnerLog() {
   const evText = (x) => {
     const k = `the key for ${x.key_for || "someone"}`;
     return { redeemed: `${x.username} redeemed ${k}`, carried_over: `${x.username} kept ${k} from before accounts`, blocked: `${x.username} tried to use ${k}, ${x.detail || "already used"}`,
-      disabled: `You turned off ${x.username}'s key (${x.key_for || "key"})`, enabled: `You turned ${x.username}'s key (${x.key_for || "key"}) back on` }[x.event] || `${x.event}: ${x.username || ""}`;
+      renamed: `${x.username} changed their username (${x.detail || "renamed"})`, disabled: `You turned off ${x.username}'s key (${x.key_for || "key"})`, enabled: `You turned ${x.username}'s key (${x.key_for || "key"}) back on` }[x.event] || `${x.event}: ${x.username || ""}`;
   };
   const ts = (iso) => Math.floor(new Date(iso).getTime() / 1000);
   const load = async () => {
