@@ -491,3 +491,251 @@ $$;
 
 revoke execute on function public.username_available(text), public.change_username(text) from public, anon;
 grant execute on function public.username_available(text), public.change_username(text) to authenticated;
+
+-- ============================================================================
+-- v2.16.2: username automod. Blocks bad words and names that pretend to be staff
+-- (owner, admin, mod...). Checked here on the server, so a modded Orbit can't skip it.
+-- Safe to run again. The owner can add or remove words from the Owner panel.
+-- ============================================================================
+create table if not exists public.blocked_words (
+  word text primary key check (word ~ '^[a-z]{2,24}$'),
+  kind text not null check (kind in ('bad', 'reserved')),
+  match text not null default 'anywhere' check (match in ('anywhere', 'word', 'whole')),
+  added_at timestamptz not null default now()
+);
+alter table public.blocked_words enable row level security;
+revoke all on public.blocked_words from anon, authenticated;
+
+-- anywhere = inside any name ("xXfuckXx"); word = as its own piece of the name ("Mod_Jake", "TheMod", "mod123")
+-- so normal names like "Modern" or "Classic" stay fine; whole = only the entire name ("Orbit").
+insert into public.blocked_words (word, kind, match) values
+  ('fuck','bad','anywhere'), ('fuk','bad','anywhere'), ('fvck','bad','anywhere'), ('shit','bad','anywhere'),
+  ('bitch','bad','anywhere'), ('cunt','bad','anywhere'), ('nigger','bad','anywhere'), ('nigga','bad','anywhere'),
+  ('faggot','bad','anywhere'), ('fagot','bad','anywhere'), ('retard','bad','anywhere'), ('whore','bad','anywhere'),
+  ('slut','bad','anywhere'), ('rape','bad','anywhere'), ('rapist','bad','anywhere'), ('porn','bad','anywhere'),
+  ('penis','bad','anywhere'), ('vagina','bad','anywhere'), ('pussy','bad','anywhere'), ('dildo','bad','anywhere'),
+  ('hitler','bad','anywhere'), ('nazi','bad','anywhere'), ('kkk','bad','anywhere'), ('molest','bad','anywhere'),
+  ('tranny','bad','anywhere'), ('jizz','bad','anywhere'), ('hentai','bad','anywhere'), ('horny','bad','anywhere'),
+  ('milf','bad','anywhere'), ('bastard','bad','anywhere'), ('twat','bad','anywhere'), ('boob','bad','anywhere'),
+  ('cock','bad','word'), ('dick','bad','word'), ('ass','bad','word'), ('asshole','bad','anywhere'), ('sex','bad','word'),
+  ('cum','bad','word'), ('tits','bad','word'), ('hoe','bad','word'), ('fag','bad','word'), ('pedo','bad','word'),
+  ('kys','bad','word'), ('chink','bad','word'), ('spic','bad','word'), ('wank','bad','word'), ('anal','bad','word'),
+  ('prick','bad','word'), ('negro','bad','word'),
+  ('admin','reserved','anywhere'), ('administrator','reserved','anywhere'), ('owner','reserved','anywhere'),
+  ('moderator','reserved','anywhere'), ('official','reserved','anywhere'), ('developer','reserved','anywhere'),
+  ('founder','reserved','anywhere'), ('staff','reserved','anywhere'), ('helpdesk','reserved','anywhere'),
+  ('stabzane','reserved','anywhere'),
+  ('mod','reserved','word'), ('mods','reserved','word'), ('dev','reserved','word'), ('support','reserved','word'),
+  ('ceo','reserved','word'), ('orbitteam','reserved','anywhere'),
+  ('orbit','reserved','whole'), ('roblox','reserved','whole'), ('system','reserved','whole'), ('orbitlauncher','reserved','whole')
+on conflict (word) do nothing;
+
+create or replace function public._leet(t text) returns text
+language sql immutable as $$ select translate(lower(coalesce(t, '')), '013457@$8!|', 'oieastasbii') $$;
+
+-- Returns {"word": ..., "kind": "bad"|"reserved"} for the first rule a name breaks, or null.
+create or replace function public._name_rule(p_name text, p_kinds text[] default array['bad', 'reserved']) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  spaced text := regexp_replace(regexp_replace(coalesce(p_name, ''), '([a-z])([A-Z])', '\1_\2', 'g'), '([A-Za-z])([0-9])|([0-9])([A-Za-z])', '\1\3_\2\4', 'g');
+  flat text := replace(public._leet(p_name), '_', '');
+  squashed text;
+  bare text := regexp_replace(lower(coalesce(p_name, '')), '[^a-z]', '', 'g');
+  parts text[];
+  r record;
+begin
+  squashed := regexp_replace(flat, '(.)\1+', '\1', 'g');
+  parts := regexp_split_to_array(lower(spaced), '[^a-z0-9]+') || regexp_split_to_array(lower(spaced), '[^a-z]+')
+        || regexp_split_to_array(public._leet(spaced), '[^a-z]+')
+        || regexp_split_to_array(public._leet(regexp_replace(coalesce(p_name, ''), '([a-z])([A-Z])', '\1_\2', 'g')), '[^a-z]+');
+  for r in select w.word, w.kind, w.match from public.blocked_words w where w.kind = any (p_kinds) order by length(w.word) desc loop
+    if (r.match = 'anywhere' and (position(r.word in flat) > 0 or position(r.word in squashed) > 0 or position(r.word in bare) > 0))
+       or (r.match = 'word' and r.word = any (parts))
+       or (r.match = 'whole' and (r.word = flat or r.word = bare or r.word = squashed)) then
+      return json_build_object('word', r.word, 'kind', r.kind);
+    end if;
+  end loop;
+  return null;
+end
+$$;
+
+create or replace function public._bio_rule(p_bio text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  words text[] := regexp_split_to_array(public._leet(p_bio), '[^a-z]+');
+  flat text := regexp_replace(public._leet(p_bio), '[^a-z]', '', 'g');
+  r record;
+begin
+  for r in select w.word, w.match from public.blocked_words w where w.kind = 'bad' loop
+    if (r.match = 'anywhere' and position(r.word in flat) > 0) or (r.match <> 'anywhere' and r.word = any (words)) then
+      return json_build_object('word', r.word);
+    end if;
+  end loop;
+  return null;
+end
+$$;
+
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  uname text := new.raw_user_meta_data ->> 'username';
+begin
+  if uname is null or uname !~ '^[A-Za-z0-9_]{3,20}$' then
+    raise exception 'bad username';
+  end if;
+  if public._name_rule(uname) is not null then
+    raise exception 'username not allowed';
+  end if;
+  insert into public.profiles (id, username) values (new.id, uname);
+  return new;
+end
+$$;
+
+-- Lets the sign-up screen say "not allowed" or "taken" before trying, instead of a generic error.
+create or replace function public.signup_check(p_username text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  rule json;
+begin
+  if p_username is null or p_username !~ '^[A-Za-z0-9_]{3,20}$' then
+    return json_build_object('ok', false, 'reason', 'invalid');
+  end if;
+  rule := public._name_rule(p_username);
+  if rule is not null then
+    return json_build_object('ok', false, 'reason', case when rule ->> 'kind' = 'reserved' then 'reserved' else 'blocked' end);
+  end if;
+  if exists (select 1 from public.profiles where lower(username) = lower(p_username)) then
+    return json_build_object('ok', false, 'reason', 'taken');
+  end if;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.username_available(p_username text) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  owner_id uuid;
+  rule json;
+begin
+  if me is null then
+    raise exception 'log in first';
+  end if;
+  if p_username is null or p_username !~ '^[A-Za-z0-9_]{3,20}$' then
+    return json_build_object('ok', false, 'reason', 'invalid');
+  end if;
+  select id into owner_id from public.profiles where lower(username) = lower(p_username);
+  if owner_id is not null and owner_id <> me then
+    return json_build_object('ok', false, 'reason', 'taken');
+  end if;
+  if owner_id = me and exists (select 1 from public.profiles where id = me and username = p_username) then
+    return json_build_object('ok', false, 'reason', 'yours');
+  end if;
+  rule := public._name_rule(p_username, case when public.is_owner() then array['bad'] else array['bad', 'reserved'] end);
+  if rule is not null then
+    return json_build_object('ok', false, 'reason', case when rule ->> 'kind' = 'reserved' then 'reserved' else 'blocked' end);
+  end if;
+  if owner_id = me then
+    return json_build_object('ok', true, 'case_only', true);
+  end if;
+  return json_build_object('ok', true);
+end
+$$;
+
+-- Bios get the bad-word check too (staff words are fine in a bio).
+create or replace function public.check_bio(p_bio text) returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('ok', public._bio_rule(p_bio) is null)
+$$;
+
+create or replace function public._enforce_bio() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.bio is distinct from old.bio and new.bio is not null and public._bio_rule(new.bio) is not null then
+    new.bio := old.bio;
+  end if;
+  return new;
+end
+$$;
+drop trigger if exists profiles_bio_automod on public.profiles;
+create trigger profiles_bio_automod before update of bio on public.profiles for each row execute function public._enforce_bio();
+
+-- Owner tools: edit the word list, find accounts whose names break the rules, and rename them.
+create or replace function public.owner_words() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(json_build_object('word', word, 'kind', kind, 'match', match) order by kind, word) from public.blocked_words), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_word_set(p_word text, p_kind text, p_match text, p_remove boolean default false) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  w text := regexp_replace(lower(coalesce(p_word, '')), '[^a-z]', '', 'g');
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  if p_remove then
+    delete from public.blocked_words where word = w;
+  else
+    if w !~ '^[a-z]{2,24}$' then raise exception 'word must be 2 to 24 letters'; end if;
+    insert into public.blocked_words (word, kind, match) values (w, coalesce(p_kind, 'bad'), coalesce(p_match, 'anywhere'))
+    on conflict (word) do update set kind = excluded.kind, match = excluded.match;
+  end if;
+  return json_build_object('ok', true, 'word', w);
+end
+$$;
+
+create or replace function public.owner_name_test(p_name text) returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce(public._name_rule(p_name), json_build_object('ok', true));
+end
+$$;
+
+create or replace function public.owner_bad_names() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((
+    select json_agg(json_build_object('username', p.username, 'word', r ->> 'word', 'kind', r ->> 'kind', 'last_seen', p.last_seen) order by p.last_seen desc)
+    from public.profiles p, lateral (select public._name_rule(p.username) as r) x
+    where not p.is_owner and r is not null
+  ), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_force_rename(p_username text) returns json
+language plpgsql security definer set search_path = public, auth as $$
+declare
+  uid uuid;
+  old_name text;
+  new_name text;
+  domain text;
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  select id, username into uid, old_name from public.profiles where lower(username) = lower(p_username) and not is_owner;
+  if uid is null then raise exception 'no such user'; end if;
+  loop
+    new_name := 'Player' || (floor(random() * 9000000) + 1000000)::int;
+    exit when not exists (select 1 from public.profiles where lower(username) = lower(new_name));
+  end loop;
+  select coalesce(nullif(split_part(email, '@', 2), ''), 'players.orbit.invalid') into domain from auth.users where id = uid;
+  update public.profiles set username = new_name, username_changed_at = now() where id = uid;
+  update auth.users set email = lower(new_name) || '@' || domain, updated_at = now(),
+         raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('username', new_name) where id = uid;
+  update auth.identities set identity_data = coalesce(identity_data, '{}'::jsonb) || jsonb_build_object('email', lower(new_name) || '@' || domain), updated_at = now()
+   where user_id = uid and provider = 'email';
+  update public.redemptions set username = new_name where user_id = uid;
+  insert into public.key_log (event, username, detail) values ('force_renamed', new_name, 'was ' || old_name);
+  return json_build_object('ok', true, 'username', new_name, 'old', old_name);
+end
+$$;
+
+revoke execute on function public._leet(text), public._name_rule(text, text[]), public._bio_rule(text), public._enforce_bio(),
+  public.signup_check(text), public.check_bio(text), public.owner_words(), public.owner_word_set(text, text, text, boolean),
+  public.owner_name_test(text), public.owner_bad_names(), public.owner_force_rename(text) from public, anon;
+grant execute on function public.signup_check(text) to anon, authenticated;
+grant execute on function public.check_bio(text), public.owner_words(), public.owner_word_set(text, text, text, boolean),
+  public.owner_name_test(text), public.owner_bad_names(), public.owner_force_rename(text) to authenticated;

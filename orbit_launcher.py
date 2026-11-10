@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.16.1"
+APP_VERSION = "2.16.2"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -6715,8 +6715,10 @@ def _friendly(err, during="login"):
     low = text.lower()
     if isinstance(err, AccountOffline):
         return "Couldn't reach Orbit's servers. Check your internet and try again."
-    if "already registered" in low or "already exists" in low or "user_already_exists" in low or "database error saving" in low:
+    if "already registered" in low or "already exists" in low or "user_already_exists" in low:
         return "That username is taken. Try another one."
+    if "database error saving" in low or "not allowed" in low:
+        return "That username is taken or isn't allowed. Try another one."
     if "invalid login" in low or "invalid_credentials" in low or "invalid_grant" in low:
         return "Wrong username or password."
     if "weak" in low or "password should" in low:
@@ -6821,6 +6823,12 @@ def account_signup(username, password):
     if len(password or "") < 6:
         raise ValueError("Pick a password with at least 6 characters.")
     try:
+        pre = _sb("POST", "/rest/v1/rpc/signup_check", {"p_username": username}, timeout=8) or {}
+        if pre.get("ok") is False:
+            raise ValueError(USERNAME_REASONS.get(pre.get("reason"), "You can't use that username."))
+    except AccountError:
+        pass
+    try:
         sess = _sb("POST", "/auth/v1/signup", {"email": _account_email(username), "password": password,
                                                 "data": {"username": username}})
     except AccountError as e:
@@ -6881,7 +6889,8 @@ def account_state(check=False):
 
 
 USERNAME_REASONS = {"invalid": "Usernames are 3 to 20 letters, numbers or underscores.", "taken": "Someone already has that username.",
-                    "yours": "That's already your username."}
+                    "yours": "That's already your username.", "blocked": "That username has a word that isn't allowed. Pick a different one.",
+                    "reserved": "Names that look like Orbit staff (owner, admin, mod...) aren't allowed. Pick a different one."}
 
 
 def account_username_check(name):
@@ -7864,6 +7873,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.16.2": ["owner:ownerNames"],
     "2.16.1": ["social:unameCard"],
     "2.16.0": ["social", "accounts"],
     "2.15.0": ["owner:ownerLog", "premium"],
@@ -10552,7 +10562,14 @@ class Api:
             if k in (changes or {}):
                 soc[k] = bool(changes[k])
         if "bio" in (changes or {}):
-            soc["bio"] = re.sub(r"\s+", " ", str(changes["bio"] or "")).strip()[:120]
+            bio = re.sub(r"\s+", " ", str(changes["bio"] or "")).strip()[:120]
+            if bio:
+                try:
+                    if account_rpc("check_bio", {"p_bio": bio}).get("ok") is False:
+                        return {"error": "Your bio has a word that isn't allowed."}
+                except AccountError:
+                    pass
+            soc["bio"] = bio
         save_settings(self._settings)
         return self._social(lambda: (social_sync(self._settings, force=True), {"ok": True})[1])
 
@@ -10631,6 +10648,25 @@ class Api:
             return {"error": _friendly(e, "owner")}
         except Exception as e:
             return self._err(e)
+
+    def owner_name_rules(self):
+        words = self._owner_call("owner_words")
+        if "error" in words:
+            return words
+        bad = self._owner_call("owner_bad_names")
+        if "error" in bad:
+            return bad
+        return {"words": words["data"] or [], "bad_names": bad["data"] or []}
+
+    def owner_word_set(self, word, kind="bad", match="anywhere", remove=False):
+        return self._owner_call("owner_word_set", {"p_word": str(word or ""), "p_kind": kind if kind in ("bad", "reserved") else "bad",
+                                                   "p_match": match if match in ("anywhere", "word", "whole") else "anywhere", "p_remove": bool(remove)})
+
+    def owner_name_test(self, name):
+        return self._owner_call("owner_name_test", {"p_name": str(name or "")[:40]})
+
+    def owner_force_rename(self, username):
+        return self._owner_call("owner_force_rename", {"p_username": str(username or "")})
 
     def owner_keylog(self, search=""):
         search = (search or "").strip()[:40]

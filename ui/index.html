@@ -949,6 +949,18 @@ body.idle #glow { opacity: 0; }
 .uname-note { margin-top: 8px; font-size: 12.5px; color: var(--muted); min-height: 17px; transition: color .25s; }
 .uname-note.good { color: var(--good); } .uname-note.good::before { content: "✓ "; font-weight: 800; }
 .uname-note.bad { color: var(--bad); }
+.rules-alert { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: rgba(251,113,133,.08); border: 1px solid rgba(251,113,133,.3); margin-bottom: 6px; }
+.rules-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.rules-row .btn { height: 30px; font-size: 12.5px; }
+.rule-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(251,113,133,.14); color: var(--bad); }
+.rule-tag.reserved { background: rgba(251,191,36,.14); color: var(--warn); }
+.good-t { color: var(--good); font-weight: 650; } .bad-t { color: var(--bad); font-weight: 650; }
+.word-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.word-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 10px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--panel2); border: 1px solid var(--line); }
+.word-chip i { font-style: normal; } .word-chip small { color: var(--faint); font-size: 10.5px; }
+.word-chip.hide i { filter: blur(4px); transition: filter .2s; } .word-chip.hide:hover i { filter: none; }
+.word-chip.reserved { border-color: rgba(251,191,36,.3); }
+.word-chip button { width: 20px; height: 20px; border-radius: 50%; font-size: 10px; color: var(--faint); } .word-chip button:hover { background: rgba(251,113,133,.15); color: var(--bad); }
 </style>
 </head>
 <body>
@@ -1264,6 +1276,7 @@ body.idle #glow { opacity: 0; }
       <div class="page-head rise" style="--i:0"><h1>Owner panel</h1><p>Only you can see this. Give players premium access with a key.</p></div>
       <div class="card rise" style="--i:1" id="ownerIssue"></div>
       <div class="card rise" style="--i:2" id="ownerLog"></div>
+      <div class="card rise" style="--i:2" id="ownerNames"></div>
       <div class="card rise" style="--i:2" id="ownerBulk"></div>
       <div class="card rise" style="--i:2" id="ownerKeys"></div>
       <div class="card rise" style="--i:3" id="ownerNews"></div>
@@ -4060,7 +4073,7 @@ async function renderOwner() {
   iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
-  renderOwnerLog(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
+  renderOwnerLog(); renderOwnerNames(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
   const safe = $("#ownerSafe"); safe.innerHTML = "";
   safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
@@ -4132,6 +4145,59 @@ async function checkAccount() {
   const r = await api.account(true); S.account = r; renderAccountChip();
   if (!r.logged_in) showGate("login", r.expired ? "Your login expired. Log in again." : "");
 }
+async function renderOwnerNames() {
+  const box = $("#ownerNames"); if (!box) return;
+  box.innerHTML = "";
+  box.append(h("h3", {}, "Username rules"), h("p", { class: "sub" }, "Orbit blocks usernames with bad words or that pretend to be staff (owner, admin, mod...), on sign-up and when someone changes their name. Bios get the bad-word check too. Your own account can use staff words."));
+  if (!(S.account || {}).enabled) return box.append(h("p", { class: "muted small" }, "Orbit accounts aren't switched on yet."));
+  const body = h("div", {}, h("div", { class: "skel", style: "height:80px" }));
+  box.append(body);
+  const r = await api.owner_name_rules();
+  if (r.error) { body.replaceChildren(h("p", { class: "muted small" }, r.error.includes("setup") || r.error.includes("wrong") ? "Run the new supabase/setup.sql first." : r.error)); return; }
+  const out = [];
+  if (r.bad_names.length) {
+    out.push(h("div", { class: "rules-alert" }, h("b", {}, `${r.bad_names.length} account${r.bad_names.length === 1 ? "" : "s"} already break${r.bad_names.length === 1 ? "s" : ""} the rules`),
+      h("span", { class: "muted small" }, "Rename gives them a random Player name. They log in with that name from then on (same password)."),
+      r.bad_names.map((b) => h("div", { class: "rules-row" }, h("b", {}, b.username), h("span", { class: "rule-tag " + b.kind }, b.kind === "reserved" ? `looks like staff: ${b.word}` : `bad word: ${b.word}`),
+        h("span", { class: "spacer" }), h("button", { class: "btn danger", onclick: async () => {
+          if (!await modal({ title: `Rename ${b.username}?`, text: "They get a random name like Player4821937 and have to log in with it from now on. Tell them their new name if you can.", ok: "Rename", danger: true })) return;
+          const x = await api.owner_force_rename(b.username); if (x.error) return toast(x.error, "err");
+          toast(`${b.username} is now ${x.data.username}.`, "ok"); renderOwnerNames();
+        } }, "Rename")))));
+  }
+  const test = h("input", { class: "input", placeholder: "Test a username", maxlength: 20, spellcheck: "false", style: "flex:1" });
+  const res = h("span", { class: "small" });
+  let tt = null;
+  test.oninput = () => { clearTimeout(tt); res.textContent = ""; const v = test.value.trim(); if (!v) return;
+    tt = setTimeout(async () => { const x = await api.owner_name_test(v); if (x.error) return; const d = x.data || {};
+      res.className = "small " + (d.word ? "bad-t" : "good-t"); res.textContent = d.word ? `Blocked (${d.kind === "reserved" ? "looks like staff" : "bad word"}: ${d.word})` : "Allowed"; }, 300); };
+  out.push(h("div", { class: "row", style: "margin:12px 0 4px" }, test, res));
+  let kind = "bad", match = "anywhere";
+  const word = h("input", { class: "input", placeholder: "Add a word", maxlength: 24, spellcheck: "false", style: "flex:1;min-width:140px" });
+  const add = h("button", { class: "btn primary", onclick: async () => {
+    const w = word.value.trim(); if (!w) return;
+    const x = await api.owner_word_set(w, kind, match, false); if (x.error) return toast(x.error, "err");
+    toast(`"${x.data.word}" added.`, "ok"); renderOwnerNames();
+  } }, "Add");
+  word.onkeydown = (e) => { if (e.key === "Enter") add.click(); };
+  const kindSeg = segmented([["bad", "Bad word"], ["reserved", "Staff name"]], kind, (v) => { kind = v; });
+  const matchSeg = segmented([["anywhere", "Anywhere"], ["word", "As its own word"], ["whole", "Whole name"]], match, (v) => { match = v; });
+  out.push(h("div", { class: "row", style: "margin-top:10px" }, word, kindSeg, matchSeg, add),
+    h("p", { class: "muted small", style: "margin:6px 0 0" }, "Anywhere blocks it inside any name. As its own word blocks Mod_Jake, TheMod and mod123 but keeps names like Modern. Whole name only blocks the exact name."));
+  const groups = [["bad", "Bad words"], ["reserved", "Staff names"]];
+  const matchLabel = { anywhere: "", word: " · own word", whole: " · whole name" };
+  groups.forEach(([k, label]) => {
+    const list = r.words.filter((w) => w.kind === k);
+    const chips = h("div", { class: "word-chips" }, list.map((w) => {
+      const x = h("button", { title: "Remove", onclick: async () => { const y = await api.owner_word_set(w.word, w.kind, w.match, true); if (y.error) return toast(y.error, "err"); chip.remove(); } }, "✕");
+      const chip = h("span", { class: "word-chip " + k + (k === "bad" ? " hide" : ""), title: k === "bad" ? "Hover to show" : "" }, h("i", {}, w.word), h("small", {}, matchLabel[w.match] || ""), x);
+      return chip;
+    }));
+    out.push(h("div", { class: "row", style: "margin:16px 0 6px" }, h("b", {}, label), h("span", { class: "muted small" }, `${list.length}`)), chips);
+  });
+  body.replaceChildren(...out);
+  requestAnimationFrame(() => [kindSeg, matchSeg].forEach((x) => x._remeasure()));
+}
 async function renderOwnerLog() {
   const box = $("#ownerLog"); if (!box) return;
   box.innerHTML = "";
@@ -4148,7 +4214,7 @@ async function renderOwnerLog() {
   const evText = (x) => {
     const k = `the key for ${x.key_for || "someone"}`;
     return { redeemed: `${x.username} redeemed ${k}`, carried_over: `${x.username} kept ${k} from before accounts`, blocked: `${x.username} tried to use ${k}, ${x.detail || "already used"}`,
-      renamed: `${x.username} changed their username (${x.detail || "renamed"})`, disabled: `You turned off ${x.username}'s key (${x.key_for || "key"})`, enabled: `You turned ${x.username}'s key (${x.key_for || "key"}) back on` }[x.event] || `${x.event}: ${x.username || ""}`;
+      renamed: `${x.username} changed their username (${x.detail || "renamed"})`, force_renamed: `You renamed a player to ${x.username} (${x.detail || "bad name"})`, disabled: `You turned off ${x.username}'s key (${x.key_for || "key"})`, enabled: `You turned ${x.username}'s key (${x.key_for || "key"}) back on` }[x.event] || `${x.event}: ${x.username || ""}`;
   };
   const ts = (iso) => Math.floor(new Date(iso).getTime() / 1000);
   const load = async () => {

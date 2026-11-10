@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.16.2
+- **Username automod:** usernames with bad words, or that pretend to be Orbit staff (owner, admin, mod, official and so on), are blocked when you sign up or change your name. It catches tricks like Adm1n, M0D and xXAdminXx, while normal names like Modern or Classic still work. Bios get the bad-word check too.
+- **Owner panel:** a new Username rules card to add or remove blocked words, test any name, and rename accounts that already break the rules.
+
 ## v2.16.1
 - **Change your username:** Social > Profile now has a Username box. Type a new name and Orbit tells you right away if it's free. Names someone else already has can't be used. You log in with the new name from then on, with the same password.
 - The owner key log shows when a player changes their username.
