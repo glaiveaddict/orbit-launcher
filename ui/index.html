@@ -630,6 +630,49 @@ body.setup-mode #setupView { display: flex; grid-column: 1 / -1; align-items: ce
 .pj-chip .bell { opacity: .55; padding: 0 2px; } .pj-chip .bell.on { opacity: 1; filter: drop-shadow(0 0 4px #fbbf24); }
 .lib-upd { font-size: 11px; color: var(--accent2); font-weight: 650; }
 .nav-item[hidden] { display: none; }
+#gate { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: radial-gradient(1200px 700px at 50% 30%, rgba(var(--accent-rgb),.16), transparent 60%), rgba(6,4,14,.82); backdrop-filter: blur(14px); }
+#gate[hidden] { display: none; }
+#gate .g-card { width: 380px; max-width: calc(100vw - 40px); padding: 30px 28px 24px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line2); box-shadow: 0 30px 80px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(var(--accent-rgb),.12); animation: rise .5s var(--spring); }
+#gate .g-logo { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 50%; background: radial-gradient(circle, #05030a 33%, transparent 35%), var(--grad); box-shadow: 0 0 34px rgba(var(--accent-rgb),.55); animation: gspin 6s linear infinite; }
+@keyframes gspin { to { transform: rotate(360deg); } }
+#gate h2 { text-align: center; margin: 0 0 4px; font-size: 22px; }
+#gate .g-sub { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+#gate .g-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); margin-bottom: 16px; }
+#gate .g-tabs button { height: 34px; border-radius: 9px; font-weight: 650; color: var(--muted); }
+#gate .g-tabs button.on { color: var(--text); background: linear-gradient(90deg, rgba(var(--accent-rgb),.28), rgba(var(--accent-rgb),.1)); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),.35); }
+#gate .field { margin-bottom: 12px; }
+#gate .g-pass { position: relative; }
+#gate .g-pass .input { padding-right: 58px; }
+#gate .g-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11.5px; font-weight: 650; color: var(--muted); padding: 4px 6px; }
+#gate .g-err { min-height: 18px; color: var(--bad, #fb7185); font-size: 12.5px; margin: 2px 0 10px; }
+#gate .g-go { width: 100%; height: 42px; font-size: 14.5px; }
+#gate .g-foot { text-align: center; color: var(--faint); font-size: 11.5px; margin-top: 14px; line-height: 1.45; }
+.acct-chip { flex: none; display: flex; align-items: center; gap: 9px; padding: 8px 8px 8px 10px; margin-bottom: 8px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); }
+.acct-chip[hidden] { display: none; }
+.acct-chip .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 12px; color: #fff; background: var(--grad); flex: none; }
+.acct-chip .nm { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-chip .nm small { display: block; font-weight: 500; font-size: 10.5px; color: var(--faint); }
+.acct-chip button { width: 28px; height: 28px; border-radius: 8px; color: var(--muted); display: grid; place-items: center; }
+.acct-chip button:hover { color: var(--text); background: rgba(255,255,255,.06); }
+.klog-top { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+.klog-top .input { flex: 1; min-width: 200px; }
+.klog-user { border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; margin-bottom: 8px; background: rgba(255,255,255,.02); animation: rise .4s var(--spring) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.klog-user .hd { display: flex; align-items: center; gap: 10px; }
+.klog-user .hd .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; background: var(--grad); flex: none; }
+.klog-user .hd .who { flex: 1; min-width: 0; }
+.klog-user .hd .who span { display: block; font-size: 11.5px; color: var(--faint); }
+.klog-key { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 11px; border-radius: 10px; background: var(--panel2); font-size: 12.5px; }
+.klog-key .k { flex: 1; min-width: 0; }
+.klog-key .k span { color: var(--faint); font-size: 11.5px; }
+.klog-row { display: grid; grid-template-columns: 92px 112px 1fr; gap: 10px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.klog-row .t { color: var(--faint); font-size: 11.5px; }
+.ev { justify-self: start; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; padding: 3px 8px; border-radius: 99px; text-transform: uppercase; background: rgba(255,255,255,.07); color: var(--muted); }
+.ev.redeemed, .ev.enabled { background: rgba(52,211,153,.14); color: #34d399; }
+.ev.carried_over { background: rgba(96,165,250,.14); color: #60a5fa; }
+.ev.blocked { background: rgba(251,191,36,.14); color: #fbbf24; }
+.ev.disabled { background: rgba(251,113,133,.14); color: #fb7185; }
+.otag { font-size: 9.5px; font-weight: 850; letter-spacing: .08em; padding: 2px 6px; border-radius: 99px; margin-left: 6px; background: linear-gradient(90deg, #f59e0b, #fde047); color: #1a1205; vertical-align: 1px; }
+
 .nav-item .nav-new { margin-left: auto; font-size: 9.5px; font-weight: 850; letter-spacing: .06em; padding: 2px 6px; border-radius: 99px; color: #1a0b12; background: linear-gradient(90deg, #fde047, #fb7185); box-shadow: 0 0 10px rgba(251,113,133,.55); animation: newPop 1.6s var(--ease) infinite alternate; }
 .nav-item .nav-new + .nav-dot, .nav-item .nav-new + .nav-lock { margin-left: 6px; }
 @keyframes newPop { from { transform: scale(1); } to { transform: scale(1.08); } }
@@ -783,6 +826,7 @@ body.bg-fireflies #flies { opacity: 1; }
 
   <aside class="sidebar">
         <nav id="nav"><div class="nav-indicator" id="navInd"></div></nav>
+    <div class="acct-chip" id="acctChip" hidden></div>
     <div class="side-foot"><span class="dot" id="sideDot"></span><span id="sideStatus">Checking Roblox...</span></div>
   </aside>
 
@@ -1066,6 +1110,7 @@ body.bg-fireflies #flies { opacity: 1; }
     <section class="page" id="page-owner">
       <div class="page-head rise" style="--i:0"><h1>Owner panel</h1><p>Only you can see this. Give players premium access with a key.</p></div>
       <div class="card rise" style="--i:1" id="ownerIssue"></div>
+      <div class="card rise" style="--i:2" id="ownerLog"></div>
       <div class="card rise" style="--i:2" id="ownerBulk"></div>
       <div class="card rise" style="--i:2" id="ownerKeys"></div>
       <div class="card rise" style="--i:3" id="ownerNews"></div>
@@ -1113,6 +1158,7 @@ body.bg-fireflies #flies { opacity: 1; }
 <div id="wrapped"><div><div class="row" style="justify-content:center;margin-bottom:12px" id="wrTop"></div><div class="wr-card" id="wrCard"></div><div class="wr-dots" id="wrDots"></div>
   <div class="row" style="justify-content:center;margin-top:12px"><button class="btn" id="wrPrev">‹ Back</button><button class="btn primary" id="wrNext">Next ›</button><button class="btn" id="wrSave">Save as image</button><button class="btn ghost" id="wrClose">Close</button></div></div></div>
 <div id="palette"><div class="pal"><input id="palInput" placeholder="Search pages, games and actions..." spellcheck="false"><div class="pal-list" id="palList"></div></div></div>
+<div id="gate" hidden></div>
 <div class="modal-wrap" id="wn"><div class="modal"><span class="ver-badge" id="wnVer"></span><h3 id="wnTitle">What's new</h3><div class="notes" id="wnNotes"></div>
   <div class="row"><button class="btn primary" id="wnOk">Let's go</button></div></div></div>
 <div class="modal-wrap" id="modal"><div class="modal">
@@ -3527,7 +3573,9 @@ async function renderPremium(refresh = true) {
     return;
   }
   const why = { expired: "Your premium key has expired.", revoked: "Your premium key was turned off by the owner.", invalid: "Your saved premium key isn't valid anymore.",
-    account: `Your key belongs to ${st.for || "another player"}, so it only works while their Roblox account is the one playing.` }[st.reason];
+    account: `Your key belongs to ${st.for || "another player"}, so it only works while their Roblox account is the one playing.`,
+    login: "Log in to your Orbit account to use your premium key.",
+    taken: "This premium key is already used by another Orbit account. Each key works for one account." }[st.reason];
   const inp = h("input", { class: "input mono", placeholder: "ORBIT-PREMIUM-...", style: "flex:1" });
   const btn = h("button", { class: "btn primary" }, "Activate");
   const go_ = async () => {
@@ -3567,11 +3615,138 @@ async function renderOwner() {
   iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
-  renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
+  renderOwnerLog(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
   const safe = $("#ownerSafe"); safe.innerHTML = "";
   safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
     h("button", { class: "btn", onclick: async () => { const r = await api.owner_backup_key(); if (!r) return; r.error ? toast(r.error, "err") : toast("Owner key backed up.", "ok"); } }, "Back up owner key")));
+}
+
+function renderAccountChip() {
+  const box = $("#acctChip"); if (!box) return;
+  const a = S.account || {};
+  box.hidden = !(a.enabled && a.logged_in); box.innerHTML = "";
+  if (box.hidden) return;
+  const name = a.user.username;
+  const out = h("button", { title: "Log out" }); out.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+  out.onclick = async () => {
+    if (!await modal({ title: "Log out of Orbit?", text: "You'll need to log in again to use Orbit.", ok: "Log out", danger: true })) return;
+    const r = await api.account_logout(); S.account = r.account; renderAccountChip(); showGate("login");
+  };
+  box.append(h("div", { class: "av" }, name.slice(0, 1).toUpperCase()),
+    h("div", { class: "nm" }, name, h("small", {}, (a.user.owner ? "Owner · " : "") + (a.offline ? "Offline" : "Logged in"))), out);
+}
+function showGate(mode = "login", note = "") {
+  const g = $("#gate"); g.hidden = false; g.innerHTML = "";
+  let tab = mode;
+  const card = h("div", { class: "g-card" });
+  const draw = () => {
+    card.innerHTML = "";
+    const user = h("input", { class: "input", placeholder: "Username", maxlength: 20, autocomplete: "username", spellcheck: "false" });
+    const pass = h("input", { class: "input", type: "password", placeholder: "Password", autocomplete: tab === "signup" ? "new-password" : "current-password" });
+    const pass2 = h("input", { class: "input", type: "password", placeholder: "Type the password again", autocomplete: "new-password" });
+    const eye = h("button", { class: "g-eye", type: "button" }, "Show");
+    eye.onclick = () => { const show = pass.type === "password"; pass.type = pass2.type = show ? "text" : "password"; eye.textContent = show ? "Hide" : "Show"; };
+    const err = h("div", { class: "g-err" }, note); note = "";
+    const go_ = h("button", { class: "btn primary g-go" }, tab === "signup" ? "Create account" : "Log in");
+    const submit = async () => {
+      err.textContent = "";
+      const u = user.value.trim(), p = pass.value;
+      if (!/^[A-Za-z0-9_]{3,20}$/.test(u)) { err.textContent = "Usernames are 3 to 20 letters, numbers or underscores."; return user.focus(); }
+      if (p.length < 6) { err.textContent = "Passwords need at least 6 characters."; return pass.focus(); }
+      if (tab === "signup" && p !== pass2.value) { err.textContent = "The two passwords don't match."; return pass2.focus(); }
+      go_.disabled = true; go_.textContent = tab === "signup" ? "Creating your account..." : "Logging in...";
+      const r = tab === "signup" ? await api.account_signup(u, p) : await api.account_login(u, p);
+      go_.disabled = false; go_.textContent = tab === "signup" ? "Create account" : "Log in";
+      if (r.error) { err.textContent = r.error; card.animate([{ transform: "translateX(0)" }, { transform: "translateX(-8px)" }, { transform: "translateX(8px)" }, { transform: "translateX(0)" }], { duration: 260 }); return; }
+      S.account = r.account; renderAccountChip(); sfx("ready");
+      g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 280 }).onfinish = () => { g.hidden = true; };
+      toast(tab === "signup" ? `Welcome to Orbit, ${r.account.user.username}!` : `Welcome back, ${r.account.user.username}!`, "ok");
+      if (r.premium) premChanged(r.premium);
+      if (page === "owner") renderOwner();
+    };
+    go_.onclick = submit;
+    [user, pass, pass2].forEach((x) => x.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); }));
+    const tabs = h("div", { class: "g-tabs" },
+      h("button", { class: tab === "login" ? "on" : "", onclick: () => { tab = "login"; draw(); } }, "Log in"),
+      h("button", { class: tab === "signup" ? "on" : "", onclick: () => { tab = "signup"; draw(); } }, "Sign up"));
+    card.append(h("div", { class: "g-logo" }), h("h2", {}, tab === "signup" ? "Make your Orbit account" : "Welcome to Orbit"),
+      h("p", { class: "g-sub" }, tab === "signup" ? "Pick a username and password. It only takes a second." : "Log in to keep going."),
+      tabs, h("div", { class: "field" }, user), h("div", { class: "field g-pass" }, pass, eye),
+      tab === "signup" ? h("div", { class: "field" }, pass2) : "", err, go_,
+      h("div", { class: "g-foot" }, tab === "signup" ? "Your Orbit username doesn't have to match your Roblox name. Never use your Roblox password here." : "Forgot your password? Ask the Orbit owner to reset it."));
+    setTimeout(() => user.focus(), 60);
+  };
+  draw(); g.append(card);
+}
+async function checkAccount() {
+  renderAccountChip();
+  const a = S.account || {};
+  if (!a.enabled) return;
+  if (!a.logged_in) return showGate("login");
+  const r = await api.account(true); S.account = r; renderAccountChip();
+  if (!r.logged_in) showGate("login", r.expired ? "Your login expired. Log in again." : "");
+}
+async function renderOwnerLog() {
+  const box = $("#ownerLog"); if (!box) return;
+  box.innerHTML = "";
+  const clear = h("button", { class: "btn danger" }, "Clear log");
+  box.append(h("div", { class: "row", style: "align-items:flex-start" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Key log"),
+    h("p", { class: "sub", style: "margin:4px 0 0" }, "Every key that gets redeemed, blocked, turned off or on, and which Orbit account did it. Search a player to turn their key off or on.")), clear));
+  if (!(S.account || {}).enabled) { clear.remove(); return box.append(h("p", { class: "muted small", style: "margin:10px 0 0" }, "Orbit accounts aren't switched on yet.")); }
+  let view = "users", q = "", timer = null;
+  const search = h("input", { class: "input", placeholder: "Search players or keys", maxlength: 40, spellcheck: "false" });
+  const seg = segmented([["users", "Players"], ["log", "Log"]], view, (v) => { view = v; load(); });
+  const body = h("div");
+  box.append(h("div", { class: "klog-top" }, search, seg), body);
+  requestAnimationFrame(() => seg._remeasure());
+  const evText = (x) => {
+    const k = `the key for ${x.key_for || "someone"}`;
+    return { redeemed: `${x.username} redeemed ${k}`, carried_over: `${x.username} kept ${k} from before accounts`, blocked: `${x.username} tried to use ${k}, ${x.detail || "already used"}`,
+      disabled: `You turned off ${x.username}'s key (${x.key_for || "key"})`, enabled: `You turned ${x.username}'s key (${x.key_for || "key"}) back on` }[x.event] || `${x.event}: ${x.username || ""}`;
+  };
+  const ts = (iso) => Math.floor(new Date(iso).getTime() / 1000);
+  const load = async () => {
+    body.innerHTML = ""; body.append(h("div", { class: "row", style: "margin:8px 0" }, h("span", { class: "spinner", style: "color:var(--accent)" })));
+    const r = await api.owner_keylog(q); body.innerHTML = "";
+    if (r.error) return body.append(h("p", { class: "sub", style: "margin:0" }, r.error));
+    if (view === "log") {
+      if (!r.log.length) return body.append(h("p", { class: "muted small", style: "margin:4px 0 0" }, q ? "Nothing in the log matches that." : "The log is empty."));
+      r.log.forEach((x) => body.append(h("div", { class: "klog-row" }, h("span", { class: "t" }, fmtAgo(ts(x.at))), h("span", { class: "ev " + x.event }, x.event.replace("_", " ")),
+        h("span", {}, evText(x), x.key_id ? h("span", { class: "muted small" }, ` · #${x.key_id}`) : ""))));
+      return;
+    }
+    if (!r.users.length) return body.append(h("p", { class: "muted small", style: "margin:4px 0 0" }, q ? "No players match that." : "No accounts yet."));
+    r.users.forEach((u, i) => {
+      const reset = h("button", { class: "btn ghost" }, "Reset password");
+      reset.onclick = async () => {
+        const pw = await modal({ title: `New password for ${u.username}`, text: "Type a new password (at least 6 characters), then send it to them.", input: true, placeholder: "New password", ok: "Set password" });
+        if (!pw) return;
+        const x = await api.owner_reset_password(u.username, pw); x.error ? toast(x.error, "err") : toast(`${u.username}'s password is changed.`, "ok");
+      };
+      const card = h("div", { class: "klog-user", style: `--i:${i}` }, h("div", { class: "hd" }, h("div", { class: "av" }, u.username.slice(0, 1).toUpperCase()),
+        h("div", { class: "who" }, h("b", {}, u.username, u.is_owner ? h("span", { class: "otag" }, "OWNER") : ""), h("span", {}, `Joined ${fmtAgo(ts(u.created_at))} · last seen ${fmtAgo(ts(u.last_seen))}`)), reset));
+      if (!u.keys.length) card.append(h("div", { class: "muted small", style: "margin-top:8px" }, "No premium key."));
+      u.keys.forEach((k) => {
+        const exp = k.expires_at ? ts(k.expires_at) : 0, ended = exp && exp < Date.now() / 1000;
+        const sw = switchEl(!k.disabled, async (on) => {
+          const x = await api.owner_set_key(k.key_id, !on);
+          if (x.error) { toast(x.error, "err"); return load(); }
+          k.disabled = !on; toast(on ? `${u.username}'s key is back on.` : `${u.username}'s key is off. They lose premium within an hour.`, "ok");
+        });
+        card.append(h("div", { class: "klog-key" }, h("div", { class: "k" }, h("b", {}, `Key for ${k.key_for || "someone"}`),
+          h("span", {}, ` · #${k.key_id} · ${k.carried_over ? "kept from before accounts" : "redeemed " + fmtAgo(ts(k.redeemed_at))}` + (exp ? (ended ? " · ended" : ` · ends ${fmtDay(exp)}`) : " · never ends"))), sw));
+      });
+      body.append(card);
+    });
+  };
+  search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { q = search.value.trim(); load(); }, 300); };
+  clear.onclick = async () => {
+    if (!await modal({ title: "Clear the whole key log?", text: "This deletes every entry in the log for good and can't be undone. Players, accounts and keys stay exactly as they are.", ok: "Clear log", danger: true })) return;
+    const r = await api.owner_clear_log(); if (r.error) return toast(r.error, "err");
+    toast(`Key log cleared (${r.cleared} entr${r.cleared === 1 ? "y" : "ies"}).`, "ok"); load();
+  };
+  load();
 }
 function renderOwnerBulk() {
   const box = $("#ownerBulk"); box.innerHTML = "";
@@ -4016,7 +4191,7 @@ async function init() {
   $("#ver").textContent = "v" + S.version;
   if (S.mode === "setup") { wireWindow(); renderSetup(); api.ui_ready("setup"); return; }
   spotlight(); blackHole($("#bhCanvas"), $(".hero")); applyBackground();
-  buildNav(); watchNav(); renderNewTags(); wire(); wireUpdates(); wireExtras(); wireClips(); wireWrapped(); renderCredits(); startI18n();
+  buildNav(); watchNav(); renderNewTags(); checkAccount(); wire(); wireUpdates(); wireExtras(); wireClips(); wireWrapped(); renderCredits(); startI18n();
   $("#spotCancel").onclick = async () => { await api.cancel_spot(); toast("Stopped waiting.", "ok"); pollSpot(); };
   pollSpot();
   idleWatch();
