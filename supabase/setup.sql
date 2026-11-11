@@ -315,6 +315,11 @@ begin
     showcase = case when p ? 'showcase' then public._clean_showcase(p -> 'showcase') else showcase end,
     status_at = case when p ? 'status' and nullif(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60), '') is distinct from status then now() else status_at end,
     status = case when p ? 'status' then nullif(trim(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60)), '') else status end,
+    socials = case when p ? 'socials' then public._clean_socials(p -> 'socials') else socials end,
+    socials_visibility = case when p ->> 'socials_visibility' in ('nobody', 'friends', 'crew', 'everyone') then p ->> 'socials_visibility' else socials_visibility end,
+    friend_ids = case when jsonb_typeof(p -> 'friend_ids') = 'array'
+                      then (select array_agg(x::bigint) from (select jsonb_array_elements_text(p -> 'friend_ids') x limit 1000) f where x ~ '^[0-9]{1,15}$')
+                      else friend_ids end,
     app_version = case when (p ->> 'app_version') ~ '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+\.?[0-9]*)?$' then p ->> 'app_version' else app_version end,
     banner = case when p ? 'banner' then public._clean_banner(me, p ->> 'banner') else banner end,
     name_style = case when p ? 'name_style' then public._clean_name_style(me, p ->> 'name_style') else name_style end,
@@ -374,6 +379,13 @@ begin
     'crew', public._crew_tag(p.id), 'banner', p.banner, 'name_style', p.name_style, 'showcase', coalesce(p.showcase, '[]'::jsonb),
     'banned', public._is_banned(p.id), 'ban_reason', case when public.is_owner() then p.ban_reason end,
     'status', p.status, 'status_at', p.status_at,
+    'socials', case when mine or public.is_owner() or p.socials_visibility = 'everyone'
+                         or (p.socials_visibility = 'crew' and public._crew_tag(p.id) is not null
+                             and exists (select 1 from public.crew_members a join public.crew_members b on a.crew_id = b.crew_id
+                                          where a.user_id = p.id and b.user_id = auth.uid()))
+                         or (p.socials_visibility = 'friends' and (select v.roblox_id from public.profiles v where v.id = auth.uid()) = any (coalesce(p.friend_ids, '{}')))
+                    then coalesce(p.socials, '{}'::jsonb) end,
+    'socials_visibility', case when mine then coalesce(p.socials_visibility, 'nobody') end,
     'visitors_week', case when mine then (select count(distinct viewer) from public.profile_views v where v.target = p.id and v.day > current_date - 7) end,
     'visitors_total', case when mine then (select count(distinct viewer) from public.profile_views v where v.target = p.id) end);
 end
@@ -595,14 +607,16 @@ begin
 end
 $$;
 
-create or replace function public._bio_rule(p_bio text) returns json
+alter table public.blocked_words add column if not exists chat_ok boolean not null default false;
+drop function if exists public._bio_rule(text);
+create or replace function public._bio_rule(p_bio text, p_swears_ok boolean default false) returns json
 language plpgsql stable security definer set search_path = public as $$
 declare
   words text[] := regexp_split_to_array(public._leet(p_bio), '[^a-z]+');
   flat text := regexp_replace(public._leet(p_bio), '[^a-z]', '', 'g');
   r record;
 begin
-  for r in select w.word, w.match from public.blocked_words w where w.kind = 'bad' loop
+  for r in select w.word, w.match from public.blocked_words w where w.kind = 'bad' and not (p_swears_ok and w.chat_ok) loop
     if (r.match = 'anywhere' and position(r.word in flat) > 0) or (r.match <> 'anywhere' and r.word = any (words)) then
       return json_build_object('word', r.word);
     end if;
@@ -769,7 +783,7 @@ begin
 end
 $$;
 
-revoke execute on function public._leet(text), public._name_rule(text, text[]), public._bio_rule(text), public._enforce_bio(),
+revoke execute on function public._leet(text), public._name_rule(text, text[]), public._bio_rule(text, boolean), public._enforce_bio(),
   public.signup_check(text), public.check_bio(text), public.owner_words(), public.owner_word_set(text, text, text, boolean),
   public.owner_name_test(text), public.owner_bad_names(), public.owner_force_rename(text) from public, anon;
 grant execute on function public.signup_check(text) to anon, authenticated;
@@ -1092,7 +1106,7 @@ begin
   select * into t from public.profiles where lower(username) = lower(p_username);
   if not found then return json_build_object('ok', false, 'reason', 'no_user'); end if;
   if t.id = me then return json_build_object('ok', false, 'reason', 'self'); end if;
-  if p_reason not in ('name', 'bio', 'crew', 'cheating', 'other') then return json_build_object('ok', false, 'reason', 'bad_reason'); end if;
+  if p_reason not in ('name', 'bio', 'status', 'socials', 'crew', 'cheating', 'other') then return json_build_object('ok', false, 'reason', 'bad_reason'); end if;
   if exists (select 1 from public.reports where reporter = me and target = t.id and reason = p_reason and status = 'open') then
     return json_build_object('ok', true, 'already', true);
   end if;
@@ -1323,7 +1337,7 @@ alter table public.crew_messages enable row level security;
 revoke all on public.profile_weeks, public.profile_months, public.profile_views, public.crew_wars, public.crew_messages from anon, authenticated;
 
 alter table public.reports drop constraint if exists reports_reason_check;
-alter table public.reports add constraint reports_reason_check check (reason in ('name', 'bio', 'crew', 'cheating', 'chat', 'status', 'other'));
+alter table public.reports add constraint reports_reason_check check (reason in ('name', 'bio', 'crew', 'cheating', 'chat', 'status', 'socials', 'other'));
 
 -- Bad words are kept out of statuses the same way as bios.
 create or replace function public._enforce_bio() returns trigger
@@ -1649,7 +1663,7 @@ begin
   end if;
   if length(body) < 1 then return json_build_object('ok', false, 'reason', 'empty'); end if;
   if length(body) > 200 then return json_build_object('ok', false, 'reason', 'long'); end if;
-  if public._bio_rule(body) is not null then return json_build_object('ok', false, 'reason', 'blocked'); end if;
+  if public._bio_rule(body, true) is not null then return json_build_object('ok', false, 'reason', 'blocked'); end if;
   if not pr.is_owner and public._contact_rule(body) then return json_build_object('ok', false, 'reason', 'contact'); end if;
   select max(at) into last_at from public.global_messages where user_id = me;
   if not pr.is_owner and last_at > now() - interval '4 seconds' then return json_build_object('ok', false, 'reason', 'slow'); end if;
@@ -1819,3 +1833,63 @@ grant execute on function public.app_min_version() to anon, authenticated;
 grant execute on function public.owner_set_min_version(text, text), public.global_chat_send(text), public.global_chat_list(text),
   public.global_chat_delete(bigint), public.global_chat_report(bigint), public.owner_hidden_messages(), public.owner_message_set(text, bigint, text),
   public.owner_chat_mute(text, int), public.owner_chat_mutes(), public.owner_stats() to authenticated;
+
+
+-- ============================================================================
+-- v2.20.0: cussing in global chat (slurs and sexual words stay blocked), socials on profiles.
+-- Safe to run again.
+-- ============================================================================
+alter table public.profiles add column if not exists socials jsonb not null default '{}';
+alter table public.profiles add column if not exists socials_visibility text not null default 'nobody';
+alter table public.profiles add column if not exists friend_ids bigint[];
+
+-- Everyday swear words are fine in global chat. Slurs and sexual words are not (chat_ok stays false for those).
+update public.blocked_words set chat_ok = true
+ where word in ('fuck', 'fuk', 'fvck', 'shit', 'bitch', 'ass', 'asshole', 'bastard', 'dick', 'prick', 'wank', 'twat') and not chat_ok;
+
+create or replace function public._clean_socials(p jsonb) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  out jsonb := '{}'::jsonb;
+  k text;
+  v text;
+begin
+  if jsonb_typeof(p) <> 'object' then return out; end if;
+  for k, v in select key, trim(value) from jsonb_each_text(p) loop
+    if k in ('discord', 'snapchat', 'instagram', 'tiktok', 'youtube', 'twitch', 'x')
+       and v ~ '^@?[A-Za-z0-9_.#-]{2,40}$' and public._bio_rule(v) is null and v !~* '(\.com|\.gg|\.net|https?)' then
+      out := out || jsonb_build_object(k, v);
+    end if;
+  end loop;
+  return out;
+end
+$$;
+
+create or replace function public.owner_clear_socials(p_username text) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  update public.profiles set socials = '{}'::jsonb where lower(username) = lower(p_username);
+  return json_build_object('ok', found);
+end
+$$;
+
+create or replace function public.owner_word_chat(p_word text, p_ok boolean) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  update public.blocked_words set chat_ok = coalesce(p_ok, false) where word = lower(p_word);
+  return json_build_object('ok', found);
+end
+$$;
+
+create or replace function public.owner_words() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(json_build_object('word', word, 'kind', kind, 'match', match, 'chat_ok', chat_ok) order by kind, word) from public.blocked_words), '[]'::json);
+end
+$$;
+
+revoke execute on function public._clean_socials(jsonb), public.owner_clear_socials(text), public.owner_word_chat(text, boolean) from public, anon;
+grant execute on function public.owner_clear_socials(text), public.owner_word_chat(text, boolean) to authenticated;

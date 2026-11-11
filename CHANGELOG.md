@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.20.0
+- **Cussing is allowed in global chat.** Slurs and sexual words are still blocked, and names, bios and statuses stay clean.
+- **Socials on profiles:** add your Discord, Snapchat, Instagram, TikTok, YouTube, Twitch or X username to your profile, and pick who can see them: only you, your Roblox friends on Orbit, your crew, or everyone. They're off by default.
+- Links, socials and phone numbers still aren't allowed in global chat. Put your socials on your profile instead.
+- You can report a profile's socials, and the owner can clear them.
+- **Owner panel:** the 💬 button on each bad word chooses whether it's allowed in global chat.
+
 ## v2.19.1
 - **Fix: custom skies not showing in some games.** Skies, suns and moons from the Pack store now apply in every game, even ones with their own mod profile (like the BedWars kit) and when you hop between games inside Roblox. Before, they only lived in your current mod profile and could get skipped.
 - **Skies now also replace Roblox's default sky in games that use a Sky object with Roblox's built-in sky.** They're written to every folder Roblox reads that sky from.

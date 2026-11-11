@@ -1069,6 +1069,15 @@ body.idle #glow { opacity: 0; }
 .ver-row b { text-align: right; }
 .need-row { display: flex; justify-content: space-between; padding: 7px 4px; border-top: 1px solid var(--line); font-size: 13px; } .need-row:first-of-type { border-top: 0; }
 .need-row.link { cursor: pointer; } .need-row.link:hover span { color: var(--accent); } .need-row b.hot { color: var(--warn); }
+
+/* ===== v2.20 ===== */
+.socials-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+.soc-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 13px 0 10px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); font-weight: 650; font-size: 13px; transition: all .2s var(--ease); }
+.soc-chip:hover { border-color: var(--line2); transform: translateY(-1px); }
+.soc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.soc-field { display: flex; flex-direction: column; gap: 5px; } .soc-field > span { font-size: 12px; font-weight: 650; color: var(--muted); }
+.soc-safe { margin-top: 12px; padding: 10px 14px; border-radius: 12px; font-size: 12.5px; color: var(--muted); background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.25); }
+.word-chip .chat-ok { opacity: .35; } .word-chip .chat-ok.on { opacity: 1; background: rgba(74,222,128,.15); }
 </style>
 </head>
 <body>
@@ -2722,8 +2731,11 @@ function profileView(p, { mine = false, local = null } = {}) {
       h("div", { style: "min-width:0" }, h("div", { style: "font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" }, g.name), h("div", { class: "bar" }, h("i", { style: `width:${Math.max(4, 100 * (g.seconds || 0) / max)}%` }))),
       h("div", { class: "muted", style: "font-weight:700;font-variant-numeric:tabular-nums" }, fmtHrs(g.seconds)))))
       : h("p", { class: "sub", style: "margin:6px 0 0" }, mine ? "Play some games through Orbit and your favorites show up here." : "Nothing played yet."));
+  const soc = p.socials && Object.keys(p.socials).length ? h("div", { class: "card socials-row" }, h("b", { class: "muted small", style: "margin-right:4px" }, "SOCIALS"),
+    Object.entries(p.socials).map(([k, v]) => h("button", { class: "soc-chip", title: "Copy", onclick: async () => { await api.copy_text(v); toast(`Copied ${v}.`, "ok"); } }, h("span", { class: "soc-ic" }, SOCIAL_ICONS[k] || "🔗"), h("span", {}, v))),
+    mine ? h("span", { class: "muted small", style: "margin-left:auto" }, { nobody: "Only you can see these", friends: "Your Roblox friends on Orbit can see these", crew: "Your crew can see these", everyone: "Everyone can see these" }[p.socials_visibility || "nobody"]) : null) : null;
   const shows = (p.showcase || []).length ? h("div", { class: "showcase" }, (p.showcase || []).map((a) => h("div", { class: "show-item" }, h("span", { class: "ic" }, a.icon || "🏆"), h("b", {}, a.title || a.id)))) : null;
-  return [hero, shows, tiles, top].filter(Boolean);
+  return [hero, soc, shows, tiles, top].filter(Boolean);
 }
 async function socProfile() {
   const r = await api.social_me();
@@ -2750,7 +2762,7 @@ async function socProfile() {
   const look = h("button", { class: "btn primary", onclick: () => q.value.trim() && openProfile(q.value.trim()) }, "View profile");
   q.onkeydown = (e) => { if (e.key === "Enter") look.click(); };
   const lookup = h("div", { class: "card" }, h("h3", {}, "Look up a player"), h("p", { class: "sub" }, "See anyone's Orbit profile by their Orbit username."), h("div", { class: "row" }, q, look));
-  return [...profileView(r.profile, { mine: true, local: r.local }), lookC, uname, edit, lookup];
+  return [...profileView(r.profile, { mine: true, local: r.local }), lookC, uname, edit, socialsCard(set), lookup];
 }
 function usernameCard() {
   const current = (S.account && S.account.user && S.account.user.username) || "";
@@ -2921,7 +2933,7 @@ function miniSheet(title, sub, bodyEls, okLabel, onOk, danger = false) {
 }
 function reportPlayer(username, hasCrew) {
   let reason = "name";
-  const opts = [["name", "Username"], ["bio", "Bio"], ["status", "Status"], ...(hasCrew ? [["crew", "Crew"]] : []), ["cheating", "Cheating"], ["other", "Other"]];
+  const opts = [["name", "Username"], ["bio", "Bio"], ["status", "Status"], ["socials", "Socials"], ...(hasCrew ? [["crew", "Crew"]] : []), ["cheating", "Cheating"], ["other", "Other"]];
   const note = h("textarea", { class: "input", rows: 3, maxlength: 300, placeholder: "What's wrong? (optional)", style: "width:100%;height:auto;padding:10px 12px;margin-top:12px;resize:none" });
   miniSheet(`Report ${username}`, "The Orbit owner reviews every report. False reports can get your account banned.",
     [segmented(opts, reason, (v) => { reason = v; }), note], "Send report", async () => {
@@ -3060,6 +3072,33 @@ async function crewBoard() {
     h("div", { style: "font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, x.name, x.trophies ? h("span", { class: "trophies", title: `${x.trophies} crew war win${x.trophies === 1 ? "" : "s"}` }, ` 🏆${x.trophies > 1 ? "×" + x.trophies : ""}`) : null), h("span", { class: "muted small" }, `${x.members} member${x.members === 1 ? "" : "s"}`), h("div", { class: "tm" }, fmtHrs(x.seconds)))))];
 }
 
+// ===== v2.20: socials on profiles =====
+const SOCIAL_ICONS = { discord: "🎮", snapchat: "👻", instagram: "📸", tiktok: "🎵", youtube: "▶️", twitch: "🟣", x: "✖️" };
+const SOCIAL_NAMES = { discord: "Discord", snapchat: "Snapchat", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", twitch: "Twitch", x: "X" };
+function socialsCard(set) {
+  const cur = set.socials || {};
+  let vis = set.socials_visibility || "nobody";
+  const inputs = {};
+  const grid = h("div", { class: "soc-grid" }, Object.keys(SOCIAL_NAMES).map((k) => {
+    inputs[k] = h("input", { class: "input", maxlength: 40, spellcheck: "false", placeholder: k === "youtube" ? "@channel" : "username", value: cur[k] || "" });
+    return h("label", { class: "soc-field" }, h("span", {}, SOCIAL_ICONS[k] + " " + SOCIAL_NAMES[k]), inputs[k]);
+  }));
+  const seg = segmented([["nobody", "Only me"], ["friends", "Roblox friends"], ["crew", "My crew"], ["everyone", "Everyone"]], vis, (v) => { vis = v; });
+  const save = h("button", { class: "btn primary", onclick: async () => {
+    const socials = Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value.trim()]).filter(([, v]) => v));
+    if (vis === "everyone" && Object.keys(socials).length && !await modal({ title: "Show your socials to everyone?", text: "Anyone on Orbit, including strangers, will be able to see them. Only do this if you're okay with people you don't know adding you.", ok: "Show to everyone" })) return;
+    const r = await api.social_save({ socials, socials_visibility: vis });
+    if (r && r.error) return toast(r.error, "err");
+    cfg.social = Object.assign(cfg.social || {}, { socials, socials_visibility: vis });
+    toast("Socials saved.", "ok"); renderSocialTab();
+  } }, "Save socials");
+  requestAnimationFrame(() => seg._remeasure && seg._remeasure());
+  return h("div", { class: "card", id: "socialsCard" }, h("h3", {}, "Socials"),
+    h("p", { class: "sub" }, "Share your other accounts on your profile. Just the username, no links. You pick who can see them."), grid,
+    h("div", { class: "row", style: "margin-top:12px" }, h("span", { class: "muted small" }, "Who can see them"), seg, h("span", { class: "spacer" }), save),
+    h("div", { class: "soc-safe" }, "🛡️ Be careful adding people you only know online. Never share your password, address, school or phone number, and tell an adult you trust if someone makes you uncomfortable."));
+}
+
 // ===== v2.19: global chat =====
 let gchatTimer = null;
 function renderGlobalChat() {
@@ -3072,7 +3111,7 @@ function renderGlobalChat() {
   const send = h("button", { class: "btn primary" }, "Send");
   const lock = h("div", { class: "chat-lock", hidden: true });
   const owner = !!(S.account && S.account.user && S.account.user.owner);
-  const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "No bad words, no links, and no sharing Discord, Snap, phone numbers or where you live. Messages that 3 people report get hidden, and repeat offenders get timed out."));
+  const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "Cussing is fine, but no slurs or sexual stuff, no links, and no sharing socials, phone numbers or where you live here. Want to share socials? Add them to your profile, where you pick who sees them. Messages 3 people report get hidden, and repeat offenders get timed out."));
   const card = h("div", { class: "card chat-card" }, rules, box, lock, h("div", { class: "row", style: "margin-top:10px" }, inp, send));
   body.replaceChildren(card);
   const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -3356,7 +3395,7 @@ async function renderOwnerReports() {
   if (r.error) return body.replaceChildren(h("p", { class: "muted small" }, r.error));
   const list = r.data || [];
   if (!list.length) return body.replaceChildren(h("p", { class: "muted small" }, status === "open" ? "No open reports. 🎉" : "Nothing here."));
-  const reasonText = { name: "Username", bio: "Bio", crew: "Crew", cheating: "Cheating", chat: "Crew chat", status: "Status", other: "Other" };
+  const reasonText = { name: "Username", bio: "Bio", crew: "Crew", cheating: "Cheating", chat: "Chat", status: "Status", socials: "Socials", other: "Other" };
   const act = (fn, args, msg) => async () => { const x = await api.owner_rpc(fn, args); if (x.error) return toast(x.error, "err"); if (msg) toast(msg, "ok"); renderOwnerReports(); };
   body.replaceChildren(...list.map((x) => h("div", { class: "rep" },
     h("div", { class: "row", style: "gap:8px" }, h("b", { class: "rep-name", onclick: () => openProfile(x.target) }, x.target), x.crew ? h("span", { class: "crew-tag" }, x.crew) : null,
@@ -3369,6 +3408,7 @@ async function renderOwnerReports() {
       x.reason === "name" ? h("button", { class: "btn", onclick: async () => { if (!await modal({ title: `Rename ${x.target}?`, text: "They get a random Player name and log in with it from now on.", ok: "Rename", danger: true })) return; const y = await api.owner_force_rename(x.target); if (y.error) return toast(y.error, "err"); await api.owner_rpc("owner_report_set", { p_id: x.id, p_status: "done" }); toast(`Renamed to ${y.data.username}.`, "ok"); renderOwnerReports(); } }, "Rename") : null,
       x.reason === "bio" && x.bio ? h("button", { class: "btn", onclick: async () => { await api.owner_rpc("owner_clear_bio", { p_username: x.target }); act("owner_report_set", { p_id: x.id, p_status: "done" }, "Bio cleared.")(); } }, "Clear bio") : null,
       x.crew && x.reason === "crew" ? h("button", { class: "btn", onclick: () => openCrew(x.crew) }, "View crew") : null,
+      x.reason === "socials" ? h("button", { class: "btn", onclick: async () => { await api.owner_rpc("owner_clear_socials", { p_username: x.target }); act("owner_report_set", { p_id: x.id, p_status: "done" }, "Socials cleared.")(); } }, "Clear socials") : null,
       h("button", { class: "btn danger", onclick: () => banDialog(x.target, async () => { await api.owner_rpc("owner_report_set", { p_id: x.id, p_status: "done" }); renderOwnerReports(); }) }, "Ban"),
       h("span", { class: "spacer" }),
       h("button", { class: "btn ghost", onclick: act("owner_report_set", { p_id: x.id, p_status: "dismissed" }, "Dismissed.") }, "Dismiss"),
@@ -4896,10 +4936,12 @@ async function renderOwnerNames() {
     const list = r.words.filter((w) => w.kind === k);
     const chips = h("div", { class: "word-chips" }, list.map((w) => {
       const x = h("button", { title: "Remove", onclick: async () => { const y = await api.owner_word_set(w.word, w.kind, w.match, true); if (y.error) return toast(y.error, "err"); chip.remove(); } }, "✕");
-      const chip = h("span", { class: "word-chip " + k + (k === "bad" ? " hide" : ""), title: k === "bad" ? "Hover to show" : "" }, h("i", {}, w.word), h("small", {}, matchLabel[w.match] || ""), x);
+      const chatBtn = k === "bad" ? h("button", { class: "chat-ok" + (w.chat_ok ? " on" : ""), title: w.chat_ok ? "Allowed in global chat (click to block there too)" : "Blocked in global chat (click to allow there)", onclick: async () => { const y = await api.owner_rpc("owner_word_chat", { p_word: w.word, p_ok: !w.chat_ok }); if (y.error) return toast(y.error, "err"); w.chat_ok = !w.chat_ok; chatBtn.classList.toggle("on", w.chat_ok); chatBtn.title = w.chat_ok ? "Allowed in global chat (click to block there too)" : "Blocked in global chat (click to allow there)"; } }, "💬") : null;
+      const chip = h("span", { class: "word-chip " + k + (k === "bad" ? " hide" : ""), title: k === "bad" ? "Hover to show" : "" }, h("i", {}, w.word), h("small", {}, matchLabel[w.match] || ""), chatBtn, x);
       return chip;
     }));
-    out.push(h("div", { class: "row", style: "margin:16px 0 6px" }, h("b", {}, label), h("span", { class: "muted small" }, `${list.length}`)), chips);
+    out.push(h("div", { class: "row", style: "margin:16px 0 6px" }, h("b", {}, label), h("span", { class: "muted small" }, `${list.length}`),
+      k === "bad" ? h("span", { class: "muted small", style: "margin-left:auto" }, "💬 lit up = allowed in global chat (cussing). Still blocked in names, bios and statuses.") : null), chips);
   });
   body.replaceChildren(...out);
   requestAnimationFrame(() => [kindSeg, matchSeg].forEach((x) => x._remeasure()));

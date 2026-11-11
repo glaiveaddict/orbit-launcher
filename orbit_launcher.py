@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.19.1"
+APP_VERSION = "2.20.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -7095,7 +7095,9 @@ def social_payload(settings=None):
             "top_games": [{"pid": str(pid), "name": e.get("name") or "Game", "seconds": int(e.get("seconds", 0))} for pid, e in top],
             "now_playing": playing, "public_profile": bool(soc.get("public_profile", True)),
             "showcase": showcase_items(soc.get("showcase") or []), "banner": soc.get("banner") or "", "name_style": soc.get("name_style") or "",
-            "status": (soc.get("status") or "")[:60], "app_version": APP_VERSION, "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
+            "status": (soc.get("status") or "")[:60], "app_version": APP_VERSION,
+            "socials": {k: v for k, v in (soc.get("socials") or {}).items() if k in SOCIAL_SITES and SOCIAL_HANDLE_RE.fullmatch(str(v or ""))},
+            "socials_visibility": soc.get("socials_visibility") or "nobody", **friend_ids_payload(soc, uid), "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
             "month_seconds": month[0], "month_games": month[1],
             "on_leaderboard": bool(soc.get("on_leaderboard", True)), "share_activity": bool(soc.get("share_activity", True))}
 
@@ -7145,6 +7147,28 @@ def _until_text(iso):
         return time.strftime("%b %d, %I:%M %p", time.localtime(ts)).replace(" 0", " ")
     except Exception:
         return "later"
+
+
+SOCIAL_SITES = ("discord", "snapchat", "instagram", "tiktok", "youtube", "twitch", "x")
+SOCIAL_HANDLE_RE = re.compile(r"@?[A-Za-z0-9_.#-]{2,40}")
+
+
+def friend_ids_payload(soc, uid):
+    """Your Roblox friend list, sent only if your socials are set to "Roblox friends" (so Orbit can check who may see them).
+    Refreshed every 6 hours at most."""
+    if (soc.get("socials_visibility") or "nobody") != "friends" or not uid or not soc.get("socials"):
+        return {}
+    state = load_json(SOCIAL_FILE, {}) or {}
+    if state.get("friends_uid") == uid and time.time() - state.get("friends_at", 0) < 6 * 3600:
+        return {}
+    try:
+        ids = roblox_friend_ids(uid)[:1000]
+    except Exception as e:
+        log(f"Friend list for socials failed: {e}")
+        return {}
+    state.update(friends_uid=uid, friends_at=int(time.time()))
+    save_json(SOCIAL_FILE, state)
+    return {"friend_ids": ids}
 
 
 def social_sync(settings=None, force=False):
@@ -8005,6 +8029,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.20.0": ["social:socialsCard"],
     "2.19.0": ["chat", "owner:ownerStats", "owner:ownerMin", "owner:ownerHidden"],
     "2.18.0": ["social"],
     "2.17.0": ["social", "owner:ownerReports", "owner:ownerBans", "owner:ownerFeedback", "health:feedbackCard", "credits:betaCard"],
@@ -10724,6 +10749,21 @@ class Api:
         for k in ("banner", "name_style"):
             if k in (changes or {}):
                 soc[k] = re.sub(r"[^a-z]", "", str(changes[k] or ""))[:12]
+        if "socials" in (changes or {}):
+            clean = {}
+            for k, v in (changes["socials"] or {}).items():
+                v = str(v or "").strip()
+                if k in SOCIAL_SITES and v:
+                    if not SOCIAL_HANDLE_RE.fullmatch(v) or re.search(r"(?i)https?|\.(com|gg|net)", v):
+                        return {"error": f"Type just your {k.title()} username, not a link."}
+                    clean[k] = v
+            soc["socials"] = clean
+        if (changes or {}).get("socials_visibility") in ("nobody", "friends", "crew", "everyone"):
+            soc["socials_visibility"] = changes["socials_visibility"]
+            if changes["socials_visibility"] == "friends":
+                st = load_json(SOCIAL_FILE, {}) or {}
+                st.pop("friends_at", None)
+                save_json(SOCIAL_FILE, st)
         if "status" in (changes or {}):
             st = re.sub(r"\s+", " ", str(changes["status"] or "")).strip()[:60]
             if st:
@@ -10804,7 +10844,7 @@ class Api:
                 if why == "new_account":
                     return {"error": f"New accounts can post in global chat after their first day ({_until_text(r.get('until'))})."}
                 if why == "contact":
-                    return {"error": "Links and other apps (Discord, Snap, phone numbers...) aren't allowed in global chat. It keeps everyone safe."}
+                    return {"error": "Links, socials and phone numbers aren't allowed in global chat. Put your socials on your profile instead (Social > Profile), where you pick who can see them."}
                 if why == "long":
                     return {"error": "That message is too long."}
                 return {"error": self.CREW_REASONS.get(why, "That didn't work.")}
@@ -10856,7 +10896,7 @@ class Api:
 
     OWNER_RPCS = {"owner_reports", "owner_report_set", "owner_clear_bio", "owner_crew_delete", "owner_ban", "owner_unban", "owner_bans",
                   "owner_feedback", "owner_feedback_log", "owner_feedback_set", "owner_stats", "owner_set_min_version",
-                  "owner_hidden_messages", "owner_message_set", "owner_chat_mute", "owner_chat_mutes"}
+                  "owner_hidden_messages", "owner_message_set", "owner_chat_mute", "owner_chat_mutes", "owner_clear_socials", "owner_word_chat"}
 
     def min_version(self):
         try:
