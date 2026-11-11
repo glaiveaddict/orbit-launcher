@@ -315,10 +315,12 @@ begin
     showcase = case when p ? 'showcase' then public._clean_showcase(p -> 'showcase') else showcase end,
     status_at = case when p ? 'status' and nullif(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60), '') is distinct from status then now() else status_at end,
     status = case when p ? 'status' then nullif(trim(left(regexp_replace(coalesce(p ->> 'status', ''), '[\r\n\t]+', ' ', 'g'), 60)), '') else status end,
+    app_version = case when (p ->> 'app_version') ~ '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+\.?[0-9]*)?$' then p ->> 'app_version' else app_version end,
     banner = case when p ? 'banner' then public._clean_banner(me, p ->> 'banner') else banner end,
     name_style = case when p ? 'name_style' then public._clean_name_style(me, p ->> 'name_style') else name_style end,
     last_seen = now()
   where id = me;
+  insert into public.profile_days (user_id, day) values (me, current_date) on conflict do nothing;
   if ws is not null then
     insert into public.profile_weeks (user_id, week, seconds) values (me, ws, least(greatest(coalesce((p ->> 'week_seconds')::numeric, 0), 0), 604800)::int)
     on conflict (user_id, week) do update set seconds = excluded.seconds;
@@ -1434,6 +1436,9 @@ declare
   m public.crew_messages;
 begin
   if cid is null then return json_build_object('ok', false, 'reason', 'no_crew'); end if;
+  if public._chat_muted(me) is not null then
+    return json_build_object('ok', false, 'reason', 'muted', 'until', public._chat_muted(me));
+  end if;
   body := regexp_replace(body, '\n{3,}', E'\n\n', 'g');
   if length(body) < 1 then return json_build_object('ok', false, 'reason', 'empty'); end if;
   if length(body) > 300 then return json_build_object('ok', false, 'reason', 'long'); end if;
@@ -1458,14 +1463,14 @@ declare
 begin
   if me is null then raise exception 'log in first'; end if;
   if cid is null then return json_build_object('found', false); end if;
-  select coalesce(max(id), 0) || ':' || count(*) filter (where deleted) into sig
-    from (select id, deleted from public.crew_messages where crew_id = cid order by id desc limit 80) x;
+  select coalesce(max(id), 0) || ':' || count(*) filter (where deleted or hidden) into sig
+    from (select id, deleted, hidden from public.crew_messages where crew_id = cid order by id desc limit 80) x;
   if sig = p_sig then return json_build_object('found', true, 'same', true, 'sig', sig); end if;
   select c.leader into leader from public.crews c where c.id = cid;
   return json_build_object('found', true, 'sig', sig, 'is_leader', leader = me, 'messages', coalesce((
     select json_agg(json_build_object('id', m.id, 'username', coalesce(p.username, m.username), 'at', m.at, 'body', m.body,
              'mine', m.user_id = me, 'leader', m.user_id = leader, 'name_style', p.name_style) order by m.id)
-      from (select * from public.crew_messages where crew_id = cid and not deleted order by id desc limit 80) m
+      from (select * from public.crew_messages where crew_id = cid and not deleted and not hidden order by id desc limit 80) m
       left join public.profiles p on p.id = m.user_id), '[]'::json));
 end
 $$;
@@ -1506,6 +1511,7 @@ begin
   insert into public.reports (reporter, reporter_name, target, target_name, reason, note)
   values (me, (select username from public.profiles where id = me), m.user_id, m.username, 'chat',
           left('[' || tag || '] chat: "' || m.body || '"', 290) || ' #' || p_id);
+  perform public._flag_message('crew', p_id, me);
   return json_build_object('ok', true);
 end
 $$;
@@ -1514,3 +1520,302 @@ revoke execute on function public._clean_games(jsonb), public._settle_crew_wars(
   public.crew_chat_send(text), public.crew_chat_list(text), public.crew_chat_delete(bigint), public.crew_chat_report(bigint) from public, anon;
 grant execute on function public.crew_wrapped(text, text), public.crew_chat_send(text), public.crew_chat_list(text),
   public.crew_chat_delete(bigint), public.crew_chat_report(bigint) to authenticated;
+
+
+-- ============================================================================
+-- v2.19.0: owner stats, required updates, chat auto-mod and timeouts, global chat.
+-- Safe to run again.
+-- ============================================================================
+alter table public.profiles add column if not exists app_version text;
+alter table public.profiles add column if not exists chat_muted_until timestamptz;
+alter table public.crew_messages add column if not exists hidden boolean not null default false;
+
+create table if not exists public.profile_days (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null,
+  primary key (user_id, day)
+);
+create index if not exists profile_days_day on public.profile_days (day);
+create table if not exists public.app_config (key text primary key, value jsonb, updated_at timestamptz not null default now());
+create table if not exists public.global_messages (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users (id) on delete set null,
+  username text,
+  body text not null,
+  at timestamptz not null default now(),
+  deleted boolean not null default false,
+  hidden boolean not null default false
+);
+create table if not exists public.chat_flags (
+  kind text not null check (kind in ('crew', 'global')),
+  msg_id bigint not null,
+  reporter uuid not null references auth.users (id) on delete cascade,
+  at timestamptz not null default now(),
+  primary key (kind, msg_id, reporter)
+);
+create table if not exists public.chat_strikes (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  at timestamptz not null default now(),
+  kind text,
+  msg_id bigint
+);
+alter table public.profile_days enable row level security;
+alter table public.app_config enable row level security;
+alter table public.global_messages enable row level security;
+alter table public.chat_flags enable row level security;
+alter table public.chat_strikes enable row level security;
+revoke all on public.profile_days, public.app_config, public.global_messages, public.chat_flags, public.chat_strikes from anon, authenticated;
+
+-- ---------- Required update ----------
+create or replace function public.app_min_version() returns json
+language sql stable security definer set search_path = public as $$
+  select coalesce((select value from public.app_config where key = 'min_version')::json, '{}'::json)
+$$;
+
+create or replace function public.owner_set_min_version(p_version text, p_message text default null) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  if coalesce(trim(p_version), '') = '' then
+    delete from public.app_config where key = 'min_version';
+    return json_build_object('ok', true, 'cleared', true);
+  end if;
+  if trim(p_version) !~ '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+\.?[0-9]*)?$' then raise exception 'version must look like 2.19.0'; end if;
+  insert into public.app_config (key, value, updated_at)
+  values ('min_version', jsonb_build_object('min', trim(p_version), 'message', nullif(left(trim(coalesce(p_message, '')), 200), '')), now())
+  on conflict (key) do update set value = excluded.value, updated_at = now();
+  return json_build_object('ok', true);
+end
+$$;
+
+-- ---------- Chat auto-mod ----------
+create or replace function public._chat_muted(p_uid uuid) returns timestamptz
+language sql stable security definer set search_path = public as $$
+  select chat_muted_until from public.profiles where id = p_uid and chat_muted_until > now()
+$$;
+
+-- 3 different people reporting a message hides it until the owner looks. 2 hidden messages in a week = 24 hour chat timeout.
+create or replace function public._flag_message(p_kind text, p_id bigint, p_reporter uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  author uuid;
+  author_name text;
+  n int;
+  newly boolean := false;
+begin
+  insert into public.chat_flags (kind, msg_id, reporter) values (p_kind, p_id, p_reporter) on conflict do nothing;
+  select count(*) into n from public.chat_flags where kind = p_kind and msg_id = p_id;
+  if n < 3 then return; end if;
+  if p_kind = 'crew' then
+    update public.crew_messages set hidden = true where id = p_id and not hidden and not deleted returning user_id, username into author, author_name;
+  else
+    update public.global_messages set hidden = true where id = p_id and not hidden and not deleted returning user_id, username into author, author_name;
+  end if;
+  if author is null then return; end if;
+  insert into public.chat_strikes (user_id, kind, msg_id) values (author, p_kind, p_id);
+  insert into public.key_log (event, username, detail) values ('auto_hidden', author_name, p_kind || ' message #' || p_id);
+  if (select count(*) from public.chat_strikes where user_id = author and at > now() - interval '7 days') >= 2
+     and not exists (select 1 from public.profiles where id = author and is_owner) then
+    update public.profiles set chat_muted_until = greatest(coalesce(chat_muted_until, now()), now() + interval '24 hours') where id = author;
+    insert into public.key_log (event, username, detail) values ('auto_muted', author_name, '24 hours');
+  end if;
+end
+$$;
+
+-- ---------- Global chat ----------
+-- Keeps people safe: no links, no swapping Discord/Snap/phone numbers with strangers.
+create or replace function public._contact_rule(p_text text) returns boolean
+language sql immutable as $$
+  select coalesce(p_text, '') ~* '(https?://|www\.|discord\.gg|\.(com|net|org|gg|io|xyz|ly|me|co|tv)(\W|$)|@[a-z0-9-]+\.[a-z]{2,})'
+      or coalesce(p_text, '') ~* '\m(discord|snap|snapchat|insta|instagram|ig|tiktok|whatsapp|telegram|kik|facetime|venmo|cashapp)\M'
+      or coalesce(p_text, '') ~* '\m(add|dm|text|call|message|friend) me (on|at)\M(?!\s*roblox)|\mmy (number|phone|snap|insta|discord|address|location)\M'
+      or regexp_replace(coalesce(p_text, ''), '[\s\-\.\(\)]', '', 'g') ~ '[0-9]{7,}'
+$$;
+
+create or replace function public.global_chat_send(p_body text) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  pr public.profiles;
+  body text := trim(regexp_replace(coalesce(p_body, ''), '[\r\n\t]+', ' ', 'g'));
+  last_at timestamptz;
+  m bigint;
+begin
+  select * into pr from public.profiles where id = me;
+  if public._chat_muted(me) is not null then return json_build_object('ok', false, 'reason', 'muted', 'until', public._chat_muted(me)); end if;
+  if not pr.is_owner and pr.created_at > now() - interval '1 day' then
+    return json_build_object('ok', false, 'reason', 'new_account', 'until', pr.created_at + interval '1 day');
+  end if;
+  if length(body) < 1 then return json_build_object('ok', false, 'reason', 'empty'); end if;
+  if length(body) > 200 then return json_build_object('ok', false, 'reason', 'long'); end if;
+  if public._bio_rule(body) is not null then return json_build_object('ok', false, 'reason', 'blocked'); end if;
+  if not pr.is_owner and public._contact_rule(body) then return json_build_object('ok', false, 'reason', 'contact'); end if;
+  select max(at) into last_at from public.global_messages where user_id = me;
+  if not pr.is_owner and last_at > now() - interval '4 seconds' then return json_build_object('ok', false, 'reason', 'slow'); end if;
+  if not pr.is_owner and (select count(*) from public.global_messages where user_id = me and at > now() - interval '1 minute') >= 8 then
+    return json_build_object('ok', false, 'reason', 'slow');
+  end if;
+  insert into public.global_messages (user_id, username, body) values (me, pr.username, body) returning id into m;
+  if random() < 0.05 then
+    delete from public.global_messages where id < (select id from public.global_messages order by id desc offset 3000 limit 1);
+  end if;
+  return json_build_object('ok', true, 'id', m);
+end
+$$;
+
+create or replace function public.global_chat_list(p_sig text default null) returns json
+language plpgsql stable security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  sig text;
+  pr public.profiles;
+begin
+  if me is null then raise exception 'log in first'; end if;
+  select coalesce(max(id), 0) || ':' || count(*) filter (where deleted or hidden) into sig
+    from (select id, deleted, hidden from public.global_messages order by id desc limit 100) x;
+  select * into pr from public.profiles where id = me;
+  if sig = p_sig then
+    return json_build_object('same', true, 'sig', sig, 'online', (select count(*) from public.profiles where last_seen > now() - interval '5 minutes'));
+  end if;
+  return json_build_object('sig', sig, 'online', (select count(*) from public.profiles where last_seen > now() - interval '5 minutes'),
+    'muted_until', public._chat_muted(me),
+    'new_until', case when not pr.is_owner and pr.created_at > now() - interval '1 day' then pr.created_at + interval '1 day' end,
+    'messages', coalesce((
+      select json_agg(json_build_object('id', m.id, 'username', coalesce(p.username, m.username), 'at', m.at, 'body', m.body, 'mine', m.user_id = me,
+               'crew', public._crew_tag(m.user_id), 'name_style', p.name_style, 'level', p.level, 'owner', coalesce(p.is_owner, false),
+               'badges', public._badges(p.id, p.is_owner, p.badges)) order by m.id)
+        from (select * from public.global_messages g where not g.deleted and not g.hidden and not public._is_banned(g.user_id) order by g.id desc limit 100) m
+        left join public.profiles p on p.id = m.user_id), '[]'::json));
+end
+$$;
+
+create or replace function public.global_chat_delete(p_id bigint) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.global_messages set deleted = true, body = '' where id = p_id and (user_id = auth.uid() or public.is_owner());
+  if not found then raise exception 'not allowed'; end if;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.global_chat_report(p_id bigint) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := public._active();
+  m public.global_messages;
+begin
+  select * into m from public.global_messages where id = p_id and not deleted and not hidden;
+  if not found then return json_build_object('ok', false, 'reason', 'gone'); end if;
+  if m.user_id = me then return json_build_object('ok', false, 'reason', 'self'); end if;
+  if exists (select 1 from public.chat_flags where kind = 'global' and msg_id = p_id and reporter = me) then
+    return json_build_object('ok', true, 'already', true);
+  end if;
+  if (select count(*) from public.reports where reporter = me and at > now() - interval '1 day') >= 15 then
+    return json_build_object('ok', false, 'reason', 'too_many');
+  end if;
+  insert into public.reports (reporter, reporter_name, target, target_name, reason, note)
+  values (me, (select username from public.profiles where id = me), m.user_id, m.username, 'chat', left('Global chat: "' || m.body || '"', 290) || ' #g' || p_id);
+  perform public._flag_message('global', p_id, me);
+  return json_build_object('ok', true);
+end
+$$;
+
+-- ---------- Owner tools ----------
+create or replace function public.owner_hidden_messages() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(x order by x.at desc) from (
+    select 'global' as kind, g.id, g.username, g.body, g.at, null::text as crew,
+           (select count(*) from public.chat_flags f where f.kind = 'global' and f.msg_id = g.id) as flags
+      from public.global_messages g where g.hidden and not g.deleted
+    union all
+    select 'crew', c.id, c.username, c.body, c.at, (select tag from public.crews where id = c.crew_id),
+           (select count(*) from public.chat_flags f where f.kind = 'crew' and f.msg_id = c.id)
+      from public.crew_messages c where c.hidden and not c.deleted
+    order by 5 desc limit 100) x), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_message_set(p_kind text, p_id bigint, p_action text) returns json
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  if p_kind = 'global' then
+    if p_action = 'restore' then update public.global_messages set hidden = false where id = p_id;
+    else update public.global_messages set deleted = true, hidden = false, body = '' where id = p_id; end if;
+  else
+    if p_action = 'restore' then update public.crew_messages set hidden = false where id = p_id;
+    else update public.crew_messages set deleted = true, hidden = false, body = '' where id = p_id; end if;
+  end if;
+  if p_action = 'restore' then
+    delete from public.chat_flags where kind = p_kind and msg_id = p_id;
+    delete from public.chat_strikes where kind = p_kind and msg_id = p_id;
+  end if;
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_chat_mute(p_username text, p_hours int) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  n text;
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  if exists (select 1 from public.profiles where lower(username) = lower(p_username) and is_owner) then raise exception 'you can''t time out the owner'; end if;
+  update public.profiles set chat_muted_until = case when coalesce(p_hours, 0) > 0 then now() + make_interval(hours => p_hours) end
+   where lower(username) = lower(p_username) and not is_owner returning username into n;
+  if n is null then raise exception 'no such user'; end if;
+  insert into public.key_log (event, username, detail) values (case when coalesce(p_hours, 0) > 0 then 'muted' else 'unmuted' end, n,
+    case when coalesce(p_hours, 0) > 0 then p_hours || ' hours' end);
+  return json_build_object('ok', true);
+end
+$$;
+
+create or replace function public.owner_chat_mutes() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return coalesce((select json_agg(json_build_object('username', username, 'until', chat_muted_until) order by chat_muted_until)
+                   from public.profiles where chat_muted_until > now()), '[]'::json);
+end
+$$;
+
+create or replace function public.owner_stats() returns json
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_owner() then raise exception 'owner only'; end if;
+  return json_build_object(
+    'online', (select count(*) from public.profiles where last_seen > now() - interval '5 minutes'),
+    'playing', (select count(*) from public.profiles where now_playing is not null and playing_at > now() - interval '5 minutes'),
+    'accounts', (select count(*) from public.profiles),
+    'new_today', (select count(*) from public.profiles where created_at >= current_date),
+    'active_today', (select count(*) from public.profile_days where day = current_date),
+    'active_week', (select count(distinct user_id) from public.profile_days where day > current_date - 7),
+    'premium', (select count(distinct user_id) from public.redemptions where not disabled and (expires_at is null or expires_at > now())),
+    'banned', (select count(*) from public.profiles where banned_until > now()),
+    'muted', (select count(*) from public.profiles where chat_muted_until > now()),
+    'crews', (select count(*) from public.crews),
+    'open_reports', (select count(*) from public.reports where status = 'open'),
+    'new_feedback', (select count(*) from public.feedback where status = 'new'),
+    'hidden_messages', (select count(*) from public.global_messages where hidden and not deleted) + (select count(*) from public.crew_messages where hidden and not deleted),
+    'messages_today', (select count(*) from public.global_messages where at >= current_date) + (select count(*) from public.crew_messages where at >= current_date),
+    'signups', (select json_agg(json_build_object('day', d::date, 'n', (select count(*) from public.profiles where created_at >= d and created_at < d + interval '1 day')) order by d)
+                  from generate_series(current_date - 13, current_date, interval '1 day') d),
+    'active', (select json_agg(json_build_object('day', d::date, 'n', (select count(*) from public.profile_days where day = d::date)) order by d)
+                 from generate_series(current_date - 13, current_date, interval '1 day') d),
+    'versions', coalesce((select json_agg(json_build_object('version', v, 'n', n) order by n desc) from (
+                   select coalesce(app_version, 'older') v, count(*) n from public.profiles where last_seen > now() - interval '7 days' group by 1) x), '[]'::json),
+    'min_version', public.app_min_version());
+end
+$$;
+
+revoke execute on function public.app_min_version(), public.owner_set_min_version(text, text), public._chat_muted(uuid),
+  public._flag_message(text, bigint, uuid), public._contact_rule(text), public.global_chat_send(text), public.global_chat_list(text),
+  public.global_chat_delete(bigint), public.global_chat_report(bigint), public.owner_hidden_messages(), public.owner_message_set(text, bigint, text),
+  public.owner_chat_mute(text, int), public.owner_chat_mutes(), public.owner_stats() from public, anon;
+grant execute on function public.app_min_version() to anon, authenticated;
+grant execute on function public.owner_set_min_version(text, text), public.global_chat_send(text), public.global_chat_list(text),
+  public.global_chat_delete(bigint), public.global_chat_report(bigint), public.owner_hidden_messages(), public.owner_message_set(text, bigint, text),
+  public.owner_chat_mute(text, int), public.owner_chat_mutes(), public.owner_stats() to authenticated;

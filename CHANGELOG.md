@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.19.0
+- **Global chat:** a new Chat page where everyone on Orbit can talk. To keep it safe: no bad words, no links, and no swapping Discord, Snap or phone numbers with strangers. New accounts can read right away and post after their first day, and there's a short slow mode.
+- **Chat auto-mod:** a message that 3 people report hides itself until the owner checks it, and players who get 2 messages hidden in a week are timed out of chat for 24 hours. This works in crew chat too.
+- **Required updates:** if a version has a bad bug, the owner can require the fixed one, and older copies of Orbit show an "Update required" screen with a one-click update.
+- **Owner panel:** a live stats dashboard (players online, sign-ups, daily players, Premium, which Orbit versions people are on), a Required update card, and a Chat auto-mod card for hidden messages and timeouts.
+
 ## v2.18.0
 - **Crew chat:** talk with your crew right on the Crew page. Only crew members can see it, bad words are blocked, and you can report or delete messages (crew leaders can delete any message).
 - **Weekly crew wars:** the crew with the most hours each week (Monday to Sunday) wins a 🏆 for its crew page. See the countdown and last week's winner on the crew leaderboard.

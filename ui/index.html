@@ -1037,12 +1037,38 @@ body.idle #glow { opacity: 0; }
 .msg.cont { padding-top: 1px; }
 .msg-av { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; background: var(--grad); }
 .msg-av.ghost { height: 0; background: none; }
-.msg-main { min-width: 0; flex: 1; } .msg-head { font-size: 12.5px; display: flex; align-items: baseline; gap: 8px; } .msg-head b { cursor: pointer; } .msg-head span { color: var(--faint); font-size: 11px; }
+.msg-main { min-width: 0; flex: 1; } .msg-head { font-size: 12.5px; display: flex; align-items: baseline; gap: 8px; } .msg-head b { cursor: pointer; } .msg-head .t { color: var(--faint); font-size: 11px; }
 .msg-body { font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
 .msg.mine .msg-av { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
 .msg-acts { position: absolute; right: 8px; top: 4px; display: none; gap: 2px; } .msg:hover .msg-acts { display: flex; }
 .msg-acts button { width: 26px; height: 26px; border-radius: 8px; font-size: 12px; background: var(--panel-solid); border: 1px solid var(--line); } .msg-acts button:hover { border-color: var(--line2); }
 .wrap-canvas { display: block; width: 100%; max-width: 380px; margin: 0 auto; border-radius: 18px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.8), 0 0 50px -20px rgba(var(--accent-rgb),.9); }
+
+/* ===== v2.19 ===== */
+.online-pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 99px; background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.3); font-weight: 650; font-size: 13px; }
+.online-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px var(--good); animation: pulse 2.4s infinite; }
+.gchat { height: calc(100vh - 330px); min-height: 280px; }
+.chat-rules { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; border-radius: 12px; background: rgba(var(--accent-rgb),.08); border: 1px solid rgba(var(--accent-rgb),.22); font-size: 12.5px; color: var(--muted); }
+.chat-rules b { color: var(--text); white-space: nowrap; }
+.chat-lock { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.3); color: #fde68a; font-size: 13px; }
+.msg.staff .msg-av { background: linear-gradient(135deg, #f59e0b, #fde68a); color: #3b2306; }
+.msg-head .obadge.sm { height: 16px; }
+#updGate { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: radial-gradient(60% 60% at 50% 40%, rgba(var(--accent-rgb),.25), transparent 70%), rgba(4,2,10,.94); backdrop-filter: blur(14px); animation: fadeIn .3s; }
+.upd-card { border-color: rgba(var(--accent-rgb),.45); box-shadow: 0 40px 100px -30px rgba(0,0,0,.9), 0 0 80px -30px rgba(var(--accent-rgb),1); }
+.upd-card .ban-icon { filter: drop-shadow(0 0 18px rgba(var(--accent-rgb),.9)); } .upd-msg { background: rgba(var(--accent-rgb),.12) !important; color: var(--text) !important; }
+.stat-tile.hot b { color: var(--good); text-shadow: 0 0 18px rgba(74,222,128,.5); }
+.mini-chart { padding: 14px 16px; border-radius: var(--radius); background: var(--panel2); border: 1px solid var(--line); }
+.mc-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.mc-bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; }
+.mc-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.mc-col i { width: 100%; border-radius: 5px 5px 2px 2px; animation: grow2 .8s var(--ease) backwards; transform-origin: bottom; }
+.mc-col span { font-size: 9.5px; color: var(--faint); }
+@keyframes grow2 { from { transform: scaleY(0); } }
+.ver-row { display: grid; grid-template-columns: 130px 1fr 44px; gap: 10px; align-items: center; padding: 5px 0; font-size: 12.5px; }
+.ver-bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.06); overflow: hidden; } .ver-bar i { display: block; height: 100%; background: var(--grad); border-radius: inherit; }
+.ver-row b { text-align: right; }
+.need-row { display: flex; justify-content: space-between; padding: 7px 4px; border-top: 1px solid var(--line); font-size: 13px; } .need-row:first-of-type { border-top: 0; }
+.need-row.link { cursor: pointer; } .need-row.link:hover span { color: var(--accent); } .need-row b.hot { color: var(--warn); }
 </style>
 </head>
 <body>
@@ -1341,6 +1367,10 @@ body.idle #glow { opacity: 0; }
       <div class="page-head rise row" style="--i:0"><div><h1>Social</h1><p>Your Orbit profile, Roblox friends who use Orbit, and who's played the most.</p></div><span class="spacer"></span><div id="socTabs"></div></div>
       <div id="socBody"></div>
     </section>
+    <section class="page" id="page-chat">
+      <div class="page-head rise row" style="--i:0"><div><h1>Chat</h1><p>Talk with everyone on Orbit. Be kind, keep it safe.</p></div><span class="spacer"></span><div class="online-pill" id="chatOnline"><i></i><span>–</span></div></div>
+      <div id="chatBody"></div>
+    </section>
     <section class="page" id="page-accounts">
       <div class="page-head rise row" style="--i:0"><div><h1>Accounts</h1><p>Keep all your Roblox accounts here and switch between them in one click.</p></div><span class="spacer"></span>
         <button class="btn primary" id="rbxAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add account</button></div>
@@ -1357,12 +1387,15 @@ body.idle #glow { opacity: 0; }
     </section>
     <section class="page" id="page-owner">
       <div class="page-head rise" style="--i:0"><h1>Owner panel</h1><p>Only you can see this. Give players premium access with a key.</p></div>
+      <div class="card rise" style="--i:1" id="ownerStats"></div>
       <div class="card rise" style="--i:1" id="ownerIssue"></div>
       <div class="card rise" style="--i:2" id="ownerLog"></div>
       <div class="card rise" style="--i:2" id="ownerNames"></div>
       <div class="card rise" style="--i:2" id="ownerReports"></div>
       <div class="card rise" style="--i:2" id="ownerBans"></div>
       <div class="card rise" style="--i:2" id="ownerFeedback"></div>
+      <div class="card rise" style="--i:2" id="ownerHidden"></div>
+      <div class="card rise" style="--i:2" id="ownerMin"></div>
       <div class="card rise" style="--i:2" id="ownerBulk"></div>
       <div class="card rise" style="--i:2" id="ownerKeys"></div>
       <div class="card rise" style="--i:3" id="ownerNews"></div>
@@ -1459,12 +1492,13 @@ const ICONS = {
   owner: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 21h14"/>',
   social: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M16 14.6a5 5 0 0 1 6 4.9"/>',
   accounts: '<circle cx="8" cy="8" r="3.2"/><path d="M2.8 19a5.2 5.2 0 0 1 10.4 0"/><path d="M15 7h6m0 0-2.2-2.2M21 7l-2.2 2.2M21 15h-6m0 0 2.2-2.2M15 15l2.2 2.2"/>',
+  chat: '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z"/><path d="M8 10h8M8 13h5"/>',
   shield: '<path d="M12 3 4 6v6c0 4.6 3.4 8.3 8 9 4.6-.7 8-4.4 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["discover", "Discover"], ["servers", "Servers"], ["accounts", "Accounts"],
-               ["#You"], ["social", "Social"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
+               ["#You"], ["social", "Social"], ["chat", "Chat"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
                ["#Orbit"], ["premium", "Premium"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
 
@@ -1810,7 +1844,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: applyLocks, discover: () => renderDiscover(), credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     social: renderSocial, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: () => { renderHealth(); renderFeedbackCard(); }, news: renderNews })[id]?.();
+     social: renderSocial, chat: renderGlobalChat, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: () => { renderHealth(); renderFeedbackCard(); }, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -3026,6 +3060,156 @@ async function crewBoard() {
     h("div", { style: "font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, x.name, x.trophies ? h("span", { class: "trophies", title: `${x.trophies} crew war win${x.trophies === 1 ? "" : "s"}` }, ` 🏆${x.trophies > 1 ? "×" + x.trophies : ""}`) : null), h("span", { class: "muted small" }, `${x.members} member${x.members === 1 ? "" : "s"}`), h("div", { class: "tm" }, fmtHrs(x.seconds)))))];
 }
 
+// ===== v2.19: global chat =====
+let gchatTimer = null;
+function renderGlobalChat() {
+  const body = $("#chatBody");
+  clearInterval(gchatTimer);
+  if (!(S.account || {}).enabled) { body.replaceChildren(h("div", { class: "card" }, emptyState("chat", "Orbit accounts aren't set up", ""))); return; }
+  let sig = null, lastTop = 0;
+  const box = h("div", { class: "chat-box gchat" }, h("div", { class: "muted small", style: "text-align:center;padding:40px" }, "Loading chat..."));
+  const inp = h("input", { class: "input", maxlength: 200, placeholder: "Say something to everyone", style: "flex:1" });
+  const send = h("button", { class: "btn primary" }, "Send");
+  const lock = h("div", { class: "chat-lock", hidden: true });
+  const owner = !!(S.account && S.account.user && S.account.user.owner);
+  const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "No bad words, no links, and no sharing Discord, Snap, phone numbers or where you live. Messages that 3 people report get hidden, and repeat offenders get timed out."));
+  const card = h("div", { class: "card chat-card" }, rules, box, lock, h("div", { class: "row", style: "margin-top:10px" }, inp, send));
+  body.replaceChildren(card);
+  const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const draw = (r) => {
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    const list = r.messages || [];
+    if (!list.length) box.replaceChildren(h("div", { class: "muted small", style: "text-align:center;padding:40px" }, "It's quiet in here. Say hi! 👋"));
+    else box.replaceChildren(...list.map((m, i) => {
+      const same = i > 0 && list[i - 1].username === m.username && Date.parse(m.at) - Date.parse(list[i - 1].at) < 300000;
+      const acts = h("span", { class: "msg-acts" },
+        m.mine || owner ? h("button", { title: "Delete", onclick: async () => { const x = await api.crew("global_chat_delete", { p_id: m.id }); if (x.error) return toast(x.error, "err"); poll(true); } }, "🗑") : null,
+        owner && !m.mine ? h("button", { title: "Time out for 24 hours", onclick: async () => { if (!await modal({ title: `Time out ${m.username}?`, text: "They can't chat (global or crew) for 24 hours.", ok: "Time out", danger: true })) return; const x = await api.owner_rpc("owner_chat_mute", { p_username: m.username, p_hours: 24 }); if (x.error) return toast(x.error, "err"); toast(`${m.username} is timed out for 24 hours.`, "ok"); } }, "⏱") : null,
+        !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. 3 reports hide it until the owner checks.`, ok: "Report" })) return; const x = await api.crew("global_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "You already reported it." : "Reported. Thanks!", "ok"); poll(true); } }, "⚑") : null);
+      return h("div", { class: "msg" + (m.mine ? " mine" : "") + (same ? " cont" : "") + (m.owner ? " staff" : "") },
+        same ? h("div", { class: "msg-av ghost" }) : h("div", { class: "msg-av" }, (m.username || "?")[0].toUpperCase()),
+        h("div", { class: "msg-main" }, same ? null : h("div", { class: "msg-head" }, m.crew ? h("span", { class: "crew-tag" }, m.crew) : null,
+            h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username),
+            (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)), h("span", { class: "lvl", style: "height:15px;font-size:9.5px;min-width:20px" }, m.level || 1), h("span", { class: "t" }, time(m.at))),
+          h("div", { class: "msg-body" }, m.body)), acts);
+    }));
+    if (atBottom || lastTop === 0 || (list.length && list[list.length - 1].mine && list[list.length - 1].id !== lastTop)) box.scrollTop = box.scrollHeight;
+    lastTop = list.length ? list[list.length - 1].id : 0;
+    const until = r.muted_until || r.new_until;
+    lock.hidden = !until; inp.disabled = send.disabled = !!until;
+    if (until) lock.textContent = r.muted_until ? `⏱ You're timed out from chat until ${new Date(r.muted_until).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}.` : `👋 New accounts can chat after their first day (${new Date(r.new_until).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}). You can read along until then.`;
+  };
+  const poll = async (force) => {
+    if (!card.isConnected || page !== "chat") { clearInterval(gchatTimer); return; }
+    if (document.hidden && !force) return;
+    const r = await api.crew("global_chat_list", { p_sig: force ? null : sig });
+    if (r.error) { if (force) box.replaceChildren(socError(r, () => renderGlobalChat())); return; }
+    $("#chatOnline span").textContent = `${r.online || 0} online`;
+    if (r.same) return;
+    sig = r.sig; draw(r);
+  };
+  const doSend = async () => {
+    const v = inp.value.trim(); if (!v) return;
+    send.disabled = true; const r = await api.crew("global_chat_send", { p_body: v }); send.disabled = false;
+    if (r.error) return toast(r.error, "err");
+    inp.value = ""; await poll(true); inp.focus();
+  };
+  send.onclick = doSend; inp.onkeydown = (e) => { if (e.key === "Enter") doSend(); };
+  poll(true);
+  gchatTimer = setInterval(poll, 3000);
+}
+
+// ===== v2.19: required update =====
+function showUpdateGate(r) {
+  let g = $("#updGate"); if (!g) { g = h("div", { id: "updGate" }); document.body.append(g); }
+  const btn = h("button", { class: "btn primary btn-launch", style: "height:46px" }, "Update now");
+  const note = h("div", { class: "muted small", style: "margin-top:10px;min-height:16px" });
+  btn.onclick = async () => {
+    btn.disabled = true;
+    if (!S.pending_update) {
+      note.textContent = "Downloading the update...";
+      const d = await api.download_update();
+      if (d.error) { btn.disabled = false; note.textContent = d.error; return; }
+      S.pending_update = d.version;
+    }
+    note.textContent = "Restarting Orbit..."; await saveNow();
+    const x = await api.restart_to_update(); if (x && x.error) { btn.disabled = false; note.textContent = x.error; }
+  };
+  g.replaceChildren(h("div", { class: "ban-card upd-card" }, h("div", { class: "ban-icon" }, "🚀"), h("h2", {}, "Update required"),
+    h("p", { class: "muted" }, `This version of Orbit (v${r.current}) is too old. Update to v${r.min} or newer to keep going.`),
+    r.message ? h("p", { class: "ban-reason upd-msg" }, r.message) : null, btn, note));
+}
+
+// ===== v2.19: owner stats, min version, hidden messages =====
+async function renderOwnerStats() {
+  const box = $("#ownerStats"); if (!box) return;
+  box.replaceChildren(h("div", { class: "row" }, h("h3", { style: "margin:0" }, "Orbit stats"), h("span", { class: "spacer" }), h("button", { class: "btn ghost", onclick: renderOwnerStats }, "Refresh")), h("div", { class: "skel", style: "height:120px;margin-top:12px" }));
+  const r = await api.owner_rpc("owner_stats");
+  if (r.error) { box.lastChild.replaceWith(h("p", { class: "muted small" }, r.error)); return; }
+  const d = r.data || {};
+  const tile = (label, val, sub, hot) => h("div", { class: "stat-tile" + (hot ? " hot" : "") }, h("small", {}, label), h("b", {}, String(val ?? "–")), h("span", {}, sub || ""));
+  const bars = (title, rows, color) => {
+    const max = Math.max(1, ...rows.map((x) => x.n));
+    return h("div", { class: "mini-chart" }, h("div", { class: "mc-head" }, h("b", {}, title), h("span", { class: "muted small" }, `${rows.reduce((a, x) => a + x.n, 0)} in 14 days`)),
+      h("div", { class: "mc-bars" }, rows.map((x) => h("div", { class: "mc-col", title: `${new Date(x.day + "T12:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}: ${x.n}` },
+        h("i", { style: `height:${Math.max(3, 100 * x.n / max)}%;background:${color}` }), h("span", {}, new Date(x.day + "T12:00:00").getDate())))));
+  };
+  const vers = d.versions || [], vmax = Math.max(1, ...vers.map((v) => v.n)), vtot = vers.reduce((a, v) => a + v.n, 0) || 1;
+  box.replaceChildren(
+    h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Orbit stats"), h("p", { class: "sub", style: "margin:4px 0 0" }, "Live numbers for your whole player base.")), h("button", { class: "btn ghost", onclick: renderOwnerStats }, "Refresh")),
+    h("div", { class: "stat-tiles", style: "margin-top:12px" },
+      tile("Online now", d.online, `${d.playing || 0} in a game`, true), tile("Played today", d.active_today, `${d.active_week || 0} this week`),
+      tile("Accounts", d.accounts, `+${d.new_today || 0} today`), tile("Premium", d.premium, `${d.crews || 0} crews`)),
+    h("div", { class: "grid2" }, bars("Sign-ups", d.signups || [], "var(--grad)"), bars("Players per day", d.active || [], "linear-gradient(180deg,#22d3ee,#6366f1)")),
+    h("div", { class: "grid2", style: "margin-top:14px" },
+      h("div", { class: "mini-chart" }, h("div", { class: "mc-head" }, h("b", {}, "Orbit versions"), h("span", { class: "muted small" }, "players seen this week")),
+        vers.length ? vers.map((v) => h("div", { class: "ver-row" }, h("span", { class: "mono" }, v.version === "older" ? "older than 2.19" : "v" + v.version + (v.version === S.version ? " (yours)" : "")),
+          h("div", { class: "ver-bar" }, h("i", { style: `width:${100 * v.n / vmax}%` })), h("b", {}, `${Math.round(100 * v.n / vtot)}%`))) : h("p", { class: "muted small" }, "No data yet.")),
+      h("div", { class: "mini-chart" }, h("div", { class: "mc-head" }, h("b", {}, "Needs you")),
+        [["⚑ Open reports", d.open_reports, "ownerReports"], ["💬 New feedback", d.new_feedback, "ownerFeedback"], ["🙈 Hidden messages", d.hidden_messages, "ownerHidden"],
+         ["⛔ Banned", d.banned, "ownerBans"], ["⏱ Timed out", d.muted, "ownerHidden"], ["✉️ Messages today", d.messages_today, null]].map(([l, n, id]) =>
+          h("div", { class: "need-row" + (id ? " link" : ""), onclick: () => id && $("#" + id)?.scrollIntoView({ behavior: "smooth", block: "start" }) }, h("span", {}, l), h("b", { class: n && id && id !== "ownerBans" ? "hot" : "" }, String(n ?? 0)))))));
+}
+async function renderOwnerMin() {
+  const box = $("#ownerMin"); if (!box) return;
+  box.innerHTML = "";
+  const cur = await api.min_version();
+  const ver = h("input", { class: "input mono", placeholder: S.version, maxlength: 20, style: "width:140px", value: cur.min || "" });
+  const msg = h("input", { class: "input", placeholder: "Why? (players see this, optional)", maxlength: 200, style: "flex:1", value: cur.message || "" });
+  const save = h("button", { class: "btn primary", onclick: async () => {
+    if (ver.value.trim() && !await modal({ title: `Require v${ver.value.trim()} or newer?`, text: "Everyone on an older Orbit gets a full-screen \"Update required\" message until they update. Only do this once that version is published.", ok: "Require it", danger: true })) return;
+    const r = await api.owner_rpc("owner_set_min_version", { p_version: ver.value.trim(), p_message: msg.value }); if (r.error) return toast(r.error, "err");
+    toast(ver.value.trim() ? `Players now need v${ver.value.trim()} or newer.` : "No update is required anymore.", "ok"); renderOwnerMin();
+  } }, "Save");
+  box.append(h("h3", {}, "Required update"), h("p", { class: "sub" }, "If a release has a bad bug, require the fixed version. Older copies of Orbit show an Update required screen with a one-click update."),
+    h("div", { class: "row" }, h("span", { class: "muted" }, "Minimum version"), ver, msg, save),
+    h("p", { class: "muted small", style: "margin:8px 0 0" }, cur.min ? `Right now everyone needs v${cur.min} or newer.` : "Right now any version is allowed. Leave it empty and press Save to turn this off."));
+}
+async function renderOwnerHidden() {
+  const box = $("#ownerHidden"); if (!box) return;
+  box.innerHTML = "";
+  const who = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, style: "flex:1" });
+  let hours = "24";
+  const seg = segmented([["1", "1 hour"], ["24", "24 hours"], ["168", "7 days"]], hours, (v) => { hours = v; });
+  box.append(h("h3", {}, "Chat auto-mod"), h("p", { class: "sub" }, "Messages 3 people report are hidden until you check them here. 2 hidden messages in a week gets that player a 24-hour chat timeout automatically."),
+    h("div", { class: "row" }, who, seg, h("button", { class: "btn danger", onclick: async () => { if (!who.value.trim()) return; const x = await api.owner_rpc("owner_chat_mute", { p_username: who.value.trim(), p_hours: +hours }); if (x.error) return toast(x.error, "err"); toast(`${who.value.trim()} is timed out.`, "ok"); renderOwnerHidden(); } }, "Time out")));
+  requestAnimationFrame(() => seg._remeasure());
+  const [hid, mutes] = await Promise.all([api.owner_rpc("owner_hidden_messages"), api.owner_rpc("owner_chat_mutes")]);
+  const list = (hid.data || []), ml = (mutes.data || []);
+  box.append(h("div", { class: "look-label" }, `Hidden messages (${list.length})`),
+    list.length ? h("div", {}, list.map((m) => h("div", { class: "rep" },
+      h("div", { class: "row", style: "gap:8px" }, h("span", { class: "fb-kind" }, m.kind === "global" ? "🌍 Global" : `👥 [${m.crew || "?"}]`), h("b", { class: "rep-name", onclick: () => openProfile(m.username) }, m.username),
+        h("span", { class: "rule-tag" }, `${m.flags} reports`), h("span", { class: "spacer" }), h("span", { class: "muted small" }, fmtAgo(Date.parse(m.at) / 1000))),
+      h("div", { class: "rep-note" }, m.body),
+      h("div", { class: "row", style: "gap:6px;margin-top:8px;justify-content:flex-end" },
+        h("button", { class: "btn ghost", onclick: async () => { await api.owner_rpc("owner_message_set", { p_kind: m.kind, p_id: m.id, p_action: "restore" }); toast("Message is back, and the strike was removed.", "ok"); renderOwnerHidden(); } }, "It's fine, restore"),
+        h("button", { class: "btn danger", onclick: async () => { await api.owner_rpc("owner_message_set", { p_kind: m.kind, p_id: m.id, p_action: "delete" }); toast("Deleted.", "ok"); renderOwnerHidden(); } }, "Delete"))))) : h("p", { class: "muted small" }, "Nothing hidden. 🎉"),
+    h("div", { class: "look-label" }, `Timed out (${ml.length})`),
+    ml.length ? h("div", {}, ml.map((m) => h("div", { class: "rules-row" }, h("b", { class: "rep-name", onclick: () => openProfile(m.username) }, m.username),
+      h("span", { class: "muted small" }, "until " + new Date(m.until).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })), h("span", { class: "spacer" }),
+      h("button", { class: "btn", onclick: async () => { const x = await api.owner_rpc("owner_chat_mute", { p_username: m.username, p_hours: 0 }); if (x.error) return toast(x.error, "err"); renderOwnerHidden(); } }, "End timeout")))) : h("p", { class: "muted small" }, "Nobody is timed out."));
+}
+
 // ===== v2.18: crew wars, crew chat, crew Wrapped =====
 function warBanner(r) {
   const ends = r.war_ends ? Date.parse(r.war_ends) : 0;
@@ -3057,7 +3241,7 @@ function crewChat(c) {
         !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. The Orbit owner will see it.`, ok: "Report" })) return; const x = await api.crew("crew_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "Already reported." : "Reported. Thanks!", "ok"); } }, "⚑") : null);
       return h("div", { class: "msg" + (m.mine ? " mine" : "") + (same ? " cont" : "") },
         same ? h("div", { class: "msg-av ghost" }) : h("div", { class: "msg-av" }, (m.username || "?")[0].toUpperCase()),
-        h("div", { class: "msg-main" }, same ? null : h("div", { class: "msg-head" }, m.leader ? "👑 " : "", h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username), h("span", {}, time(m.at))),
+        h("div", { class: "msg-main" }, same ? null : h("div", { class: "msg-head" }, m.leader ? "👑 " : "", h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username), h("span", { class: "t" }, time(m.at))),
           h("div", { class: "msg-body" }, m.body)), acts);
     }));
     if (atBottom || list.length && list[list.length - 1].id !== lastTop && list[list.length - 1].mine || lastTop === 0) box.scrollTop = box.scrollHeight;
@@ -4593,7 +4777,7 @@ async function renderOwner() {
   iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
-  renderOwnerLog(); renderOwnerNames(); renderOwnerReports(); renderOwnerBans(); renderOwnerFeedback(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
+  renderOwnerStats(); renderOwnerLog(); renderOwnerNames(); renderOwnerReports(); renderOwnerBans(); renderOwnerFeedback(); renderOwnerHidden(); renderOwnerMin(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
   const safe = $("#ownerSafe"); safe.innerHTML = "";
   safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
@@ -5253,6 +5437,7 @@ async function init() {
   setInterval(liveTick, 4000);
   window.addEventListener("focus", liveTick);
   setTimeout(showWhatsNew, 900);
+  api.min_version().then((r) => { if (r && r.required) showUpdateGate(r); });
   setTimeout(checkAchievements, 2600);
   setTimeout(checkLevel, 3400);
   setTimeout(checkNews, 4200);

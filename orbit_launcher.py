@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.18.0"
+APP_VERSION = "2.19.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -7060,7 +7060,7 @@ def social_payload(settings=None):
             "top_games": [{"pid": str(pid), "name": e.get("name") or "Game", "seconds": int(e.get("seconds", 0))} for pid, e in top],
             "now_playing": playing, "public_profile": bool(soc.get("public_profile", True)),
             "showcase": showcase_items(soc.get("showcase") or []), "banner": soc.get("banner") or "", "name_style": soc.get("name_style") or "",
-            "status": (soc.get("status") or "")[:60], "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
+            "status": (soc.get("status") or "")[:60], "app_version": APP_VERSION, "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
             "month_seconds": month[0], "month_games": month[1],
             "on_leaderboard": bool(soc.get("on_leaderboard", True)), "share_activity": bool(soc.get("share_activity", True))}
 
@@ -7089,6 +7089,27 @@ def feedback_log_tail(max_chars=60000):
     if len(user) >= 3:
         text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(user) + r"(?![A-Za-z0-9])", "<user>", text, flags=re.I)
     return text[-max_chars:]
+
+
+def min_version_info():
+    """The oldest Orbit version the owner still allows. Asked without logging in, so it works on the login screen too."""
+    if not accounts_on():
+        return {"required": False}
+    try:
+        r = _sb("POST", "/rest/v1/rpc/app_min_version", {}, timeout=8) or {}
+    except AccountError:
+        return {"required": False}
+    need = str(r.get("min") or "")
+    return {"required": bool(need) and parse_version(APP_VERSION) < parse_version(need), "min": need or None,
+            "message": r.get("message"), "current": APP_VERSION}
+
+
+def _until_text(iso):
+    try:
+        ts = calendar.timegm(time.strptime(str(iso)[:19], "%Y-%m-%dT%H:%M:%S"))
+        return time.strftime("%b %d, %I:%M %p", time.localtime(ts)).replace(" 0", " ")
+    except Exception:
+        return "later"
 
 
 def social_sync(settings=None, force=False):
@@ -7949,6 +7970,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.19.0": ["chat", "owner:ownerStats", "owner:ownerMin", "owner:ownerHidden"],
     "2.18.0": ["social"],
     "2.17.0": ["social", "owner:ownerReports", "owner:ownerBans", "owner:ownerFeedback", "health:feedbackCard", "credits:betaCard"],
     "2.16.2": ["owner:ownerNames"],
@@ -10721,7 +10743,8 @@ class Api:
             return self._err(e)
 
     CREW_CALLS = {"crew_create", "crew_join", "crew_leave", "crew_kick", "crew_new_code", "crew_disband", "crew_info", "crew_board",
-                  "crew_wrapped", "crew_chat_send", "crew_chat_list", "crew_chat_delete", "crew_chat_report"}
+                  "crew_wrapped", "crew_chat_send", "crew_chat_list", "crew_chat_delete", "crew_chat_report",
+                  "global_chat_send", "global_chat_list", "global_chat_delete", "global_chat_report"}
     CREW_REASONS = {"in_crew": "You're already in a crew. Leave it first.", "name": "Crew names are 3 to 24 letters, numbers or spaces.",
                     "tag": "Tags are 2 to 5 letters or numbers.", "blocked": "That name or tag isn't allowed. Pick something else.",
                     "taken": "Another crew already has that name or tag.", "no_crew": "No crew has that code. Check it and try again.",
@@ -10738,9 +10761,18 @@ class Api:
         def run():
             r = account_rpc(fn, args or {})
             if isinstance(r, dict) and r.get("ok") is False:
-                return {"error": self.CREW_REASONS.get(r.get("reason"), "That didn't work.")}
-            if fn == "crew_chat_send" and r.get("ok") is False and r.get("reason") == "blocked":
-                return {"error": "That message has a word that isn't allowed."}
+                why = r.get("reason")
+                if why == "blocked":
+                    return {"error": "That message has a word that isn't allowed."}
+                if why == "muted":
+                    return {"error": f"You're timed out from chat until {_until_text(r.get('until'))}."}
+                if why == "new_account":
+                    return {"error": f"New accounts can post in global chat after their first day ({_until_text(r.get('until'))})."}
+                if why == "contact":
+                    return {"error": "Links and other apps (Discord, Snap, phone numbers...) aren't allowed in global chat. It keeps everyone safe."}
+                if why == "long":
+                    return {"error": "That message is too long."}
+                return {"error": self.CREW_REASONS.get(why, "That didn't work.")}
             if fn == "crew_wrapped" and r.get("found"):
                 pics = avatar_urls([m["roblox_id"] for m in r.get("top") or [] if m.get("roblox_id")], "420x420")
                 for m in r.get("top") or []:
@@ -10788,7 +10820,15 @@ class Api:
         return {"on": beta_updates_on(self._settings)}
 
     OWNER_RPCS = {"owner_reports", "owner_report_set", "owner_clear_bio", "owner_crew_delete", "owner_ban", "owner_unban", "owner_bans",
-                  "owner_feedback", "owner_feedback_log", "owner_feedback_set"}
+                  "owner_feedback", "owner_feedback_log", "owner_feedback_set", "owner_stats", "owner_set_min_version",
+                  "owner_hidden_messages", "owner_message_set", "owner_chat_mute", "owner_chat_mutes"}
+
+    def min_version(self):
+        try:
+            return min_version_info()
+        except Exception as e:
+            log(f"Min version check failed: {e}")
+            return {"required": False}
 
     def owner_rpc(self, fn, args=None):
         if fn not in self.OWNER_RPCS:
