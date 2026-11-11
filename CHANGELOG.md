@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.21.0
+- **Chat channels:** General, Looking for group, Trading, plus BedWars, Blox Fruits, Grow a Garden and Steal The Crown! channels. The owner can add or remove channels.
+- **Looking for group posts:** post "BedWars · needs 2 players" in chat with a **Join me** button. Joining uses Roblox's normal "join friend", so privacy settings still apply. Posts expire after 30 minutes.
+- **Reactions and @mentions:** react to messages with 🔥😂👍❤️😮💀, and @mention someone to ping them. Messages that mention you are highlighted.
+- **Inbox:** a bell in the title bar for mentions, crew war wins, new badges, crew news, game nights and handled reports.
+- **Orbit Pass (Season 1: Supernova):** play through Orbit to unlock 8 tiers of badges, banners and name effects. Premium gets a second track of rewards. Everything you unlock is yours to keep.
+- **Achievement rarity:** every achievement shows how many players have it, from Common to 💎 Legendary.
+- **Crew officers:** leaders can make officers who can kick members, delete chat messages, reset the join code and schedule game nights.
+- **Game nights:** schedule crew game nights. Everyone gets a heads-up, can RSVP, and gets a reminder 10 minutes before. When it's time, there's a Join host button.
+
 ## v2.20.0
 - **Cussing is allowed in global chat.** Slurs and sexual words are still blocked, and names, bios and statuses stay clean.
 - **Socials on profiles:** add your Discord, Snapchat, Instagram, TikTok, YouTube, Twitch or X username to your profile, and pick who can see them: only you, your Roblox friends on Orbit, your crew, or everyone. They're off by default.

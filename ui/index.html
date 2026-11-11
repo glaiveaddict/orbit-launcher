@@ -974,7 +974,7 @@ body.idle #glow { opacity: 0; }
 .crew-hero h2 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
 .crew-code { display: flex; flex-direction: column; padding: 6px 14px; border-radius: 12px; background: rgba(0,0,0,.25); border: 1px dashed var(--line2); }
 .crew-code small { font-size: 9.5px; font-weight: 800; letter-spacing: .16em; color: var(--faint); } .crew-code b { font-size: 18px; letter-spacing: .25em; font-family: Consolas, monospace; }
-.crew-row { grid-template-columns: 36px 1fr auto auto auto 28px; } .crew-lb { grid-template-columns: 44px auto 1fr auto auto; }
+.crew-row { grid-template-columns: 36px 1fr auto auto auto 60px; } .mem-acts { display: flex; gap: 2px; justify-content: flex-end; } .crew-lb { grid-template-columns: 44px auto 1fr auto auto; }
 .crew-row .kick { width: 26px; height: 26px; border-radius: 8px; color: var(--faint); } .crew-row .kick:hover { background: rgba(251,113,133,.15); color: var(--bad); }
 .showcase { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
 .show-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius); background: linear-gradient(135deg, rgba(var(--accent-rgb),.16), transparent 70%), var(--panel);
@@ -1047,7 +1047,7 @@ body.idle #glow { opacity: 0; }
 /* ===== v2.19 ===== */
 .online-pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 99px; background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.3); font-weight: 650; font-size: 13px; }
 .online-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px var(--good); animation: pulse 2.4s infinite; }
-.gchat { height: calc(100vh - 330px); min-height: 280px; }
+.gchat { height: calc(100vh - 395px); min-height: 260px; }
 .chat-rules { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; border-radius: 12px; background: rgba(var(--accent-rgb),.08); border: 1px solid rgba(var(--accent-rgb),.22); font-size: 12.5px; color: var(--muted); }
 .chat-rules b { color: var(--text); white-space: nowrap; }
 .chat-lock { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.3); color: #fde68a; font-size: 13px; }
@@ -1078,6 +1078,65 @@ body.idle #glow { opacity: 0; }
 .soc-field { display: flex; flex-direction: column; gap: 5px; } .soc-field > span { font-size: 12px; font-weight: 650; color: var(--muted); }
 .soc-safe { margin-top: 12px; padding: 10px 14px; border-radius: 12px; font-size: 12.5px; color: var(--muted); background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.25); }
 .word-chip .chat-ok { opacity: .35; } .word-chip .chat-ok.on { opacity: 1; background: rgba(74,222,128,.15); }
+
+/* ===== v2.21 ===== */
+.chan-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.chan { height: 30px; padding: 0 12px; border-radius: 99px; font-size: 12.5px; font-weight: 650; color: var(--muted); background: var(--panel2); border: 1px solid var(--line); transition: all .2s var(--ease); }
+.chan:hover { color: var(--text); } .chan.on { color: #fff; background: var(--grad); border-color: transparent; box-shadow: 0 6px 16px -8px rgba(var(--accent-rgb),1); }
+.msg.ping { background: rgba(251,191,36,.07); box-shadow: inset 3px 0 0 #fbbf24; }
+.mention { color: #93c5fd; font-weight: 650; cursor: pointer; } .mention.me { color: #fde68a; background: rgba(251,191,36,.15); padding: 0 3px; border-radius: 4px; }
+.react-pick { display: none; gap: 2px; margin-right: 4px; padding: 2px; border-radius: 10px; background: var(--panel-solid); border: 1px solid var(--line); }
+.msg:hover .react-pick { display: inline-flex; } .react-pick button { width: 24px !important; height: 24px !important; border: 0 !important; background: none !important; font-size: 13px; }
+.react-pick button:hover { transform: scale(1.25); }
+.rx-row { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.rx { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 99px; font-size: 12px; background: var(--panel2); border: 1px solid var(--line); }
+.rx b { font-size: 11px; } .rx.mine { border-color: rgba(var(--accent-rgb),.6); background: rgba(var(--accent-rgb),.15); }
+.lfg { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 12px 14px; border-radius: 14px; max-width: 520px;
+  background: linear-gradient(110deg, rgba(34,211,238,.12), rgba(var(--accent-rgb),.10)); border: 1px solid rgba(34,211,238,.35); }
+.lfg.old { opacity: .55; filter: grayscale(.6); } .lfg-ic { font-size: 26px; } .lfg-t { font-weight: 800; } .lfg-n { font-size: 13px; margin-top: 2px; } .lfg-s { font-size: 11.5px; color: #67e8f9; margin-top: 3px; }
+.inbox-btn { position: relative; } .inbox-dot { position: absolute; top: 8px; right: 10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; background: #f43f5e; color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; box-shadow: 0 0 10px #f43f5e; }
+#inboxPanel { position: fixed; top: 52px; right: 120px; z-index: 45; width: 360px; max-height: 70vh; display: flex; flex-direction: column; border-radius: 18px; background: var(--panel-solid); border: 1px solid var(--line2);
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,.9), 0 0 50px -30px rgba(var(--accent-rgb),1); animation: sheetIn .35s var(--spring); overflow: hidden; }
+.ib-head { display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); } .ib-head .btn { height: 28px; font-size: 12px; }
+.ib-list { overflow-y: auto; } .ib-item { display: flex; gap: 10px; width: 100%; text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.ib-item:hover { background: var(--panel2); } .ib-item.unread { background: rgba(var(--accent-rgb),.08); }
+.ib-ic { font-size: 18px; } .ib-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .ib-txt b { font-size: 13px; } .ib-txt span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } .ib-txt small { font-size: 10.5px; color: var(--faint); }
+.rarity { display: inline-block; margin: 4px 0 2px; font-size: 10.5px; font-weight: 750; padding: 2px 8px; border-radius: 99px; background: var(--panel3); }
+.rarity.leg { background: rgba(56,189,248,.15); color: #7dd3fc; box-shadow: 0 0 12px -4px #38bdf8; } .rarity.epic { background: rgba(192,132,252,.15); color: #d8b4fe; } .rarity.rare { background: rgba(96,165,250,.12); color: #93c5fd; } .rarity.com { color: var(--muted); }
+.pass-hero { background: radial-gradient(80% 140% at 0% 0%, rgba(56,189,248,.22), transparent 60%), radial-gradient(70% 120% at 100% 100%, rgba(240,171,252,.18), transparent 60%), var(--panel); }
+.pass-hero h2 { margin: 2px 0; font-size: 26px; font-weight: 850; letter-spacing: -.03em; } .kick2 { font-size: 10.5px; font-weight: 800; letter-spacing: .18em; color: #7dd3fc; }
+.pass-orb { width: 74px; height: 74px; border-radius: 22px; display: grid; place-items: center; font-size: 26px; font-weight: 900; color: #fff;
+  background: conic-gradient(from var(--spin), #38bdf8, #f0abfc, #fde68a, #38bdf8); animation: ringSpin 8s linear infinite; box-shadow: 0 0 40px -10px #38bdf8; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.pass-bar { position: relative; height: 12px; margin: 26px 10px 18px; border-radius: 99px; background: rgba(255,255,255,.07); }
+.pass-bar > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #a78bfa, #f0abfc); box-shadow: 0 0 18px rgba(56,189,248,.7); transition: width 1s var(--ease); }
+.pass-tick { position: absolute; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; background: var(--panel-solid); border: 2px solid var(--line2); color: var(--muted); }
+.pass-tick.on { border-color: #7dd3fc; color: #fff; background: #0c4a6e; box-shadow: 0 0 12px #38bdf8; }
+.pass-track { overflow-x: auto; display: flex; gap: 12px; padding: 16px; }
+.pt-labels { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; } .pt-labels span { font-size: 10px; font-weight: 800; letter-spacing: .14em; color: var(--faint); height: 150px; display: flex; align-items: center; } .pt-labels span:first-child { height: 34px; } .pt-labels .gold { color: #f5c451; }
+.pt-cols { display: flex; gap: 10px; } .pt-col { display: flex; flex-direction: column; gap: 12px; width: 128px; flex: none; }
+.pt-num { height: 34px; display: flex; align-items: baseline; gap: 6px; justify-content: center; } .pt-num b { font-size: 20px; } .pt-num small { color: var(--faint); } .pt-col.on .pt-num b { color: #7dd3fc; text-shadow: 0 0 12px #38bdf8; }
+.pc { height: 150px; border-radius: 16px; padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; background: var(--panel2); border: 1px solid var(--line); }
+.pc.prem { background: linear-gradient(180deg, rgba(245,196,81,.10), transparent), var(--panel2); border-color: rgba(245,196,81,.3); }
+.pc.ready { border-color: #7dd3fc; box-shadow: 0 0 24px -10px #38bdf8; } .pc.got { opacity: .75; }
+.pc-art { width: 100%; height: 48px; border-radius: 10px; display: grid; place-items: center; background: rgba(0,0,0,.25); font-weight: 800; }
+.pc-ic { font-size: 26px; } .pc b { font-size: 12.5px; } .pc small { font-size: 10.5px; color: var(--faint); margin-top: -3px; }
+.pc .btn { height: 26px; padding: 0 12px; font-size: 12px; margin-top: auto; } .pc-lock, .pc-got { margin-top: auto; font-size: 11.5px; font-weight: 700; color: var(--faint); } .pc-got { color: var(--good); }
+.gn { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); } .gn:first-child { border-top: 0; }
+.gn-date { width: 62px; flex: none; text-align: center; padding: 6px 0; border-radius: 12px; background: rgba(var(--accent-rgb),.12); border: 1px solid rgba(var(--accent-rgb),.3); display: flex; flex-direction: column; }
+.gn-date b { font-size: 22px; line-height: 1.1; } .gn-date small { font-size: 9.5px; font-weight: 750; color: var(--muted); } .gn-going { font-size: 12px; color: #67e8f9; margin-top: 3px; }
+.gn .btn { height: 32px; } .btn.going { border-color: rgba(74,222,128,.5); color: var(--good); }
+.gn .kick { width: 26px; height: 26px; border-radius: 8px; color: var(--faint); } .gn .kick:hover { color: var(--bad); }
+.bn-frostbite { background: linear-gradient(160deg, #e0f2fe, #38bdf8 45%, #0c4a6e) !important; }
+.bn-supernova { background: radial-gradient(40% 70% at 70% 40%, #fde68a, #f97316 30%, #db2777 55%, #1e0b3a 80%) !important; }
+.bn-midnight { background: radial-gradient(1.5px 1.5px at 30% 40%, #fff, transparent), radial-gradient(1px 1px at 70% 20%, #fff, transparent), linear-gradient(180deg, #020617, #1e1b4b) !important; }
+.bn-prism { background: linear-gradient(120deg, #f43f5e, #f59e0b, #84cc16, #06b6d4, #8b5cf6, #f43f5e) !important; background-size: 300% 100% !important; animation: flow 10s linear infinite; }
+.bn-eclipse { background: radial-gradient(circle at 60% 50%, #000 22%, #fde68a 24%, #f97316 30%, #111 52%) !important; }
+.bn-singularity { background: conic-gradient(from 0deg at 55% 50%, #0ea5e9, #6366f1, #d946ef, #0ea5e9) !important; }
+.ns-ice { background-image: linear-gradient(90deg, #e0f2fe, #38bdf8, #e0f2fe) !important; filter: drop-shadow(0 0 8px rgba(56,189,248,.6)); }
+.ns-mint { background-image: linear-gradient(90deg, #6ee7b7, #a7f3d0, #34d399, #6ee7b7) !important; }
+.ns-galaxy { background-image: linear-gradient(90deg, #818cf8, #e879f9, #38bdf8, #818cf8) !important; filter: drop-shadow(0 0 8px rgba(232,121,249,.5)); }
+.ns-sunset { background-image: linear-gradient(90deg, #fb923c, #f43f5e, #c026d3, #fb923c) !important; }
+.ns-chrome { background-image: linear-gradient(90deg, #9ca3af, #f9fafb, #6b7280, #f9fafb, #9ca3af) !important; }
 </style>
 </head>
 <body>
@@ -1089,6 +1148,7 @@ body.idle #glow { opacity: 0; }
       <span class="brand-name">Orbit</span><span class="ver" id="ver">v1.1</span><span class="prem-pill" id="premPill" hidden>PREMIUM</span>
     </div>
     <button class="win-btn mini-btn" id="miniBtn" title="Mini player (small always-on-top window)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor"/></svg></button>
+    <button class="win-btn inbox-btn" id="inboxBtn" title="Inbox" hidden><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="inbox-dot" id="inboxDot" hidden></span></button>
     <button class="kbd-btn" id="palBtn" title="Search everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<kbd>Ctrl K</kbd></button>
     <button class="upd-pill" id="updPill" hidden><span class="fill"></span><span class="upd-dot"></span><span id="updText">Update ready</span></button>
     <div class="saved" id="saved">Saved</div>
@@ -1380,6 +1440,10 @@ body.idle #glow { opacity: 0; }
       <div class="page-head rise row" style="--i:0"><div><h1>Chat</h1><p>Talk with everyone on Orbit. Be kind, keep it safe.</p></div><span class="spacer"></span><div class="online-pill" id="chatOnline"><i></i><span>–</span></div></div>
       <div id="chatBody"></div>
     </section>
+    <section class="page" id="page-pass">
+      <div class="page-head rise row" style="--i:0"><div><h1>Orbit Pass</h1><p>Play through Orbit to unlock limited-time badges, banners and name effects. Keep them forever.</p></div></div>
+      <div id="passBody"></div>
+    </section>
     <section class="page" id="page-accounts">
       <div class="page-head rise row" style="--i:0"><div><h1>Accounts</h1><p>Keep all your Roblox accounts here and switch between them in one click.</p></div><span class="spacer"></span>
         <button class="btn primary" id="rbxAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add account</button></div>
@@ -1405,6 +1469,7 @@ body.idle #glow { opacity: 0; }
       <div class="card rise" style="--i:2" id="ownerFeedback"></div>
       <div class="card rise" style="--i:2" id="ownerHidden"></div>
       <div class="card rise" style="--i:2" id="ownerMin"></div>
+      <div class="card rise" style="--i:2" id="ownerSeason"></div>
       <div class="card rise" style="--i:2" id="ownerBulk"></div>
       <div class="card rise" style="--i:2" id="ownerKeys"></div>
       <div class="card rise" style="--i:3" id="ownerNews"></div>
@@ -1501,13 +1566,14 @@ const ICONS = {
   owner: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/><path d="M5 21h14"/>',
   social: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M16 14.6a5 5 0 0 1 6 4.9"/>',
   accounts: '<circle cx="8" cy="8" r="3.2"/><path d="M2.8 19a5.2 5.2 0 0 1 10.4 0"/><path d="M15 7h6m0 0-2.2-2.2M21 7l-2.2 2.2M21 15h-6m0 0 2.2-2.2M15 15l2.2 2.2"/>',
+  pass: '<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 5v12" stroke-dasharray="2 2"/>',
   chat: '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z"/><path d="M8 10h8M8 13h5"/>',
   shield: '<path d="M12 3 4 6v6c0 4.6 3.4 8.3 8 9 4.6-.7 8-4.4 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
   health: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>',
 };
 const svg = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 const PAGES = [["#Play"], ["home", "Home"], ["library", "Library"], ["discover", "Discover"], ["servers", "Servers"], ["accounts", "Accounts"],
-               ["#You"], ["social", "Social"], ["chat", "Chat"], ["session", "Stats"], ["achievements", "Achievements"], ["screens", "Screenshots"],
+               ["#You"], ["social", "Social"], ["chat", "Chat"], ["session", "Stats"], ["achievements", "Achievements"], ["pass", "Orbit Pass"], ["screens", "Screenshots"],
                ["#Tune"], ["flags", "FastFlags"], ["mods", "Mods"], ["boost", "Boost"], ["discord", "Discord"], ["appearance", "Appearance"], ["extensions", "Extensions"],
                ["#Orbit"], ["premium", "Premium"], ["news", "News"], ["health", "Health"], ["credits", "Credits"], ["owner", "Owner"]];
 
@@ -1853,7 +1919,7 @@ function go(id) {
   const pg = $("#page-" + id); pg.scrollTop = 0;
   ({ home: renderHome, flags: renderFlags, mods: renderMods, session: renderSession, discord: renderDiscord,
      appearance: renderAppearance, extensions: applyLocks, discover: () => renderDiscover(), credits: () => {}, premium: () => { renderPremium(); renderPerks(); }, owner: renderOwner, library: renderLibrary, servers: renderServers,
-     social: renderSocial, chat: renderGlobalChat, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: () => { renderHealth(); renderFeedbackCard(); }, news: renderNews })[id]?.();
+     social: renderSocial, chat: renderGlobalChat, pass: renderPass, accounts: renderAccounts, achievements: renderAchievements, screens: () => { renderScreens(); renderClips(); }, boost: renderBoost, health: () => { renderHealth(); renderFeedbackCard(); }, news: renderNews })[id]?.();
   requestAnimationFrame(() => $$(".seg", pg).forEach((s) => s._remeasure && s._remeasure()));
 }
 
@@ -2656,6 +2722,8 @@ const BADGES = {
   founder: ["Founder", "#fbbf24", "👑"], premium: ["Premium", "#f5c451", "💎"], beta: ["Beta Tester", "#22d3ee", "🧪"], og: ["OG", "#a78bfa", "⭐"],
   staff: ["Staff", "#f472b6", "🛡️"], creator: ["Creator", "#fb7185", "🎬"], bug_hunter: ["Bug Hunter", "#4ade80", "🐞"], verified: ["Verified", "#60a5fa", "✔️"],
   supporter: ["Supporter", "#fb923c", "❤️"],
+  s1_player: ["Season 1", "#38bdf8", "🌟"], s1_supernova: ["Supernova", "#f0abfc", "💫"], s1_grinder: ["S1 Grinder", "#facc15", "⚡"],
+  s1_elite: ["S1 Elite", "#c084fc", "🏅"], s1_legend: ["S1 Legend", "#f97316", "🏆"],
 };
 const GIVABLE = ["beta", "og", "staff", "creator", "bug_hunter", "verified", "supporter"];
 function badgeEl(id, small = false) {
@@ -2878,18 +2946,23 @@ async function socBoard() {
 const BANNERS = [["", "None"], ["nebula", "Nebula"], ["aurora", "Aurora"], ["sunset", "Sunset"], ["ocean", "Ocean"], ["void", "Void"], ["crimson", "Crimson"], ["forest", "Forest"],
                  ["gold", "Gold", 1], ["galaxy", "Galaxy", 1], ["holo", "Holo", 1]];
 const NAME_STYLES = [["", "Normal"], ["gold", "Gold", 1], ["rainbow", "Rainbow", 1], ["aurora", "Aurora", 1], ["fire", "Fire", 1]];
+const SEASON_BANNERS = { frostbite: "Frostbite", supernova: "Supernova", midnight: "Midnight", prism: "Prism", eclipse: "Eclipse", singularity: "Singularity" };
+const SEASON_NAMES = { ice: "Ice", mint: "Mint", galaxy: "Galaxy", sunset: "Sunset", chrome: "Chrome" };
 async function lookCard(set) {
   const prem = hasPrem() || (S.account && S.account.user && S.account.user.owner);
+  const un = await api.crew("my_unlocks"), unl = Array.isArray(un) ? un : [];
+  const sb = unl.filter((x) => x.startsWith("banner:")).map((x) => x.slice(7)).filter((x) => SEASON_BANNERS[x]).map((x) => [x, SEASON_BANNERS[x], 0, 1]);
+  const sn = unl.filter((x) => x.startsWith("name:")).map((x) => x.slice(5)).filter((x) => SEASON_NAMES[x]).map((x) => [x, SEASON_NAMES[x], 0, 1]);
   const me = (S.account && S.account.user && S.account.user.username) || "You";
   const saveLook = async (changes, msg) => { cfg.social = Object.assign(cfg.social || {}, changes); const r = await api.social_save(changes); if (r && r.error) toast(r.error, "err"); else { if (msg) toast(msg, "ok"); } };
-  const banners = h("div", { class: "banner-pick" }, BANNERS.map(([id, label, pr]) => {
+  const banners = h("div", { class: "banner-pick" }, [...BANNERS, ...sb].map(([id, label, pr, season]) => {
     const locked = pr && !prem;
     const b = h("button", { class: "bn-swatch" + (id ? " bn-" + id : " none") + ((set.banner || "") === id ? " on" : "") + (locked ? " locked" : ""), title: label + (locked ? " (Premium)" : "") },
-      h("span", {}, label), locked ? h("i", {}, "🔒") : null);
+      h("span", {}, label), locked ? h("i", {}, "🔒") : season ? h("i", {}, "🌟") : null);
     b.onclick = async () => { if (locked) return toast("That banner is a Premium perk.", "err"); $$(".bn-swatch", banners).forEach((x) => x.classList.remove("on")); b.classList.add("on"); await saveLook({ banner: id }, "Banner saved."); renderSocialTab(); };
     return b;
   }));
-  const styles = h("div", { class: "row", style: "gap:8px" }, NAME_STYLES.map(([id, label, pr]) => {
+  const styles = h("div", { class: "row", style: "gap:8px" }, [...NAME_STYLES, ...sn].map(([id, label, pr]) => {
     const locked = pr && !prem;
     const c = h("button", { class: "chip" + ((set.name_style || "") === id ? " on" : "") }, h("span", { class: id ? "ns ns-" + id : "" }, label), locked ? " 🔒" : "");
     c.onclick = async () => { if (locked) return toast("Name effects are a Premium perk.", "err"); await saveLook({ name_style: id }, id ? `Your name is ${label.toLowerCase()} now.` : "Name effect off."); renderSocialTab(); };
@@ -3006,12 +3079,13 @@ async function socCrew() {
   return crewView(r, true);
 }
 function crewView(c, inTab) {
-  const leaderTools = c.is_leader ? h("div", { class: "row", style: "margin-top:14px;gap:8px" },
+  const staff = c.is_leader || c.is_officer;
+  const leaderTools = staff ? h("div", { class: "row", style: "margin-top:14px;gap:8px" },
     h("div", { class: "crew-code" }, h("small", {}, "JOIN CODE"), h("b", {}, c.code || "------")),
     h("button", { class: "btn", onclick: async () => { await api.copy_text(c.code); toast("Join code copied.", "ok"); } }, "Copy code"),
     h("button", { class: "btn", onclick: async () => { const x = await api.crew("crew_new_code"); if (x.error) return toast(x.error, "err"); toast("New code made. The old one stops working.", "ok"); renderSocialTab(); } }, "New code"),
     h("span", { class: "spacer" }),
-    h("button", { class: "btn danger", onclick: async () => { if (!await modal({ title: `Disband [${c.tag}]?`, text: "The crew is deleted for everyone. This can't be undone.", ok: "Disband", danger: true })) return; const x = await api.crew("crew_disband"); if (x.error) return toast(x.error, "err"); toast("Crew disbanded.", "ok"); renderSocialTab(); } }, "Disband")) : null;
+    c.is_leader ? h("button", { class: "btn danger", onclick: async () => { if (!await modal({ title: `Disband [${c.tag}]?`, text: "The crew is deleted for everyone. This can't be undone.", ok: "Disband", danger: true })) return; const x = await api.crew("crew_disband"); if (x.error) return toast(x.error, "err"); toast("Crew disbanded.", "ok"); renderSocialTab(); } }, "Disband") : h("span", { class: "muted small" }, "⭐ You're an officer")) : null;
   const leave = c.mine && inTab ? h("button", { class: "btn ghost danger", onclick: async () => {
     if (!await modal({ title: `Leave [${c.tag}]?`, text: c.is_leader ? "Someone else in the crew becomes the leader. If you're the last one, the crew is deleted." : "You can join again later with a code.", ok: "Leave", danger: true })) return;
     const x = await api.crew("crew_leave"); if (x.error) return toast(x.error, "err"); toast(x.disbanded ? "You left and the crew was deleted." : "You left the crew.", "ok"); renderSocialTab();
@@ -3028,12 +3102,15 @@ function crewView(c, inTab) {
     h("div", { class: "stat-tile" }, h("small", {}, "Crew rank"), h("b", {}, "#" + (c.rank || "—")), h("span", {}, "all crews")));
   const list = h("div", { class: "card", style: "padding:10px" }, (c.members || []).map((m) => h("div", { class: "lb-row crew-row", onclick: () => openProfile(m.username) },
     avatarEl(m.avatar, m.username, 32, { status: m.online ? "on" : "" }),
-    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, m.leader ? h("span", { title: "Leader" }, "👑") : null, h("span", { class: m.name_style ? "ns ns-" + m.name_style : "" }, m.username), (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)),
+    h("div", { style: "min-width:0;display:flex;align-items:center;gap:6px;font-weight:650" }, m.leader ? h("span", { title: "Leader" }, "👑") : m.role === "officer" ? h("span", { title: "Officer" }, "⭐") : null, h("span", { class: m.name_style ? "ns ns-" + m.name_style : "" }, m.username), (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)),
       m.status ? h("span", { class: "muted small", style: "font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, "· " + m.status) : null),
     h("span", { class: "muted small" }, fmtHrs(m.week_seconds) + " this week"), h("span", { class: "lvl" }, m.level || 1), h("div", { class: "tm" }, fmtHrs(m.seconds)),
-    c.is_leader && !m.leader && inTab ? h("button", { class: "kick", title: "Kick", onclick: async (e) => { e.stopPropagation(); if (!await modal({ title: `Kick ${m.username}?`, ok: "Kick", danger: true })) return; const x = await api.crew("crew_kick", { p_username: m.username }); if (x.error) return toast(x.error, "err"); renderSocialTab(); } }, "✕") : h("span"))));
+    inTab && !m.leader && (c.is_leader || (c.is_officer && m.role !== "officer")) ? h("span", { class: "mem-acts" },
+      c.is_leader ? h("button", { class: "kick", title: m.role === "officer" ? "Remove officer" : "Make officer", onclick: async (e) => { e.stopPropagation(); const x = await api.crew("crew_set_role", { p_username: m.username, p_role: m.role === "officer" ? "member" : "officer" }); if (x.error) return toast(x.error, "err"); toast(m.role === "officer" ? `${m.username} is a member again.` : `${m.username} is an officer now.`, "ok"); renderSocialTab(); } }, m.role === "officer" ? "☆" : "⭐") : null,
+      h("button", { class: "kick", title: "Kick", onclick: async (e) => { e.stopPropagation(); if (!await modal({ title: `Kick ${m.username}?`, ok: "Kick", danger: true })) return; const x = await api.crew("crew_kick", { p_username: m.username }); if (x.error) return toast(x.error, "err"); renderSocialTab(); } }, "✕")) : h("span"))));
   const chat = c.mine && inTab ? crewChat(c) : null;
-  return [head, tiles, chat, list].filter(Boolean);
+  const nights = c.mine && inTab ? gameNightsCard(c) : null;
+  return [head, tiles, nights, chat, list].filter(Boolean);
 }
 async function openCrew(tag) {
   const wrap = h("div", { class: "sheet-wrap" }), sheet = h("div", { class: "sheet" });
@@ -3072,6 +3149,181 @@ async function crewBoard() {
     h("div", { style: "font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, x.name, x.trophies ? h("span", { class: "trophies", title: `${x.trophies} crew war win${x.trophies === 1 ? "" : "s"}` }, ` 🏆${x.trophies > 1 ? "×" + x.trophies : ""}`) : null), h("span", { class: "muted small" }, `${x.members} member${x.members === 1 ? "" : "s"}`), h("div", { class: "tm" }, fmtHrs(x.seconds)))))];
 }
 
+// ===== v2.21: LFG, mentions, inbox, Orbit Pass, game nights =====
+function mentionText(body, me) {
+  const parts = String(body || "").split(/(@[A-Za-z0-9_]{3,20})/g);
+  return parts.map((p) => /^@[A-Za-z0-9_]{3,20}$/.test(p) ? h("span", { class: "mention" + (me && p.slice(1).toLowerCase() === me.toLowerCase() ? " me" : ""), onclick: () => openProfile(p.slice(1)) }, p) : p);
+}
+function lfgCard(m) {
+  const meta = m.meta || {}, expired = meta.until && Date.parse(meta.until) < Date.now();
+  const join = !m.mine && m.roblox_id && !expired ? h("button", { class: "btn primary", onclick: async () => { const r = await api.social_join(m.roblox_id); if (r && r.error) toast(r.error, "err"); else toast(`Joining ${m.username}...`, "ok"); } }, "Join me") : null;
+  return h("div", { class: "lfg" + (expired ? " old" : "") }, h("div", { class: "lfg-ic" }, "🎮"),
+    h("div", { style: "flex:1;min-width:0" }, h("div", { class: "lfg-t" }, `${meta.game || "A game"} · needs ${meta.need || 1} player${(meta.need || 1) === 1 ? "" : "s"}`),
+      h("div", { class: "lfg-n" }, m.body), h("div", { class: "lfg-s" }, expired ? "This post expired" : m.playing ? `In ${m.playing.name} right now` : "Looking now")), join);
+}
+function lfgSheet(channel, after) {
+  const lib = (cfg.library || []).filter((g) => g.pid && g.name);
+  let pid = lib[0] ? String(lib[0].pid) : "", game = lib[0] ? lib[0].name : "", need = "2";
+  const pick = h("select", { class: "input", style: "flex:1" }, lib.map((g) => h("option", { value: g.pid }, g.name)), h("option", { value: "" }, "Other game..."));
+  const other = h("input", { class: "input", placeholder: "Game name", maxlength: 60, style: "flex:1", hidden: !!lib.length });
+  pick.onchange = () => { pid = pick.value; const g = lib.find((x) => String(x.pid) === pid); game = g ? g.name : ""; other.hidden = !!pid; };
+  const note = h("input", { class: "input", placeholder: "Like \"need 2 for squads, chill vibes\"", maxlength: 120, style: "width:100%;margin-top:10px" });
+  miniSheet("🎮 Looking for group", "Your post shows a Join me button that uses Roblox's normal follow join, so your privacy settings still apply. Posts expire after 30 minutes.",
+    [h("div", { class: "row" }, lib.length ? pick : null, other), h("div", { class: "row", style: "margin-top:10px" }, h("span", { class: "muted small" }, "Players needed"),
+      segmented([["1", "1"], ["2", "2"], ["3", "3"], ["4", "4+"]], need, (v) => { need = v; })), note], "Post", async () => {
+      const r = await api.crew("global_lfg_post", { p_channel: channel, p_place_id: pid || null, p_game: pid ? game : (other.value.trim() || "A game"), p_need: +need, p_note: note.value });
+      if (r.error) { toast(r.error, "err"); return true; }
+      toast("Posted! People can join you from chat.", "ok"); after && after();
+    });
+}
+let inboxTimer = null, inboxSeen = 0;
+function startInbox() {
+  if (!((S.account || {}).logged_in)) return;
+  const btn = $("#inboxBtn"); btn.hidden = false;
+  btn.onclick = (e) => { e.stopPropagation(); toggleInbox(); };
+  const tick = async () => {
+    const n = await api.crew("inbox_count");
+    if (typeof n !== "number") return;
+    $("#inboxDot").hidden = !n; $("#inboxDot").textContent = n > 9 ? "9+" : String(n);
+    if (n > inboxSeen && inboxSeen !== -1) { sfx?.("ready"); }
+    inboxSeen = n;
+  };
+  inboxSeen = -1; tick().then(() => { if (inboxSeen === -1) inboxSeen = 0; });
+  clearInterval(inboxTimer); inboxTimer = setInterval(tick, 45000);
+  window.addEventListener("focus", tick);
+}
+async function toggleInbox() {
+  let panel = $("#inboxPanel");
+  if (panel) { panel.remove(); return; }
+  panel = h("div", { id: "inboxPanel" }, h("div", { class: "ib-head" }, h("b", {}, "Inbox"), h("span", { class: "spacer" })), h("div", { class: "skel", style: "height:80px;margin:10px" }));
+  document.body.append(panel);
+  const close = (e) => { if (!panel.contains(e.target) && e.target !== $("#inboxBtn")) { panel.remove(); document.removeEventListener("pointerdown", close); } };
+  setTimeout(() => document.addEventListener("pointerdown", close), 0);
+  const r = await api.crew("inbox_list");
+  if (!panel.isConnected) return;
+  const icons = { mention: "💬", war: "🏆", badge: "🎖️", report: "⚑", crew: "👥", event: "📅", system: "🛰️" };
+  const items = r.items || [];
+  panel.replaceChildren(h("div", { class: "ib-head" }, h("b", {}, "Inbox"), h("span", { class: "spacer" }),
+      items.some((x) => !x.read) ? h("button", { class: "btn ghost", onclick: async () => { await api.crew("inbox_read_all"); $("#inboxDot").hidden = true; inboxSeen = 0; panel.remove(); toggleInbox(); } }, "Mark all read") : null),
+    h("div", { class: "ib-list" }, items.length ? items.map((x) => h("button", { class: "ib-item" + (x.read ? "" : " unread"), onclick: () => {
+      panel.remove(); const l = x.link || {};
+      if (l.page === "chat") { gChannel = l.channel || "general"; go("chat"); }
+      else if (l.page === "social") { socTab = l.tab || "profile"; go("social"); }
+      else if (l.page) go(l.page);
+    } }, h("span", { class: "ib-ic" }, icons[x.kind] || "🔔"), h("span", { class: "ib-txt" }, h("b", {}, x.title), x.body ? h("span", {}, x.body) : null, h("small", {}, fmtAgo(Date.parse(x.at) / 1000))))) :
+      h("div", { class: "muted small", style: "padding:30px;text-align:center" }, "Nothing yet. Mentions, crew news and rewards show up here.")));
+  if (items.some((x) => !x.read)) { api.crew("inbox_read_all"); $("#inboxDot").hidden = true; inboxSeen = 0; }
+}
+const REWARD_INFO = (code) => {
+  const [k, id] = code.split(":");
+  if (k === "badge") { const b = BADGES[id] || [id, "#a1a1aa", "🎖️"]; return { ic: b[2], name: b[0], kind: "Badge" }; }
+  if (k === "banner") return { ic: "🖼️", name: SEASON_BANNERS[id] || id, kind: "Banner", banner: id };
+  return { ic: "✨", name: SEASON_NAMES[id] || id, kind: "Name effect", style: id };
+};
+async function renderPass() {
+  const body = $("#passBody");
+  if (!(S.account || {}).enabled) { body.replaceChildren(h("div", { class: "card" }, emptyState("pass", "Orbit accounts aren't set up", ""))); return; }
+  socLoading(body, 2);
+  const r = await api.crew("pass_info");
+  if (page !== "pass") return;
+  if (r.error || !r.found) { body.replaceChildren(socError(r.error ? r : { error: "There's no season running right now." })); return; }
+  const tiers = r.tiers || [], hours = +r.hours || 0, claimed = new Set(r.claimed || []), max = tiers.length ? tiers[tiers.length - 1].hours : 1;
+  const ends = Date.parse(r.season.ends + "T00:00:00Z"), left = Math.max(0, ends - Date.now()), days = Math.ceil(left / 86400000);
+  const next = tiers.find((t) => hours < t.hours);
+  const hero = h("div", { class: "card pass-hero" }, h("div", { class: "row", style: "gap:18px" }, h("div", { class: "pass-orb" }, "S1"),
+    h("div", { style: "flex:1" }, h("div", { class: "kick2" }, r.ended ? "SEASON OVER" : `${days} DAY${days === 1 ? "" : "S"} LEFT`), h("h2", {}, r.season.name),
+      h("div", { class: "muted" }, next ? `${fmtHrs(hours * 3600)} played this season · ${fmtHrs((next.hours - hours) * 3600)} to tier ${next.tier}` : `${fmtHrs(hours * 3600)} played. You maxed the pass! 🏆`)),
+    r.premium ? h("span", { class: "obadge", style: "--bc:#f5c451" }, h("i", {}, "💎"), h("b", {}, "Premium track unlocked")) : h("button", { class: "btn", onclick: () => go("premium") }, "💎 Get Premium track")),
+    h("div", { class: "pass-bar" }, h("i", { style: `width:${Math.min(100, 100 * hours / max)}%` }), tiers.map((t) => h("span", { class: "pass-tick" + (hours >= t.hours ? " on" : ""), style: `left:${100 * t.hours / max}%` }, t.tier))));
+  const cell = (t, track) => {
+    const code = t[track], info = REWARD_INFO(code), key = `${t.tier}:${track}`, have = claimed.has(key), open = hours >= t.hours, needPrem = track === "premium" && !r.premium;
+    const btn = have ? h("span", { class: "pc-got" }, "✓ Claimed") : open && !needPrem && !r.ended ? h("button", { class: "btn primary", onclick: async () => {
+      const x = await api.crew("pass_claim", { p_tier: t.tier, p_track: track }); if (x.error) return toast(x.error, "err");
+      sfx?.("ready"); toast(`${info.ic} ${info.name} unlocked! Equip it in Social > Profile.`, "ok"); renderPass();
+    } }, "Claim") : h("span", { class: "pc-lock" }, needPrem ? "💎 Premium" : `🔒 ${t.hours}h`);
+    return h("div", { class: "pc" + (track === "premium" ? " prem" : "") + (have ? " got" : open && !needPrem ? " ready" : "") },
+      h("div", { class: "pc-art" + (info.banner ? " bn-" + info.banner : "") }, info.style ? h("span", { class: "ns ns-" + info.style }, "Name") : info.banner ? null : h("span", { class: "pc-ic" }, info.ic)),
+      h("b", {}, info.name), h("small", {}, info.kind), btn);
+  };
+  const track = h("div", { class: "card pass-track" },
+    h("div", { class: "pt-labels" }, h("span", {}, "TIER"), h("span", {}, "FREE"), h("span", { class: "gold" }, "PREMIUM")),
+    h("div", { class: "pt-cols" }, tiers.map((t) => h("div", { class: "pt-col" + (hours >= t.hours ? " on" : "") }, h("div", { class: "pt-num" }, h("b", {}, t.tier), h("small", {}, `${t.hours}h`)), cell(t, "free"), cell(t, "premium")))));
+  body.replaceChildren(hero, track, h("p", { class: "muted small", style: "text-align:center" }, "Hours count from your play time through Orbit this season. Rewards are yours to keep after the season ends."));
+  [hero, track].forEach((el, i) => { el.classList.add("rise"); el.style.setProperty("--i", i); });
+}
+function gameNightsCard(c) {
+  const staff = c.is_leader || c.is_officer;
+  const list = h("div", {}, h("div", { class: "muted small" }, "Loading..."));
+  const card = h("div", { class: "card" }, h("div", { class: "row" }, h("h3", { style: "margin:0" }, "📅 Game nights"), h("span", { class: "spacer" }),
+    staff ? h("button", { class: "btn primary", onclick: () => scheduleNight(() => load()) }, "Schedule") : null), list);
+  const load = async () => {
+    const r = await api.crew("crew_events");
+    if (r.error) return list.replaceChildren(h("p", { class: "muted small" }, r.error));
+    const ev = r.events || [];
+    if (!ev.length) return list.replaceChildren(h("p", { class: "sub", style: "margin:8px 0 0" }, staff ? "Nothing planned. Schedule a game night and everyone in the crew gets a heads-up." : "Nothing planned yet. Ask your leader or an officer to schedule one."));
+    list.replaceChildren(...ev.map((e) => {
+      const at = new Date(e.at), soon = Math.abs(at - Date.now()) < 3600000;
+      return h("div", { class: "gn" }, h("div", { class: "gn-date" }, h("small", {}, at.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()), h("b", {}, at.getDate()), h("small", {}, at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }))),
+        h("div", { style: "flex:1;min-width:0" }, h("b", {}, e.title), h("div", { class: "muted small" }, `${e.game || "Any game"} · hosted by ${e.host || "someone"}`),
+          h("div", { class: "gn-going" }, `${e.going.length} going` + (e.going.length ? ": " + e.going.slice(0, 6).join(", ") + (e.going.length > 6 ? "..." : "") : ""))),
+        soon && e.host_roblox_id && !e.mine ? h("button", { class: "btn primary", onclick: () => api.social_join(e.host_roblox_id) }, "Join host") : null,
+        h("button", { class: "btn" + (e.me_going ? " going" : ""), onclick: async () => { const x = await api.crew("crew_event_rsvp", { p_id: e.id, p_going: !e.me_going }); if (x.error) return toast(x.error, "err"); load(); } }, e.me_going ? "✓ Going" : "I'm in"),
+        staff || e.mine ? h("button", { class: "kick", title: "Cancel", onclick: async () => { if (!await modal({ title: `Cancel "${e.title}"?`, ok: "Cancel it", danger: true })) return; await api.crew("crew_event_delete", { p_id: e.id }); load(); } }, "✕") : null);
+    }));
+  };
+  load();
+  return card;
+}
+function scheduleNight(after) {
+  const title = h("input", { class: "input", placeholder: "Like \"BedWars Friday\"", maxlength: 60, style: "width:100%" });
+  const lib = (cfg.library || []).filter((g) => g.pid && g.name);
+  const pick = h("select", { class: "input", style: "flex:1" }, h("option", { value: "" }, "Any game"), lib.map((g) => h("option", { value: g.pid }, g.name)));
+  const when = h("input", { class: "input", type: "datetime-local", style: "flex:1" });
+  const d = new Date(Date.now() + 86400000); d.setMinutes(0, 0, 0); d.setHours(20);
+  when.value = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  miniSheet("📅 Schedule a game night", "Everyone in your crew gets a heads-up in their inbox, and a reminder 10 minutes before if they RSVP.",
+    [title, h("div", { class: "row", style: "margin-top:10px" }, pick, when)], "Schedule", async () => {
+      const g = lib.find((x) => String(x.pid) === pick.value);
+      const r = await api.crew("crew_event_create", { p_title: title.value, p_place_id: pick.value || null, p_game: g ? g.name : null, p_at: new Date(when.value).toISOString() });
+      if (r.error) { toast(r.error, "err"); return true; }
+      toast("Game night scheduled!", "ok"); after && after();
+    });
+}
+const reminded = new Set();
+function watchGameNights() {
+  if (!((S.account || {}).logged_in)) return;
+  const tick = async () => {
+    const r = await api.crew("crew_events"); if (!r || r.error || !r.found) return;
+    for (const e of r.events || []) {
+      const mins = (Date.parse(e.at) - Date.now()) / 60000;
+      if (e.me_going && mins > 0 && mins <= 10 && !reminded.has(e.id)) {
+        reminded.add(e.id); toast(`📅 ${e.title} starts in ${Math.ceil(mins)} min!`, "ok"); sfx?.("ready");
+        api.remind(`${e.title} starts soon`, `${e.game || "Game night"} in ${Math.ceil(mins)} minutes`);
+      }
+    }
+  };
+  tick(); setInterval(tick, 60000);
+}
+async function renderOwnerSeason() {
+  const box = $("#ownerSeason"); if (!box) return;
+  box.innerHTML = "";
+  const r = await api.crew("pass_info");
+  const sz = (r && r.season) || {};
+  const name = h("input", { class: "input", value: sz.name || "", maxlength: 40, style: "flex:2" });
+  const st = h("input", { class: "input", type: "date", value: sz.starts || "", style: "flex:1" });
+  const en = h("input", { class: "input", type: "date", value: sz.ends || "", style: "flex:1" });
+  const cr = await api.crew("global_chat_list", { p_sig: "x", p_channel: "general" });
+  const chans = (cr && cr.channels) || [];
+  const cid = h("input", { class: "input", placeholder: "id (like pet-sim)", maxlength: 20, style: "width:150px" });
+  const cname = h("input", { class: "input", placeholder: "Name", maxlength: 30, style: "flex:1" });
+  const cemo = h("input", { class: "input", placeholder: "Emoji", maxlength: 4, style: "width:80px" });
+  box.append(h("h3", {}, "Season & chat channels"), h("p", { class: "sub" }, "Change the Orbit Pass season name and dates, and the channels players can chat in."),
+    h("div", { class: "row" }, name, st, en, h("button", { class: "btn primary", onclick: async () => { const x = await api.owner_rpc("owner_season_set", { p_name: name.value, p_starts: st.value, p_ends: en.value }); if (x.error) return toast(x.error, "err"); toast("Season saved.", "ok"); } }, "Save season")),
+    h("div", { class: "look-label" }, "Channels"), h("div", { class: "word-chips" }, chans.map((c) => h("span", { class: "word-chip" }, h("i", {}, `${c.emoji || "#"} ${c.name}`), h("small", {}, " #" + c.id),
+      c.id !== "general" ? h("button", { title: "Remove", onclick: async () => { const x = await api.owner_rpc("owner_channel_set", { p_id: c.id, p_name: c.name, p_emoji: c.emoji, p_remove: true }); if (x.error) return toast(x.error, "err"); renderOwnerSeason(); } }, "✕") : null))),
+    h("div", { class: "row", style: "margin-top:10px" }, cid, cemo, cname, h("button", { class: "btn", onclick: async () => { if (!/^[a-z0-9-]{2,20}$/.test(cid.value.trim())) return toast("Channel ids are 2 to 20 lowercase letters, numbers or dashes.", "err"); const x = await api.owner_rpc("owner_channel_set", { p_id: cid.value.trim(), p_name: cname.value || cid.value, p_emoji: cemo.value, p_remove: false }); if (x.error) return toast(x.error, "err"); toast("Channel added.", "ok"); renderOwnerSeason(); } }, "Add channel")));
+}
+
 // ===== v2.20: socials on profiles =====
 const SOCIAL_ICONS = { discord: "🎮", snapchat: "👻", instagram: "📸", tiktok: "🎵", youtube: "▶️", twitch: "🟣", x: "✖️" };
 const SOCIAL_NAMES = { discord: "Discord", snapchat: "Snapchat", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", twitch: "Twitch", x: "X" };
@@ -3100,7 +3352,8 @@ function socialsCard(set) {
 }
 
 // ===== v2.19: global chat =====
-let gchatTimer = null;
+let gchatTimer = null, gChannel = "general";
+const REACTS = ["🔥", "😂", "👍", "❤️", "😮", "💀"];
 function renderGlobalChat() {
   const body = $("#chatBody");
   clearInterval(gchatTimer);
@@ -3112,8 +3365,14 @@ function renderGlobalChat() {
   const lock = h("div", { class: "chat-lock", hidden: true });
   const owner = !!(S.account && S.account.user && S.account.user.owner);
   const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "Cussing is fine, but no slurs or sexual stuff, no links, and no sharing socials, phone numbers or where you live here. Want to share socials? Add them to your profile, where you pick who sees them. Messages 3 people report get hidden, and repeat offenders get timed out."));
-  const card = h("div", { class: "card chat-card" }, rules, box, lock, h("div", { class: "row", style: "margin-top:10px" }, inp, send));
+  const chans = h("div", { class: "chan-bar" });
+  const lfgBtn = h("button", { class: "btn", title: "Post that you're looking for a group" }, "🎮 Looking for group");
+  lfgBtn.onclick = () => lfgSheet(gChannel === "general" ? "lfg" : gChannel, () => { if (gChannel === "general") { gChannel = "lfg"; renderGlobalChat(); } else poll(true); });
+  const card = h("div", { class: "card chat-card" }, rules, chans, box, lock, h("div", { class: "row", style: "margin-top:10px" }, inp, lfgBtn, send));
   body.replaceChildren(card);
+  const drawChans = (list) => chans.replaceChildren(...(list || []).map((c) => h("button", { class: "chan" + (c.id === gChannel ? " on" : ""), onclick: () => { if (c.id === gChannel) return; gChannel = c.id; renderGlobalChat(); } }, `${c.emoji || "#"} ${c.name}`)));
+  inp.placeholder = gChannel === "general" ? "Say something to everyone" : `Message #${gChannel}`;
+  const me = ((S.account || {}).user || {}).username || "";
   const time = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const draw = (r) => {
     const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
@@ -3121,16 +3380,22 @@ function renderGlobalChat() {
     if (!list.length) box.replaceChildren(h("div", { class: "muted small", style: "text-align:center;padding:40px" }, "It's quiet in here. Say hi! 👋"));
     else box.replaceChildren(...list.map((m, i) => {
       const same = i > 0 && list[i - 1].username === m.username && Date.parse(m.at) - Date.parse(list[i - 1].at) < 300000;
-      const acts = h("span", { class: "msg-acts" },
+      const react = async (e) => { const x = await api.crew("global_chat_react", { p_id: m.id, p_emoji: e }); if (x.error) return toast(x.error, "err"); poll(true); };
+      const picker = h("span", { class: "react-pick" }, REACTS.map((e) => h("button", { onclick: () => react(e) }, e)));
+      const acts = h("span", { class: "msg-acts" }, picker,
+        !m.mine ? h("button", { title: "Mention", onclick: () => { inp.value = `@${m.username} ` + inp.value.replace(new RegExp(`^@${m.username} `), ""); inp.focus(); } }, "@") : null,
         m.mine || owner ? h("button", { title: "Delete", onclick: async () => { const x = await api.crew("global_chat_delete", { p_id: m.id }); if (x.error) return toast(x.error, "err"); poll(true); } }, "🗑") : null,
         owner && !m.mine ? h("button", { title: "Time out for 24 hours", onclick: async () => { if (!await modal({ title: `Time out ${m.username}?`, text: "They can't chat (global or crew) for 24 hours.", ok: "Time out", danger: true })) return; const x = await api.owner_rpc("owner_chat_mute", { p_username: m.username, p_hours: 24 }); if (x.error) return toast(x.error, "err"); toast(`${m.username} is timed out for 24 hours.`, "ok"); } }, "⏱") : null,
         !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. 3 reports hide it until the owner checks.`, ok: "Report" })) return; const x = await api.crew("global_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "You already reported it." : "Reported. Thanks!", "ok"); poll(true); } }, "⚑") : null);
-      return h("div", { class: "msg" + (m.mine ? " mine" : "") + (same ? " cont" : "") + (m.owner ? " staff" : "") },
-        same ? h("div", { class: "msg-av ghost" }) : h("div", { class: "msg-av" }, (m.username || "?")[0].toUpperCase()),
-        h("div", { class: "msg-main" }, same ? null : h("div", { class: "msg-head" }, m.crew ? h("span", { class: "crew-tag" }, m.crew) : null,
-            h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username),
-            (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)), h("span", { class: "lvl", style: "height:15px;font-size:9.5px;min-width:20px" }, m.level || 1), h("span", { class: "t" }, time(m.at))),
-          h("div", { class: "msg-body" }, m.body)), acts);
+      const rx = Object.entries(m.reactions || {});
+      const pills = rx.length ? h("div", { class: "rx-row" }, rx.map(([e, v]) => h("button", { class: "rx" + (v.mine ? " mine" : ""), onclick: () => react(e) }, e, h("b", {}, v.n)))) : null;
+      const isLfg = m.kind === "lfg" && m.meta;
+      const head = h("div", { class: "msg-head" }, m.crew ? h("span", { class: "crew-tag" }, m.crew) : null,
+        h("b", { class: m.name_style ? "ns ns-" + m.name_style : "", onclick: () => openProfile(m.username) }, m.username),
+        (m.badges || []).slice(0, 2).map((b) => badgeEl(b, true)), h("span", { class: "lvl", style: "height:15px;font-size:9.5px;min-width:20px" }, m.level || 1), h("span", { class: "t" }, time(m.at)));
+      return h("div", { class: "msg" + (m.mine ? " mine" : "") + (same && !isLfg ? " cont" : "") + (m.owner ? " staff" : "") + (m.mentions_me ? " ping" : "") },
+        same && !isLfg ? h("div", { class: "msg-av ghost" }) : h("div", { class: "msg-av" }, (m.username || "?")[0].toUpperCase()),
+        h("div", { class: "msg-main" }, same && !isLfg ? null : head, isLfg ? lfgCard(m) : h("div", { class: "msg-body" }, mentionText(m.body, me)), pills), acts);
     }));
     if (atBottom || lastTop === 0 || (list.length && list[list.length - 1].mine && list[list.length - 1].id !== lastTop)) box.scrollTop = box.scrollHeight;
     lastTop = list.length ? list[list.length - 1].id : 0;
@@ -3141,15 +3406,17 @@ function renderGlobalChat() {
   const poll = async (force) => {
     if (!card.isConnected || page !== "chat") { clearInterval(gchatTimer); return; }
     if (document.hidden && !force) return;
-    const r = await api.crew("global_chat_list", { p_sig: force ? null : sig });
+    const ch = gChannel;
+    const r = await api.crew("global_chat_list", { p_sig: force ? null : sig, p_channel: ch });
+    if (ch !== gChannel) return;
     if (r.error) { if (force) box.replaceChildren(socError(r, () => renderGlobalChat())); return; }
     $("#chatOnline span").textContent = `${r.online || 0} online`;
     if (r.same) return;
-    sig = r.sig; draw(r);
+    sig = r.sig; drawChans(r.channels); draw(r);
   };
   const doSend = async () => {
     const v = inp.value.trim(); if (!v) return;
-    send.disabled = true; const r = await api.crew("global_chat_send", { p_body: v }); send.disabled = false;
+    send.disabled = true; const r = await api.crew("global_chat_send", { p_body: v, p_channel: gChannel }); send.disabled = false;
     if (r.error) return toast(r.error, "err");
     inp.value = ""; await poll(true); inp.focus();
   };
@@ -3763,12 +4030,21 @@ async function renderAchievements() {
   const sorted = [...r.list].sort((a, b) => (b.unlocked - a.unlocked) || (b.cur / b.goal - a.cur / a.goal));
   sorted.forEach((a, i) => {
     const bar = h("i"), fmt = (v) => Number.isInteger(a.goal) && a.goal > 1 && !/hour/i.test(a.desc) ? Math.floor(v) : (Math.round(v * 10) / 10);
-    grid.append(h("div", { class: "card ach tilt" + (a.unlocked ? " done" : ""), style: `--i:${i}` },
+    grid.append(h("div", { class: "card ach tilt" + (a.unlocked ? " done" : ""), style: `--i:${i}`, "data-aid": a.id },
       h("div", { class: "ic" }, a.unlocked ? a.icon : "🔒"),
       h("div", { style: "flex:1;min-width:0" }, h("div", { class: "tt" }, a.title), h("div", { class: "dd" }, a.desc),
         a.unlocked ? h("div", { class: "pg", style: "color:var(--accent)" }, "Unlocked " + new Date(a.at * 1000).toLocaleDateString())
           : [h("div", { class: "bar" }, bar), h("div", { class: "pg" }, a.goal > 1 ? `${fmt(a.cur)} / ${a.goal}` : "Not yet")])));
     setTimeout(() => (bar.style.width = (a.cur / a.goal * 100) + "%"), 300 + i * 30);
+  });
+  if ((S.account || {}).logged_in) api.crew("achievement_rarity").then((rr) => {
+    if (!rr || rr.error || !rr.players) return;
+    $$(".card.ach", grid).forEach((c) => {
+      const pct = (rr.pct || {})[c.dataset.aid] || 0;
+      const tier = pct < 1 ? ["💎", "Legendary", "leg"] : pct < 5 ? ["💜", "Epic", "epic"] : pct < 20 ? ["💙", "Rare", "rare"] : ["⚪", "Common", "com"];
+      const tt = c.querySelector(".tt"); if (!tt || c.querySelector(".rarity")) return;
+      tt.after(h("div", { class: "rarity " + tier[2], title: `${pct}% of ${rr.players} active Orbit players have this` }, `${tier[0]} ${tier[1]} · ${pct < 1 && pct > 0 ? "<1" : Math.round(pct)}% of players`));
+    });
   });
 }
 async function checkAchievements() {
@@ -4817,7 +5093,7 @@ async function renderOwner() {
   iss.append(h("h3", { style: "margin-bottom:4px" }, "Give premium access"), h("p", { class: "sub" }, "Makes a premium key for one Roblox account. It only works for that player, and the time starts now. Only premium features unlock, never anything from this panel."),
     h("div", { class: "row" }, name, dur, make), out);
   requestAnimationFrame(() => dur._remeasure());
-  renderOwnerStats(); renderOwnerLog(); renderOwnerNames(); renderOwnerReports(); renderOwnerBans(); renderOwnerFeedback(); renderOwnerHidden(); renderOwnerMin(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
+  renderOwnerStats(); renderOwnerSeason(); renderOwnerLog(); renderOwnerNames(); renderOwnerReports(); renderOwnerBans(); renderOwnerFeedback(); renderOwnerHidden(); renderOwnerMin(); renderOwnerKeys(); renderOwnerBulk(); renderOwnerNews();
   const safe = $("#ownerSafe"); safe.innerHTML = "";
   safe.append(h("div", { class: "row" }, h("div", { style: "flex:1" }, h("h3", { style: "margin:0" }, "Your owner key"),
     h("p", { class: "sub", style: "margin:4px 0 0" }, "It lives only on this PC and is what makes this panel show up. Keep a backup somewhere safe and never send it to anyone: whoever has it can make premium keys. On a new PC, press Ctrl K and type \"unlock owner\" to load it.")),
@@ -5480,6 +5756,7 @@ async function init() {
   window.addEventListener("focus", liveTick);
   setTimeout(showWhatsNew, 900);
   api.min_version().then((r) => { if (r && r.required) showUpdateGate(r); });
+  setTimeout(startInbox, 2500); setTimeout(watchGameNights, 6000);
   setTimeout(checkAchievements, 2600);
   setTimeout(checkLevel, 3400);
   setTimeout(checkNews, 4200);

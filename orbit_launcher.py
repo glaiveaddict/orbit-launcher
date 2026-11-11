@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.20.0"
+APP_VERSION = "2.21.0"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -7095,7 +7095,7 @@ def social_payload(settings=None):
             "top_games": [{"pid": str(pid), "name": e.get("name") or "Game", "seconds": int(e.get("seconds", 0))} for pid, e in top],
             "now_playing": playing, "public_profile": bool(soc.get("public_profile", True)),
             "showcase": showcase_items(soc.get("showcase") or []), "banner": soc.get("banner") or "", "name_style": soc.get("name_style") or "",
-            "status": (soc.get("status") or "")[:60], "app_version": APP_VERSION,
+            "status": (soc.get("status") or "")[:60], "app_version": APP_VERSION, "achievements": unlocked_achievement_ids(),
             "socials": {k: v for k, v in (soc.get("socials") or {}).items() if k in SOCIAL_SITES and SOCIAL_HANDLE_RE.fullmatch(str(v or ""))},
             "socials_visibility": soc.get("socials_visibility") or "nobody", **friend_ids_payload(soc, uid), "month_start": time.strftime("%Y-%m-%d", time.localtime(_month_start_ts())),
             "month_seconds": month[0], "month_games": month[1],
@@ -7151,6 +7151,13 @@ def _until_text(iso):
 
 SOCIAL_SITES = ("discord", "snapchat", "instagram", "tiktok", "youtube", "twitch", "x")
 SOCIAL_HANDLE_RE = re.compile(r"@?[A-Za-z0-9_.#-]{2,40}")
+
+
+def unlocked_achievement_ids():
+    try:
+        return [a["id"] for a in achievements_state()["list"] if a["unlocked"]]
+    except Exception:
+        return []
 
 
 def friend_ids_payload(soc, uid):
@@ -8029,6 +8036,7 @@ def update_repo():
 
 
 NEW_SPOTS = {
+    "2.21.0": ["chat", "pass", "social", "achievements", "owner:ownerSeason"],
     "2.20.0": ["social:socialsCard"],
     "2.19.0": ["chat", "owner:ownerStats", "owner:ownerMin", "owner:ownerHidden"],
     "2.18.0": ["social"],
@@ -10819,7 +10827,9 @@ class Api:
 
     CREW_CALLS = {"crew_create", "crew_join", "crew_leave", "crew_kick", "crew_new_code", "crew_disband", "crew_info", "crew_board",
                   "crew_wrapped", "crew_chat_send", "crew_chat_list", "crew_chat_delete", "crew_chat_report",
-                  "global_chat_send", "global_chat_list", "global_chat_delete", "global_chat_report"}
+                  "global_chat_send", "global_chat_list", "global_chat_delete", "global_chat_report", "global_chat_react", "global_lfg_post",
+                  "crew_set_role", "crew_event_create", "crew_event_rsvp", "crew_event_delete", "crew_events",
+                  "inbox_list", "inbox_count", "inbox_read_all", "achievement_rarity", "pass_info", "pass_claim", "my_unlocks"}
     CREW_REASONS = {"in_crew": "You're already in a crew. Leave it first.", "name": "Crew names are 3 to 24 letters, numbers or spaces.",
                     "tag": "Tags are 2 to 5 letters or numbers.", "blocked": "That name or tag isn't allowed. Pick something else.",
                     "taken": "Another crew already has that name or tag.", "no_crew": "No crew has that code. Check it and try again.",
@@ -10827,7 +10837,12 @@ class Api:
                     "empty": "Type a message first.", "long": "Messages can be up to 300 characters.",
                     "slow": "Slow down a little. Try again in a few seconds.", "no_crew": "You're not in a crew.",
                     "gone": "That message was deleted.", "self": "You can't report your own message.",
-                    "too_many": "You've sent a lot of reports today. Try again tomorrow."}
+                    "too_many": "You've sent a lot of reports today. Try again tomorrow.",
+                    "no_channel": "That channel doesn't exist anymore.", "no_roblox": "Play a game through Orbit once so it knows your Roblox account, then you can post.",
+                    "not_allowed": "You can't do that.", "bad_emoji": "That reaction isn't available.", "too_many_reactions": "You can add up to 3 reactions to a message.",
+                    "title": "Give it a name with 3 to 60 characters.", "when": "Pick a time in the next 60 days.",
+                    "too_many_events": "Your crew already has 10 upcoming game nights.", "locked": "Play a little more to unlock that tier.",
+                    "premium": "That reward is on the Premium track.", "season_over": "This season has ended.", "bad_tier": "That reward doesn't exist."}
 
     def crew(self, fn, args=None):
         if fn not in self.CREW_CALLS:
@@ -10896,7 +10911,15 @@ class Api:
 
     OWNER_RPCS = {"owner_reports", "owner_report_set", "owner_clear_bio", "owner_crew_delete", "owner_ban", "owner_unban", "owner_bans",
                   "owner_feedback", "owner_feedback_log", "owner_feedback_set", "owner_stats", "owner_set_min_version",
-                  "owner_hidden_messages", "owner_message_set", "owner_chat_mute", "owner_chat_mutes", "owner_clear_socials", "owner_word_chat"}
+                  "owner_hidden_messages", "owner_message_set", "owner_chat_mute", "owner_chat_mutes", "owner_clear_socials", "owner_word_chat",
+                  "owner_season_set", "owner_channel_set"}
+
+    def remind(self, title, text):
+        try:
+            spawn_toast(str(title or "Orbit")[:60], str(text or "")[:120])
+            return True
+        except Exception as e:
+            return self._err(e)
 
     def min_version(self):
         try:
