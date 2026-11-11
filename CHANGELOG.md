@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.21.1
+- **Chat reports go to the Orbit team only.** Messages aren't hidden automatically anymore, and nobody gets timed out automatically, so a group of friends or alts can't silence someone by mass-reporting. The owner reviews each report and decides.
+- **Owner panel:** chat reports now have **Delete message** and **Time out 24h** buttons. The Chat auto-mod card is now Chat timeouts.
+
 ## v2.21.0
 - **Chat channels:** General, Looking for group, Trading, plus BedWars, Blox Fruits, Grow a Garden and Steal The Crown! channels. The owner can add or remove channels.
 - **Looking for group posts:** post "BedWars · needs 2 players" in chat with a **Join me** button. Joining uses Roblox's normal "join friend", so privacy settings still apply. Posts expire after 30 minutes.

@@ -1639,31 +1639,12 @@ language sql stable security definer set search_path = public as $$
   select chat_muted_until from public.profiles where id = p_uid and chat_muted_until > now()
 $$;
 
--- 3 different people reporting a message hides it until the owner looks. 2 hidden messages in a week = 24 hour chat timeout.
+-- Reports on chat messages are only counted for the owner to see. Nothing gets hidden or timed out automatically
+-- (that could be abused with alts); the owner decides from the Reports card.
 create or replace function public._flag_message(p_kind text, p_id bigint, p_reporter uuid) returns void
 language plpgsql security definer set search_path = public as $$
-declare
-  author uuid;
-  author_name text;
-  n int;
-  newly boolean := false;
 begin
   insert into public.chat_flags (kind, msg_id, reporter) values (p_kind, p_id, p_reporter) on conflict do nothing;
-  select count(*) into n from public.chat_flags where kind = p_kind and msg_id = p_id;
-  if n < 3 then return; end if;
-  if p_kind = 'crew' then
-    update public.crew_messages set hidden = true where id = p_id and not hidden and not deleted returning user_id, username into author, author_name;
-  else
-    update public.global_messages set hidden = true where id = p_id and not hidden and not deleted returning user_id, username into author, author_name;
-  end if;
-  if author is null then return; end if;
-  insert into public.chat_strikes (user_id, kind, msg_id) values (author, p_kind, p_id);
-  insert into public.key_log (event, username, detail) values ('auto_hidden', author_name, p_kind || ' message #' || p_id);
-  if (select count(*) from public.chat_strikes where user_id = author and at > now() - interval '7 days') >= 2
-     and not exists (select 1 from public.profiles where id = author and is_owner) then
-    update public.profiles set chat_muted_until = greatest(coalesce(chat_muted_until, now()), now() + interval '24 hours') where id = author;
-    insert into public.key_log (event, username, detail) values ('auto_muted', author_name, '24 hours');
-  end if;
 end
 $$;
 
@@ -2311,3 +2292,10 @@ grant execute on function public.inbox_list(), public.inbox_count(), public.inbo
   public.global_lfg_post(text, text, text, int, text), public.achievement_rarity(), public.pass_info(), public.pass_claim(int, text),
   public.owner_season_set(text, date, date), public.my_unlocks(), public.crew_set_role(text, text), public.crew_event_create(text, text, text, timestamptz),
   public.crew_event_rsvp(bigint, boolean), public.crew_event_delete(bigint), public.crew_events(), public.owner_channel_set(text, text, text, boolean) to authenticated;
+
+
+-- ============================================================================
+-- v2.21.1: no more automatic hiding or timeouts from chat reports. The owner decides.
+-- ============================================================================
+update public.global_messages set hidden = false where hidden and not deleted;
+update public.crew_messages set hidden = false where hidden and not deleted;

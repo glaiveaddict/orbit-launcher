@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.21.0"
+APP_VERSION = "2.21.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"

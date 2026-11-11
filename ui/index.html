@@ -3364,7 +3364,7 @@ function renderGlobalChat() {
   const send = h("button", { class: "btn primary" }, "Send");
   const lock = h("div", { class: "chat-lock", hidden: true });
   const owner = !!(S.account && S.account.user && S.account.user.owner);
-  const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "Cussing is fine, but no slurs or sexual stuff, no links, and no sharing socials, phone numbers or where you live here. Want to share socials? Add them to your profile, where you pick who sees them. Messages 3 people report get hidden, and repeat offenders get timed out."));
+  const rules = h("div", { class: "chat-rules" }, h("b", {}, "Chat rules"), h("span", {}, "Cussing is fine, but no slurs or sexual stuff, no links, and no sharing socials, phone numbers or where you live here. Want to share socials? Add them to your profile, where you pick who sees them. Report anything that breaks the rules and the Orbit team will take a look."));
   const chans = h("div", { class: "chan-bar" });
   const lfgBtn = h("button", { class: "btn", title: "Post that you're looking for a group" }, "🎮 Looking for group");
   lfgBtn.onclick = () => lfgSheet(gChannel === "general" ? "lfg" : gChannel, () => { if (gChannel === "general") { gChannel = "lfg"; renderGlobalChat(); } else poll(true); });
@@ -3386,7 +3386,7 @@ function renderGlobalChat() {
         !m.mine ? h("button", { title: "Mention", onclick: () => { inp.value = `@${m.username} ` + inp.value.replace(new RegExp(`^@${m.username} `), ""); inp.focus(); } }, "@") : null,
         m.mine || owner ? h("button", { title: "Delete", onclick: async () => { const x = await api.crew("global_chat_delete", { p_id: m.id }); if (x.error) return toast(x.error, "err"); poll(true); } }, "🗑") : null,
         owner && !m.mine ? h("button", { title: "Time out for 24 hours", onclick: async () => { if (!await modal({ title: `Time out ${m.username}?`, text: "They can't chat (global or crew) for 24 hours.", ok: "Time out", danger: true })) return; const x = await api.owner_rpc("owner_chat_mute", { p_username: m.username, p_hours: 24 }); if (x.error) return toast(x.error, "err"); toast(`${m.username} is timed out for 24 hours.`, "ok"); } }, "⏱") : null,
-        !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. 3 reports hide it until the owner checks.`, ok: "Report" })) return; const x = await api.crew("global_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "You already reported it." : "Reported. Thanks!", "ok"); poll(true); } }, "⚑") : null);
+        !m.mine ? h("button", { title: "Report", onclick: async () => { if (!await modal({ title: "Report this message?", text: `"${m.body.slice(0, 120)}" from ${m.username}. The Orbit team will take a look.`, ok: "Report" })) return; const x = await api.crew("global_chat_report", { p_id: m.id }); if (x.error) return toast(x.error, "err"); toast(x.already ? "You already reported it." : "Reported. Thanks!", "ok"); poll(true); } }, "⚑") : null);
       const rx = Object.entries(m.reactions || {});
       const pills = rx.length ? h("div", { class: "rx-row" }, rx.map(([e, v]) => h("button", { class: "rx" + (v.mine ? " mine" : ""), onclick: () => react(e) }, e, h("b", {}, v.n)))) : null;
       const isLfg = m.kind === "lfg" && m.meta;
@@ -3472,8 +3472,7 @@ async function renderOwnerStats() {
         vers.length ? vers.map((v) => h("div", { class: "ver-row" }, h("span", { class: "mono" }, v.version === "older" ? "older than 2.19" : "v" + v.version + (v.version === S.version ? " (yours)" : "")),
           h("div", { class: "ver-bar" }, h("i", { style: `width:${100 * v.n / vmax}%` })), h("b", {}, `${Math.round(100 * v.n / vtot)}%`))) : h("p", { class: "muted small" }, "No data yet.")),
       h("div", { class: "mini-chart" }, h("div", { class: "mc-head" }, h("b", {}, "Needs you")),
-        [["⚑ Open reports", d.open_reports, "ownerReports"], ["💬 New feedback", d.new_feedback, "ownerFeedback"], ["🙈 Hidden messages", d.hidden_messages, "ownerHidden"],
-         ["⛔ Banned", d.banned, "ownerBans"], ["⏱ Timed out", d.muted, "ownerHidden"], ["✉️ Messages today", d.messages_today, null]].map(([l, n, id]) =>
+        [["⚑ Open reports", d.open_reports, "ownerReports"], ["💬 New feedback", d.new_feedback, "ownerFeedback"], ["⛔ Banned", d.banned, "ownerBans"], ["⏱ Timed out", d.muted, "ownerHidden"], ["✉️ Messages today", d.messages_today, null]].map(([l, n, id]) =>
           h("div", { class: "need-row" + (id ? " link" : ""), onclick: () => id && $("#" + id)?.scrollIntoView({ behavior: "smooth", block: "start" }) }, h("span", {}, l), h("b", { class: n && id && id !== "ownerBans" ? "hot" : "" }, String(n ?? 0)))))));
 }
 async function renderOwnerMin() {
@@ -3497,19 +3496,19 @@ async function renderOwnerHidden() {
   const who = h("input", { class: "input", placeholder: "Orbit username", maxlength: 20, style: "flex:1" });
   let hours = "24";
   const seg = segmented([["1", "1 hour"], ["24", "24 hours"], ["168", "7 days"]], hours, (v) => { hours = v; });
-  box.append(h("h3", {}, "Chat auto-mod"), h("p", { class: "sub" }, "Messages 3 people report are hidden until you check them here. 2 hidden messages in a week gets that player a 24-hour chat timeout automatically."),
+  box.append(h("h3", {}, "Chat timeouts"), h("p", { class: "sub" }, "Time someone out of global and crew chat. Chat reports land in your Reports card, where you can delete the message, time them out or ban them."),
     h("div", { class: "row" }, who, seg, h("button", { class: "btn danger", onclick: async () => { if (!who.value.trim()) return; const x = await api.owner_rpc("owner_chat_mute", { p_username: who.value.trim(), p_hours: +hours }); if (x.error) return toast(x.error, "err"); toast(`${who.value.trim()} is timed out.`, "ok"); renderOwnerHidden(); } }, "Time out")));
   requestAnimationFrame(() => seg._remeasure());
   const [hid, mutes] = await Promise.all([api.owner_rpc("owner_hidden_messages"), api.owner_rpc("owner_chat_mutes")]);
   const list = (hid.data || []), ml = (mutes.data || []);
-  box.append(h("div", { class: "look-label" }, `Hidden messages (${list.length})`),
-    list.length ? h("div", {}, list.map((m) => h("div", { class: "rep" },
+  box.append(...(list.length ? [h("div", { class: "look-label" }, `Hidden messages from before (${list.length})`),
+    h("div", {}, list.map((m) => h("div", { class: "rep" },
       h("div", { class: "row", style: "gap:8px" }, h("span", { class: "fb-kind" }, m.kind === "global" ? "🌍 Global" : `👥 [${m.crew || "?"}]`), h("b", { class: "rep-name", onclick: () => openProfile(m.username) }, m.username),
         h("span", { class: "rule-tag" }, `${m.flags} reports`), h("span", { class: "spacer" }), h("span", { class: "muted small" }, fmtAgo(Date.parse(m.at) / 1000))),
       h("div", { class: "rep-note" }, m.body),
       h("div", { class: "row", style: "gap:6px;margin-top:8px;justify-content:flex-end" },
         h("button", { class: "btn ghost", onclick: async () => { await api.owner_rpc("owner_message_set", { p_kind: m.kind, p_id: m.id, p_action: "restore" }); toast("Message is back, and the strike was removed.", "ok"); renderOwnerHidden(); } }, "It's fine, restore"),
-        h("button", { class: "btn danger", onclick: async () => { await api.owner_rpc("owner_message_set", { p_kind: m.kind, p_id: m.id, p_action: "delete" }); toast("Deleted.", "ok"); renderOwnerHidden(); } }, "Delete"))))) : h("p", { class: "muted small" }, "Nothing hidden. 🎉"),
+        h("button", { class: "btn danger", onclick: async () => { await api.owner_rpc("owner_message_set", { p_kind: m.kind, p_id: m.id, p_action: "delete" }); toast("Deleted.", "ok"); renderOwnerHidden(); } }, "Delete")))))] : []),
     h("div", { class: "look-label" }, `Timed out (${ml.length})`),
     ml.length ? h("div", {}, ml.map((m) => h("div", { class: "rules-row" }, h("b", { class: "rep-name", onclick: () => openProfile(m.username) }, m.username),
       h("span", { class: "muted small" }, "until " + new Date(m.until).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })), h("span", { class: "spacer" }),
@@ -3676,6 +3675,12 @@ async function renderOwnerReports() {
       x.reason === "bio" && x.bio ? h("button", { class: "btn", onclick: async () => { await api.owner_rpc("owner_clear_bio", { p_username: x.target }); act("owner_report_set", { p_id: x.id, p_status: "done" }, "Bio cleared.")(); } }, "Clear bio") : null,
       x.crew && x.reason === "crew" ? h("button", { class: "btn", onclick: () => openCrew(x.crew) }, "View crew") : null,
       x.reason === "socials" ? h("button", { class: "btn", onclick: async () => { await api.owner_rpc("owner_clear_socials", { p_username: x.target }); act("owner_report_set", { p_id: x.id, p_status: "done" }, "Socials cleared.")(); } }, "Clear socials") : null,
+      x.reason === "chat" && /#g?\d+$/.test(x.note || "") ? h("button", { class: "btn", onclick: async () => {
+        const m = (x.note || "").match(/#(g?)(\d+)$/); await api.owner_rpc("owner_message_set", { p_kind: m[1] ? "global" : "crew", p_id: +m[2], p_action: "delete" });
+        act("owner_report_set", { p_id: x.id, p_status: "done" }, "Message deleted.")(); } }, "Delete message") : null,
+      x.reason === "chat" || x.reason === "status" ? h("button", { class: "btn", onclick: async () => {
+        const y = await api.owner_rpc("owner_chat_mute", { p_username: x.target, p_hours: 24 }); if (y.error) return toast(y.error, "err");
+        act("owner_report_set", { p_id: x.id, p_status: "done" }, `${x.target} is timed out of chat for 24 hours.`)(); } }, "Time out 24h") : null,
       h("button", { class: "btn danger", onclick: () => banDialog(x.target, async () => { await api.owner_rpc("owner_report_set", { p_id: x.id, p_status: "done" }); renderOwnerReports(); }) }, "Ban"),
       h("span", { class: "spacer" }),
       h("button", { class: "btn ghost", onclick: act("owner_report_set", { p_id: x.id, p_status: "dismissed" }, "Dismissed.") }, "Dismiss"),
