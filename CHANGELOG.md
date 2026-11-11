@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.19.1
+- **Fix: custom skies not showing in some games.** Skies, suns and moons from the Pack store now apply in every game, even ones with their own mod profile (like the BedWars kit) and when you hop between games inside Roblox. Before, they only lived in your current mod profile and could get skipped.
+- **Skies now also replace Roblox's default sky in games that use a Sky object with Roblox's built-in sky.** They're written to every folder Roblox reads that sky from.
+- Games that upload their own sky images still show their own sky. No launcher can change those.
+
 ## v2.19.0
 - **Global chat:** a new Chat page where everyone on Orbit can talk. To keep it safe: no bad words, no links, and no swapping Discord, Snap or phone numbers with strangers. New accounts can read right away and post after their first day, and there's a short slow mode.
 - **Chat auto-mod:** a message that 3 people report hides itself until the owner checks it, and players who get 2 messages hidden in a week are timed out of chat for 24 hours. This works in crew chat too.

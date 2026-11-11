@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.19.0"
+APP_VERSION = "2.19.1"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -804,7 +804,42 @@ def mod_overrides(settings, d, place_id=None):
         src = crosshair_source(cross)
         if src:
             overrides["content/textures/MouseLockedCursor.png"] = src
+    try:
+        sky = sky_overrides(settings)
+        if sky:
+            overrides.update(sky)
+    except Exception as e:
+        log(f"Sky mod failed: {e}")
     return overrides
+
+
+SKY_MAIN = "PlatformContent/pc/textures/sky/"
+SKY_MIRRORS = ("content/textures/sky/", "content/sky/")
+
+
+def sky_overrides(settings):
+    """Store skies, suns and moons apply in every game, whatever mod profile a game uses.
+
+    They used to live only in the current mod profile, so a Library game with its own profile (like the BedWars kit),
+    or a session started from one, never got the sky at all. Skies are also written to every folder Roblox reads
+    its built-in sky from (games whose Sky object uses Roblox's default textures can load them from content/textures/sky)."""
+    mine = load_json(STORE_INSTALLED, {}) or {}
+    if not mine or not settings.get("apply_mods", True):
+        return {}
+    roots = [mods_dir(settings)] + [p for p in PROFILES_DIR.glob("*") if p.is_dir()]
+    out = {}
+    for item, targets in mine.items():
+        for t in targets or []:
+            if ".." in str(t).split("/") or not str(t).startswith(("content/sky/", SKY_MAIN, "content/textures/sky/")):
+                continue
+            src = next((r / t for r in roots if (r / t).is_file()), None)
+            if not src:
+                continue
+            out[t] = src
+            if t.startswith(SKY_MAIN) and t.rsplit("/", 1)[-1].startswith("sky512_"):
+                for m in SKY_MIRRORS:
+                    out[m + t[len(SKY_MAIN):]] = src
+    return out
 
 
 def push_mods_now(settings):
