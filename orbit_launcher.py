@@ -20,7 +20,7 @@ import webbrowser
 from pathlib import Path
 
 APP_NAME = "Orbit Launcher"
-APP_VERSION = "2.21.1"
+APP_VERSION = "2.21.2"
 APP_ID = "OrbitLauncher"
 LAUNCH_FLAG = "--orbit-launch"
 TOAST_FLAG = "--orbit-toast"
@@ -2207,8 +2207,14 @@ class SessionMonitor:
             handed = getattr(self, "handed_over", False)
             if self.game and self.session.get("crash_rejoin") and not handed:
                 g = self.game
-                self.crashed = {"place_id": g["place_id"], "job_id": g["job_id"],
-                                "name": g["name"] or f"Place {g['place_id']}"}
+                try:
+                    crashed, why = roblox_exit_was_crash(log_path, self.launch_time)
+                except Exception as e:
+                    crashed, why = False, f"check failed: {e}"
+                log(f"Roblox closed while in a game: {'crash' if crashed else 'not a crash'} ({why})")
+                if crashed:
+                    self.crashed = {"place_id": g["place_id"], "job_id": g["job_id"],
+                                    "name": g["name"] or f"Place {g['place_id']}"}
             if self.game and not handed:
                 try:
                     found = diagnose_exit(log_path, self.launch_time)
@@ -2280,6 +2286,10 @@ def watch_for_updates(settings, known, place_id):
             apply_all(settings, d, place_id)
 
 
+LAST_ROBLOX = {}
+ORBIT_CLOSED_FILE = DATA_DIR / "orbit_closed_roblox.json"
+
+
 def start_roblox(settings, uri):
     players = player_dirs()
     if not players:
@@ -2296,7 +2306,8 @@ def start_roblox(settings, uri):
     args = [str(exe), uri] if uri else [str(exe), "--app"]
     known = set(all_version_dirs())
     launch_time = time.time()
-    subprocess.Popen(args, cwd=str(exe.parent), env=child_env())
+    global LAST_ROBLOX
+    LAST_ROBLOX = {"proc": subprocess.Popen(args, cwd=str(exe.parent), env=child_env()), "at": launch_time}
     log(f"Started {players[0].name}")
     updater = threading.Thread(target=watch_for_updates, args=(settings, known, place_id), daemon=True)
     updater.start()
@@ -3145,6 +3156,61 @@ def explain_code(code):
     return {"kind": "disconnect", "code": code, "title": title, "tip": tip}
 
 
+def crash_handler_logs(since):
+    try:
+        return [p for p in ROBLOX_LOGS.glob("*CrashHandler*.log") if p.stat().st_mtime > since] if ROBLOX_LOGS.is_dir() else []
+    except OSError:
+        return []
+
+
+def crash_handler_saw_crash(path):
+    """Roblox's crash handler starts (and writes a log) with every game, so the file existing proves nothing.
+    It only means a crash if the handler actually wrote or uploaded a crash dump."""
+    try:
+        with open(path, "rb") as f:
+            text = f.read(2_000_000).decode("utf-8", "ignore").lower()
+    except OSError:
+        return False
+    return any(w in text for w in ("minidump", ".dmp", "dump written", "writing dump", "crash dump", "uploading dump", "dumpfile"))
+
+
+def roblox_exit_was_crash(log_path, launch_time):
+    """Decides if Roblox really crashed, instead of guessing from "the session ended while in a game".
+
+    A normal close (the X button, Alt+F4, leaving to join another game) exits cleanly. A crash leaves an error
+    exit code, a crash dump, or a crash message in the log. If Orbit closed Roblox itself (bedtime, account switch),
+    it's never a crash."""
+    closed = load_json(ORBIT_CLOSED_FILE, {}) or {}
+    if closed.get("at", 0) >= launch_time:
+        return False, "Orbit closed Roblox"
+    proc = (LAST_ROBLOX or {}).get("proc")
+    code = None
+    if proc is not None:
+        try:
+            code = proc.poll()
+        except Exception:
+            code = None
+    if code is not None and code != 0 and time.time() - (LAST_ROBLOX or {}).get("at", 0) > 20:
+        # Exit codes like 0xC0000005 (access violation) mean the game process died.
+        if code not in (1, 0xFFFFFFFF, -1) or any(crash_handler_saw_crash(p) for p in crash_handler_logs(launch_time)):
+            return True, f"exit code {code if code < 0 else hex(code)}"
+    if any(crash_handler_saw_crash(p) for p in crash_handler_logs(launch_time)):
+        return True, "crash dump written"
+    # Only the last part of the log counts: a warning from an hour ago didn't end the session.
+    tail = ""
+    try:
+        if log_path and Path(log_path).exists():
+            with open(log_path, "rb") as f:
+                f.seek(max(0, Path(log_path).stat().st_size - 30_000))
+                tail = f.read().decode("utf-8", "ignore")
+    except OSError:
+        tail = ""
+    for rx, kind, title, _tip in CRASH_PATTERNS:
+        if kind in ("graphics", "memory", "vulkan") and rx.search(tail):
+            return True, title
+    return False, f"clean exit (code {code})" if code is not None else "no crash evidence"
+
+
 def diagnose_exit(log_path, launch_time):
     text = ""
     if log_path and Path(log_path).exists():
@@ -3154,8 +3220,7 @@ def diagnose_exit(log_path, launch_time):
     for rx, kind, title, tip in CRASH_PATTERNS:
         if rx.search(text):
             return {"kind": kind, "title": title, "tip": tip}
-    crash_logs = [p for p in ROBLOX_LOGS.glob("*CrashHandler*.log") if p.stat().st_mtime > launch_time] \
-        if ROBLOX_LOGS.is_dir() else []
+    crash_logs = [p for p in crash_handler_logs(launch_time) if crash_handler_saw_crash(p)]
     codes = [int(c) for c in DISCONNECT_RE.findall(text[-60_000:]) if int(c) not in IGNORED_CODES]
     if codes and not crash_logs:
         return None
@@ -3976,6 +4041,7 @@ def close_roblox(reason):
                 break
     for pid in pids_named("RobloxPlayerBeta.exe"):
         kill_tree(pid)
+    save_json(ORBIT_CLOSED_FILE, {"at": int(time.time()), "reason": reason})
     log(f"Closed Roblox ({reason})")
 
 
@@ -7625,7 +7691,7 @@ def ask_rejoin(info):
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        answer = messagebox.askyesno(APP_NAME, f"Roblox closed while you were in {info['name']}.\n\n"
+        answer = messagebox.askyesno(APP_NAME, f"Roblox crashed while you were in {info['name']}.\n\n"
                                                "Rejoin the same server?", parent=root)
         root.destroy()
         return answer

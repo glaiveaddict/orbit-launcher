@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.21.2
+- **Fixed the fake "Roblox crashed" popup.** Orbit was asking to rejoin the last server whenever Roblox closed while you were in a game, including when you closed it yourself, switched games, or Orbit closed it. Now it only asks when Roblox really crashed: it exited with an error, wrote a crash dump, or logged a crash.
+
 ## v2.21.1
 - **Chat reports go to the Orbit team only.** Messages aren't hidden automatically anymore, and nobody gets timed out automatically, so a group of friends or alts can't silence someone by mass-reporting. The owner reviews each report and decides.
 - **Owner panel:** chat reports now have **Delete message** and **Time out 24h** buttons. The Chat auto-mod card is now Chat timeouts.
